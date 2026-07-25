@@ -114,9 +114,16 @@ const schema = [
     </div>
 
     <slot />
+  </div>
 
-    <div class="toolbody">
-      <div>
+  <!--
+    Everything below here is reading, not working, and it is laid out to say so:
+    its own tinted band, a wide gap above it, and a measure capped for prose. The
+    tool is an app on white; this is an article.
+  -->
+  <div class="toolread">
+    <div class="wrap toolbody">
+      <div class="toolbody__main">
         <section aria-labelledby="how">
           <h2 id="how">How to use it</h2>
           <ol class="steps">
@@ -124,16 +131,14 @@ const schema = [
           </ol>
         </section>
 
-        <section class="prose" style="margin-top: var(--s12)">
+        <section class="prose">
           <slot name="about" />
         </section>
 
         {
           faq.length > 0 && (
-            <section aria-labelledby="faq-heading" style="margin-top: var(--s12)">
-              <h2 id="faq-heading" style="margin-bottom: var(--s4)">
-                Questions
-              </h2>
+            <section aria-labelledby="faq-heading">
+              <h2 id="faq-heading">Questions</h2>
               <div class="faq">
                 {faq.map((item) => (
                   <details>
@@ -157,7 +162,18 @@ const schema = [
                   <li>
                     <a href={`/${item.slug}`} data-cat={item.category}>
                       <span class="aside__icon" aria-hidden="true">
-                        <Icon name={item.icon} weight="duotone" size={17} />
+                        {item.icon3d ? (
+                          <img
+                            src={`/icons3d/${item.slug}.png`}
+                            alt=""
+                            width="28"
+                            height="28"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          <Icon name={item.icon} weight="duotone" size={17} />
+                        )}
                       </span>
                       {item.name}
                     </a>
@@ -171,13 +187,24 @@ const schema = [
         {
           siblings.length > 0 && (
             <div class="aside__group">
-              <h3>More in {category?.name.toLowerCase()}</h3>
+              <h3>More in {category?.name}</h3>
               <ul class="aside__list">
                 {siblings.slice(0, 8).map((item) => (
                   <li>
                     <a href={`/${item.slug}`} data-cat={item.category}>
                       <span class="aside__icon" aria-hidden="true">
-                        <Icon name={item.icon} weight="duotone" size={17} />
+                        {item.icon3d ? (
+                          <img
+                            src={`/icons3d/${item.slug}.png`}
+                            alt=""
+                            width="28"
+                            height="28"
+                            loading="lazy"
+                            decoding="async"
+                          />
+                        ) : (
+                          <Icon name={item.icon} weight="duotone" size={17} />
+                        )}
                       </span>
                       {item.name}
                     </a>
@@ -190,7 +217,7 @@ const schema = [
 
         <div class="aside__group">
           <h3>Reference</h3>
-          <ul class="aside__list">
+          <ul class="aside__list aside__list--plain">
             <li><a href="/loudness-targets">Loudness targets by platform</a></li>
             <li><a href="/audio-formats">Which format should I use?</a></li>
           </ul>

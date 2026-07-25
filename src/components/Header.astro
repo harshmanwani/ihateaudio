@@ -1,46 +1,86 @@
 ---
 import Icon from './Icon.astro';
+import Logo from './Logo.astro';
 import { CATEGORIES, toolsIn } from '../data/tools';
 
 const path = Astro.url.pathname;
+const onTool = path !== '/' && !['/about', '/privacy'].includes(path);
 ---
 
-<header class="hdr">
+<header class="hdr" data-hdr>
   <div class="wrap hdr__inner">
     <a class="wordmark" href="/" aria-label="ihateaudio, home">
-      <Icon name="waveform" size={22} class="wordmark__mark" />
-      <span>i<em>hate</em>audio</span>
+      <Logo size={28} class="wordmark__mark" />
+      <span class="wordmark__text">i<em>hate</em>audio</span>
     </a>
 
     <nav class="hdr__nav" aria-label="Main">
-      <!-- The launcher, reachable from any page: every tool, grouped and
-           glyphed, one click away. -->
+      <!-- The launcher, reachable from any page: every tool, with its own art,
+           one click away. -->
       <details class="meganav" data-meganav>
-        <summary class="hdr__link" aria-label="All tools menu">
-          All tools
-          <Icon name="caret-right" size={12} style="transform: rotate(90deg)" />
+        <summary class="hdr__link hdr__link--menu" aria-label="All tools menu">
+          <Icon name="squares-four" size={17} weight="duotone" />
+          <span>All tools</span>
+          <Icon name="caret-down" size={12} class="meganav__caret" />
         </summary>
         <div class="meganav__panel">
           <div class="wrap meganav__inner">
-            {
-              CATEGORIES.map((category) => (
-                <div class="meganav__group">
-                  <div class="meganav__cat">{category.name}</div>
-                  <ul>
-                    {toolsIn(category.id).map((tool) => (
-                      <li>
-                        <a href={`/${tool.slug}`} data-cat={tool.category}>
-                          <span class="meganav__glyph" aria-hidden="true">
-                            <Icon name={tool.icon} weight="duotone" size={18} />
-                          </span>
-                          {tool.name}
-                        </a>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))
-            }
+            <div class="meganav__grid">
+              {
+                CATEGORIES.map((category) => (
+                  <div class="meganav__group" data-cat={category.id}>
+                    <div class="meganav__cat">
+                      <span class="meganav__dot" aria-hidden="true" />
+                      {category.name}
+                    </div>
+                    <ul>
+                      {toolsIn(category.id).map((tool) => (
+                        <li>
+                          <a href={`/${tool.slug}`} data-cat={tool.category}>
+                            <span class="meganav__glyph" aria-hidden="true">
+                              {tool.icon3d ? (
+                                <img
+                                  src={`/icons3d/${tool.slug}.png`}
+                                  alt=""
+                                  width="30"
+                                  height="30"
+                                  loading="lazy"
+                                  decoding="async"
+                                />
+                              ) : (
+                                <Icon name={tool.icon} weight="duotone" size={18} />
+                              )}
+                            </span>
+                            <span class="meganav__name">{tool.name}</span>
+                          </a>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ))
+              }
+            </div>
+
+            <!-- The reference pages live here too, which is the only way they
+                 are reachable from a phone. -->
+            <div class="meganav__foot">
+              <a href="/loudness-targets">
+                <Icon name="gauge" size={16} weight="duotone" />
+                Loudness targets
+              </a>
+              <a href="/audio-formats">
+                <Icon name="swap" size={16} weight="duotone" />
+                Format guide
+              </a>
+              <a href="/about">
+                <Icon name="info" size={16} weight="duotone" />
+                About
+              </a>
+              <span class="meganav__privacy">
+                <Icon name="shield-check" size={15} />
+                Nothing you open here is uploaded
+              </span>
+            </div>
           </div>
         </div>
       </details>
@@ -57,9 +97,24 @@ const path = Astro.url.pathname;
         aria-current={path === '/audio-formats' ? 'page' : undefined}
         >Format guide</a
       >
+
+      <!-- Revealed by InstallPrompt only where installing is actually possible,
+           so it is never a button that does nothing. -->
+      <button type="button" class="hdr__install" data-pwa-trigger hidden>
+        <Icon name="download-simple" size={15} />
+        <span>Install</span>
+      </button>
     </nav>
   </div>
 </header>
+
+{
+  onTool && (
+    <div class="hdr__rail" aria-hidden="true">
+      <span class="hdr__rail-fill" data-rail />
+    </div>
+  )
+}
 
 <script>
   // <details> keeps the menu working without JS; this closes it the way a
@@ -83,5 +138,56 @@ const path = Astro.url.pathname;
         nav.open = false;
       });
     });
+
+    // The 39 pieces of tool art are lazy so they cost nothing on a page nobody
+    // opens the menu on. Hovering or focusing the button is enough intent to
+    // start fetching them, which is what stops the panel opening onto 39 empty
+    // squares on the first click.
+    const warm = (): void => {
+      nav
+        .querySelectorAll<HTMLImageElement>('.meganav__grid img[loading="lazy"]')
+        .forEach((img) => {
+          img.loading = 'eager';
+        });
+    };
+
+    const summary = nav.querySelector('summary');
+    summary?.addEventListener('pointerenter', warm, { once: true });
+    summary?.addEventListener('focus', warm, { once: true });
+    // Touch has no hover, so opening is the only signal there is.
+    nav.addEventListener('toggle', warm, { once: true });
+  }
+
+  // The header gains a shadow only once the page has moved. A permanent border
+  // on a page that never scrolls is a line for the sake of a line.
+  const header = document.querySelector('[data-hdr]');
+  if (header) {
+    const onScroll = (): void => {
+      header.toggleAttribute('data-lifted', window.scrollY > 4);
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+  }
+
+  // Reading progress on tool pages, which are long articles under the tool.
+  const rail = document.querySelector<HTMLElement>('[data-rail]');
+  if (rail) {
+    let queued = false;
+    const update = (): void => {
+      queued = false;
+      const max = document.documentElement.scrollHeight - window.innerHeight;
+      const ratio = max > 0 ? Math.min(1, window.scrollY / max) : 0;
+      rail.style.transform = `scaleX(${ratio})`;
+    };
+    window.addEventListener(
+      'scroll',
+      () => {
+        if (queued) return;
+        queued = true;
+        requestAnimationFrame(update);
+      },
+      { passive: true }
+    );
+    update();
   }
 </script>

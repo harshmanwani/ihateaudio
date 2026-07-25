@@ -24,14 +24,29 @@ const year = new Date().getFullYear();
         ))
       }
 
+    </div>
+
+    <!-- Its own row rather than a seventh column: six families fill the grid
+         exactly, and squeezing Reference in wrapped it onto a second row with
+         three empty slots beside it. -->
+    <div class="ftr__extra">
       <div class="ftr__col">
         <h3>Reference</h3>
-        <ul>
+        <ul class="ftr__inline">
           <li><a href="/loudness-targets">Loudness targets by platform</a></li>
           <li><a href="/audio-formats">Audio format guide</a></li>
           <li><a href="/privacy">Privacy</a></li>
           <li><a href="/about">About</a></li>
         </ul>
+      </div>
+
+      <div class="ftr__col ftr__col--contact">
+        <h3>Something broken?</h3>
+        <p class="ftr__contact">Tell us and we will fix it.</p>
+        <a class="ftr__mail" href={`mailto:${SITE.email}`}>
+          <Icon name="envelope-simple" size={15} />
+          {SITE.email}
+        </a>
       </div>
     </div>
 
@@ -40,7 +55,7 @@ const year = new Date().getFullYear();
         <Icon name="shield-check" size={16} />
         {PRIVACY_LINE}
       </span>
-      <span>&copy; {year} {SITE.name}</span>
+      <span class="ftr__legal">&copy; {year} {SITE.name}</span>
     </div>
   </div>
 </footer>

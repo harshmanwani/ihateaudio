@@ -7,37 +7,65 @@
   top: 0;
   z-index: var(--z-sticky);
   background: color-mix(in oklch, var(--bg) 88%, transparent);
-  backdrop-filter: saturate(1.4) blur(8px);
-  border-bottom: 1px solid var(--line);
+  backdrop-filter: saturate(1.4) blur(10px);
+  /* No permanent rule. A line under the header on a page that has not been
+     scrolled is a line drawn for its own sake; it earns its place the moment
+     there is content behind it. */
+  border-bottom: 1px solid transparent;
+  transition:
+    border-color var(--dur) var(--ease),
+    box-shadow var(--dur) var(--ease);
+}
+
+.hdr[data-lifted] {
+  border-bottom-color: var(--line);
+  box-shadow: 0 1px 12px -6px oklch(0.19 0.013 156 / 0.22);
 }
 
 .hdr__inner {
   display: flex;
   align-items: center;
   gap: var(--s4);
-  height: 56px;
+  height: 60px;
 }
 
 .wordmark {
   display: inline-flex;
   align-items: center;
   gap: var(--s2);
-  font-size: var(--t-body);
+  font-size: var(--t-lead);
   font-weight: 700;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
   color: var(--ink);
   text-decoration: none;
   flex: none;
+  border-radius: var(--r-md);
 }
 
 .wordmark__mark {
-  color: var(--brand);
   flex: none;
+  transition: transform var(--dur) var(--ease-expo);
+}
+
+.wordmark:hover .wordmark__mark {
+  transform: rotate(-4deg) scale(1.04);
+}
+
+.wordmark__text {
+  /* Optical: the mark already reads as a stack of bars, so the word sits a
+     hair tighter to it than a symmetric gap would put it. */
+  margin-left: -1px;
 }
 
 .wordmark em {
   font-style: normal;
   color: var(--brand);
+}
+
+@media (max-width: 380px) {
+  .wordmark__text {
+    font-size: var(--t-body);
+  }
 }
 
 .hdr__nav {
@@ -48,7 +76,11 @@
 }
 
 .hdr__link {
-  padding: var(--s2) var(--s3);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  height: 38px;
+  padding-inline: var(--s3);
   border-radius: var(--r-md);
   font-size: var(--t-ui);
   font-weight: 500;
@@ -65,10 +97,79 @@
   color: var(--ink);
 }
 
+/* The launcher is the primary navigation on this site, so it does not look
+   like the two reference links beside it. */
+.hdr__link--menu {
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  padding-inline: var(--s3) var(--s2);
+}
+
+.hdr__link--menu:hover {
+  background: var(--brand-soft);
+  border-color: color-mix(in oklch, var(--brand) 26%, transparent);
+}
+
+.hdr__link--menu > svg:first-child {
+  color: var(--brand);
+}
+
 @media (max-width: 640px) {
   .hdr__link--wide {
     display: none;
   }
+}
+
+.hdr__install {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  height: 38px;
+  margin-left: var(--s2);
+  padding-inline: var(--s3);
+  border: 0;
+  border-radius: var(--r-md);
+  background: var(--brand);
+  color: oklch(1 0 0);
+  font-family: inherit;
+  font-size: var(--t-ui);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--dur-micro) var(--ease);
+}
+
+.hdr__install:hover {
+  background: var(--brand-hover);
+}
+
+@media (max-width: 520px) {
+  .hdr__install span {
+    display: none;
+  }
+  .hdr__install {
+    padding-inline: var(--s2);
+  }
+}
+
+/* Reading progress. Tool pages are a tool followed by a long article, and
+   without this there is no signal for how much article is left. */
+.hdr__rail {
+  position: sticky;
+  top: 60px;
+  z-index: var(--z-sticky);
+  height: 2px;
+  margin-bottom: -2px;
+  pointer-events: none;
+}
+
+.hdr__rail-fill {
+  display: block;
+  height: 100%;
+  background: var(--brand);
+  transform-origin: 0 50%;
+  transform: scaleX(0);
 }
 
 /* ---------- All-tools mega menu ---------- */
@@ -78,9 +179,6 @@
 }
 
 .meganav > summary {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--s1);
   list-style: none;
   cursor: pointer;
   user-select: none;
@@ -90,16 +188,17 @@
   display: none;
 }
 
-.meganav > summary svg {
+.meganav__caret {
+  color: var(--ink-3);
   transition: transform var(--dur-micro) var(--ease);
 }
 
 .meganav[open] > summary {
-  background: var(--surface);
-  color: var(--ink);
+  background: var(--brand-soft);
+  border-color: color-mix(in oklch, var(--brand) 26%, transparent);
 }
 
-.meganav[open] > summary svg {
+.meganav[open] .meganav__caret {
   transform: rotate(180deg);
 }
 
@@ -113,8 +212,9 @@
   background: var(--bg);
   border-bottom: 1px solid var(--line);
   box-shadow: var(--shadow-modal);
-  max-height: calc(100dvh - 56px - var(--s6));
+  max-height: calc(100dvh - 60px);
   overflow-y: auto;
+  overscroll-behavior: contain;
   animation: meganav-in var(--dur) var(--ease-expo);
 }
 
@@ -132,20 +232,37 @@
 }
 
 .meganav__inner {
+  padding-block: var(--s6) var(--s5);
+}
+
+.meganav__grid {
   display: grid;
-  gap: var(--s6) var(--s6);
-  /* 160px lets all six families sit on one row at the content width. */
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-  padding-block: var(--s6) var(--s8);
+  gap: var(--s6) var(--s4);
+  /* 166px is what fits all six families on one row at the content width once the
+     gaps are counted. At 178 it dropped to five columns and Utility wrapped
+     under Cut, leaving half the panel empty. */
+  grid-template-columns: repeat(auto-fit, minmax(166px, 1fr));
+  align-items: start;
 }
 
 .meganav__cat {
-  font-size: var(--t-micro);
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  font-size: var(--t-small);
   font-weight: 600;
-  letter-spacing: 0.02em;
-  color: var(--ink-3);
-  text-transform: uppercase;
+  color: var(--ink);
   margin-bottom: var(--s2);
+  padding-bottom: var(--s2);
+  border-bottom: 1px solid var(--line);
+}
+
+.meganav__dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 2px;
+  background: var(--cat-vivid, var(--brand));
 }
 
 .meganav__group ul {
@@ -160,7 +277,7 @@
   display: flex;
   align-items: center;
   gap: var(--s2);
-  padding: var(--s2) var(--s2);
+  padding: 5px var(--s2);
   margin-inline: calc(var(--s2) * -1);
   border-radius: var(--r-md);
   font-size: var(--t-small);
@@ -174,10 +291,89 @@
   background: var(--cat-soft, var(--surface));
 }
 
+.meganav__group a:hover .meganav__glyph {
+  background: color-mix(in oklch, var(--cat-vivid, var(--brand)) 18%, transparent);
+}
+
+.meganav__name {
+  min-width: 0;
+}
+
+/* The tool's own art on a wash of its family colour. Without the chip these
+   pale renders sat on white at 30px and read as grey smudges; the tint is also
+   what makes the six families scannable as blocks of colour. */
 .meganav__glyph {
   display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   flex: none;
+  border-radius: 9px;
+  background: var(--cat-soft, var(--brand-soft));
   color: var(--cat-vivid, var(--brand));
+  transition: background-color var(--dur-micro) var(--ease);
+}
+
+.meganav__glyph img {
+  width: 27px;
+  height: 27px;
+  transition: transform var(--dur-micro) var(--ease-expo);
+}
+
+.meganav__group a:hover .meganav__glyph img {
+  transform: scale(1.12);
+}
+
+.meganav__foot {
+  display: flex;
+  align-items: center;
+  gap: var(--s2) var(--s5);
+  flex-wrap: wrap;
+  margin-top: var(--s6);
+  padding-top: var(--s4);
+  border-top: 1px solid var(--line);
+}
+
+.meganav__foot a {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  font-size: var(--t-small);
+  font-weight: 500;
+  color: var(--ink-2);
+  text-decoration: none;
+}
+
+.meganav__foot a:hover {
+  color: var(--brand);
+}
+
+.meganav__foot a svg {
+  color: var(--ink-3);
+}
+
+.meganav__foot a:hover svg {
+  color: var(--brand);
+}
+
+.meganav__privacy {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  margin-left: auto;
+  font-size: var(--t-micro);
+  color: var(--ink-3);
+}
+
+.meganav__privacy svg {
+  color: var(--brand);
+}
+
+@media (max-width: 560px) {
+  .meganav__privacy {
+    margin-left: 0;
+  }
 }
 
 /* ---------- Footer ---------- */
@@ -191,8 +387,11 @@
 
 .ftr__grid {
   display: grid;
-  gap: var(--s8);
-  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--s8) var(--s6);
+  /* 148px with a 24px gap is what fits all six families on one row. At 160px
+     and a 32px gap only five fitted, stranding Utility on a row by itself. */
+  grid-template-columns: repeat(auto-fit, minmax(148px, 1fr));
+  align-items: start;
 }
 
 .ftr__col h3 {
@@ -222,16 +421,80 @@
   text-underline-offset: 0.18em;
 }
 
-.ftr__base {
+/* Reference and contact, on their own row under the six tool families. */
+.ftr__extra {
+  display: grid;
+  gap: var(--s6) var(--s8);
+  grid-template-columns: minmax(0, 1fr);
   margin-top: var(--s10);
+  padding-top: var(--s6);
+  border-top: 1px solid var(--line);
+}
+
+@media (min-width: 720px) {
+  .ftr__extra {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+/* Wraps along a line instead of stacking: four short links in a column beside
+   an otherwise empty row is a lot of vertical space for very little. */
+.ftr__col ul.ftr__inline {
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--s2) var(--s5);
+}
+
+/* The address is its own line rather than trailing a sentence: an email inside
+   running text has to be spaced by hand, and the template collapsed that space
+   away, which is how it shipped as "fix it.support@". */
+.ftr__contact {
+  font-size: var(--t-small);
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
+.ftr__mail {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  margin-top: var(--s2);
+  font-size: var(--t-small);
+  font-weight: 500;
+  color: var(--brand);
+  text-decoration: none;
+  word-break: break-word;
+}
+
+.ftr__mail:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ftr__mail svg {
+  flex: none;
+  color: var(--ink-3);
+}
+
+.ftr__mail:hover svg {
+  color: var(--brand);
+}
+
+.ftr__base {
+  margin-top: var(--s8);
   padding-top: var(--s5);
   border-top: 1px solid var(--line);
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: var(--s4);
+  gap: var(--s3) var(--s6);
   flex-wrap: wrap;
   font-size: var(--t-small);
   color: var(--ink-3);
+}
+
+.ftr__legal {
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- Privacy line ---------- */
@@ -252,7 +515,10 @@
 /* ---------- Tool page ---------- */
 
 .toolpage {
-  padding-block: var(--s8) var(--s16);
+  /* The bottom padding here plus .toolread's margin is the gap between working
+     and reading. It is deliberately large: the tool is finished at that point,
+     and a cramped gap made the article look like part of the interface. */
+  padding-block: var(--s8) var(--s10);
   display: flex;
   flex-direction: column;
   gap: var(--s8);
@@ -321,22 +587,60 @@
   line-height: 1.55;
 }
 
-/* Content sections beneath the tool */
+/* ---------- Reading mode ----------
+
+   A tool page is two documents: an instrument, then an article about it. The
+   old layout separated them with a hairline and 24px, which read as "more of the
+   same page" and left the long-form content sharing the tool's full width at
+   about 99 characters a line.
+
+   So the article gets its own band, a wide gap above it, and a measure. */
+
+.toolread {
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  margin-top: var(--s16);
+  padding-block: var(--s16) var(--s20);
+}
 
 .toolbody {
   display: grid;
   gap: var(--s12);
   grid-template-columns: minmax(0, 1fr);
-  padding-top: var(--s6);
-  border-top: 1px solid var(--line);
 }
 
 @media (min-width: 900px) {
   .toolbody {
-    grid-template-columns: minmax(0, 1fr) 260px;
+    grid-template-columns: minmax(0, 1fr) 264px;
     gap: var(--s16);
   }
 }
+
+/* The sections inside carry their own rhythm, so the wrapper does not need to
+   set margins on each one from outside. */
+.toolbody__main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s16);
+  min-width: 0;
+}
+
+.toolbody__main h2 {
+  max-width: var(--prose);
+  margin-bottom: var(--s5);
+  text-wrap: balance;
+}
+
+/* Cap the measure on everything that is read rather than scanned. Body text past
+   about 75 characters a line loses the reader's place on the return sweep. */
+.toolbody__main p,
+.toolbody__main li,
+.toolbody__main dl,
+.toolbody__main blockquote {
+  max-width: var(--prose);
+}
+
+/* ---------- Numbered steps ---------- */
 
 .steps {
   list-style: none;
@@ -344,15 +648,19 @@
   counter-reset: step;
   display: flex;
   flex-direction: column;
-  gap: var(--s4);
+  gap: var(--s6);
 }
 
 .steps li {
+  position: relative;
   counter-increment: step;
   display: grid;
-  grid-template-columns: 26px 1fr;
-  gap: var(--s3);
+  grid-template-columns: 32px 1fr;
+  gap: var(--s4);
   align-items: start;
+  font-size: var(--t-body);
+  line-height: 1.65;
+  color: var(--ink);
 }
 
 .steps li::before {
@@ -360,15 +668,36 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 32px;
+  height: 32px;
   border-radius: var(--r-full);
-  background: var(--brand-soft);
+  background: var(--bg);
+  border: 1px solid color-mix(in oklch, var(--brand) 24%, transparent);
   color: var(--brand);
-  font-size: var(--t-small);
+  font-size: var(--t-ui);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+
+/* A rail joining the markers, so four paragraphs read as one sequence rather
+   than as four paragraphs that happen to have numbers. */
+.steps li:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  left: 15px;
+  top: 36px;
+  bottom: calc(var(--s6) * -1 + 4px);
+  width: 2px;
+  border-radius: 1px;
+  background: color-mix(in oklch, var(--brand) 16%, transparent);
+}
+
+.steps li > span {
+  padding-top: 3px;
+  max-width: var(--prose);
+}
+
+/* ---------- Questions ---------- */
 
 .faq {
   display: flex;
@@ -378,6 +707,11 @@
 
 .faq details {
   border-bottom: 1px solid var(--line);
+  transition: background-color var(--dur-micro) var(--ease);
+}
+
+.faq details[open] {
+  background: color-mix(in oklch, var(--bg) 70%, transparent);
 }
 
 .faq summary {
@@ -385,11 +719,21 @@
   align-items: center;
   justify-content: space-between;
   gap: var(--s4);
-  padding: var(--s4) 0;
+  /* Comfortably past the 44px minimum: this is the most-tapped thing on the
+     lower half of the page. */
+  padding: var(--s4) var(--s3);
+  margin-inline: calc(var(--s3) * -1);
   cursor: pointer;
   font-weight: 600;
   font-size: var(--t-body);
+  line-height: 1.45;
   list-style: none;
+  border-radius: var(--r-md);
+  transition: color var(--dur-micro) var(--ease);
+}
+
+.faq summary:hover {
+  color: var(--brand);
 }
 
 .faq summary::-webkit-details-marker {
@@ -407,14 +751,22 @@
   transition: transform var(--dur) var(--ease);
 }
 
+.faq summary:hover::after {
+  border-color: var(--brand);
+}
+
 .faq details[open] summary::after {
   transform: rotate(225deg) translate(-2px, -2px);
 }
 
 .faq details > div {
-  padding-bottom: var(--s4);
+  padding: 0 var(--s3) var(--s5);
+  margin-inline: calc(var(--s3) * -1);
   color: var(--ink-2);
+  font-size: var(--t-body);
+  line-height: 1.7;
   max-width: var(--prose);
+  text-wrap: pretty;
 }
 
 /* Sidebar */
@@ -426,10 +778,26 @@
   align-self: start;
 }
 
+/* Follows you down the article on desktop. Someone reading three screens of FAQ
+   is exactly the person deciding which tool to try next. */
+@media (min-width: 900px) {
+  .aside {
+    position: sticky;
+    top: calc(60px + var(--s6));
+    max-height: calc(100dvh - 60px - var(--s10));
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+}
+
 .aside__group h3 {
   font-size: var(--t-small);
   font-weight: 600;
-  margin-bottom: var(--s3);
+  color: var(--ink);
+  margin-bottom: var(--s2);
+  padding-bottom: var(--s2);
+  border-bottom: 1px solid var(--line);
 }
 
 .aside__list {
@@ -437,15 +805,15 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .aside__list a {
   display: flex;
   align-items: center;
   gap: var(--s2);
-  padding: var(--s2) var(--s3);
-  margin-inline: calc(var(--s3) * -1);
+  padding: 5px var(--s2);
+  margin-inline: calc(var(--s2) * -1);
   border-radius: var(--r-md);
   font-size: var(--t-ui);
   color: var(--ink-2);
@@ -456,16 +824,44 @@
 }
 
 .aside__list a:hover {
-  background: var(--surface);
+  background: var(--cat-soft, var(--bg));
   color: var(--ink);
 }
 
-/* Each link carries its tool's glyph in its family colour — the cue that
-   makes "which tool next" a glance instead of a read. */
+/* The plain list has no art, so its rows do not need to reserve room for it. */
+.aside__list--plain a {
+  padding-block: var(--s2);
+  line-height: 1.35;
+}
+
+/* Each link carries its tool's own art on a wash of its family colour, the same
+   treatment as the launcher. On the tinted reading band these pale renders
+   disappeared without it. */
 .aside__icon {
   display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
   flex: none;
+  border-radius: 8px;
+  background: var(--cat-soft, var(--brand-soft));
   color: var(--cat-vivid, var(--brand));
+  transition: background-color var(--dur-micro) var(--ease);
+}
+
+.aside__icon img {
+  width: 25px;
+  height: 25px;
+  transition: transform var(--dur-micro) var(--ease-expo);
+}
+
+.aside__list a:hover .aside__icon {
+  background: color-mix(in oklch, var(--cat-vivid, var(--brand)) 18%, transparent);
+}
+
+.aside__list a:hover .aside__icon img {
+  transform: scale(1.12);
 }
 
 /* ---------- Homepage ---------- */
@@ -927,4 +1323,109 @@
 
 .datatable tbody tr:hover td {
   background: var(--surface);
+}
+
+/* ---------- Install invitation ----------
+
+   A corner card, not a top banner. Top banners get dismissed on reflex and push
+   the actual tool down the page, which is a bad trade for a suggestion. */
+
+.install {
+  position: fixed;
+  z-index: var(--z-toast);
+  right: var(--s5);
+  bottom: var(--s5);
+  width: min(360px, calc(100vw - var(--s6)));
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: var(--s4);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-modal);
+  opacity: 0;
+  transform: translateY(12px) scale(0.98);
+  transition:
+    opacity var(--dur-panel) var(--ease-expo),
+    transform var(--dur-panel) var(--ease-expo);
+}
+
+.install[data-in='true'] {
+  opacity: 1;
+  transform: none;
+}
+
+.install__mark {
+  margin-top: 1px;
+}
+
+.install__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.install__title {
+  font-size: var(--t-ui);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.install__text {
+  margin-top: 2px;
+  font-size: var(--t-small);
+  color: var(--ink-2);
+  line-height: 1.45;
+}
+
+.install__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  flex: none;
+  align-self: stretch;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.install__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--r-full);
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-micro) var(--ease),
+    color var(--dur-micro) var(--ease);
+}
+
+.install__close:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+/* Phone: full width along the bottom edge, clear of the home indicator. */
+@media (max-width: 560px) {
+  .install {
+    right: var(--s3);
+    left: var(--s3);
+    bottom: calc(var(--s3) + env(safe-area-inset-bottom));
+    width: auto;
+  }
+
+  .install__actions {
+    flex-direction: column-reverse;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .install {
+    transition: opacity var(--dur) var(--ease);
+    transform: none;
+  }
 }
