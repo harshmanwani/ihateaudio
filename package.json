@@ -29,7 +29,8 @@
     "csp": "node scripts/check-csp.mjs",
     "ffmpeg:upload": "node scripts/upload-ffmpeg-core.mjs",
     "registry": "node scripts/check-registry.mjs",
-    "verify:ai": "node scripts/verify-ai.mjs"
+    "verify:ai": "node scripts/verify-ai.mjs",
+    "models:upload": "node scripts/upload-models.mjs"
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",

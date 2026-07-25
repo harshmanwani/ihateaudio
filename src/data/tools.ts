@@ -752,13 +752,17 @@ export const TOOLS: Tool[] = [
     modelBytes: 66_759_214,
   },
   {
+    // The slug keeps "stem-splitter" because that is the phrase people search for
+    // and changing a URL throws away whatever ranking it has. The name people read
+    // says what it does in their words instead: nobody outside a studio calls a
+    // bass part a stem, and "Song Splitter" needs no explaining.
     slug: 'stem-splitter',
-    name: 'Stem Splitter',
-    title: 'Stem Splitter: Split a Song Into Stems Online Free',
+    name: 'Song Splitter',
+    title: 'Song Splitter: Separate Vocals, Drums and Bass Free',
     description:
-      'Split a song into vocals, drums, bass and everything else. Pick only the stems you want. AI models run in your browser, so nothing is uploaded.',
-    tagline: "Pull a song apart into the parts it was built from.",
-    short: "Break a song into vocals, drums, bass and the rest.",
+      'Split a song into vocals, drums, bass and the rest. Hear each part on its own, mute what you like, then download. Runs in your browser, nothing uploaded.',
+    tagline: "Take a song apart and hear the pieces on their own.",
+    short: "Separate a song into vocals, drums, bass and the rest.",
     category: 'ai',
     icon: 'cards-three',
     keywords: [

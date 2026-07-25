@@ -1,0 +1,325 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import AiSetup from '../components/AiSetup.astro';
+import Icon from '../components/Icon.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('audio-transcriber');
+
+const steps = [
+  'Drop the recording in. The first run fetches Whisper, about 41 MB, once — after that this works with no internet at all.',
+  'Press Transcribe. The model listens in thirty-second windows with a little overlap, so words are not cut in half at the joins.',
+  'Read it, and fix what needs fixing. Names, jargon and acronyms are where every speech recogniser struggles, and it is faster to correct four words than to retype four hundred.',
+  'Copy it to the clipboard or download it as a text file. If you want timings rather than prose, the subtitle generator produces the same transcript as SRT.',
+];
+
+const faq = [
+  {
+    q: 'How accurate is it?',
+    a: 'On clear speech in a quiet room, close to a careful human transcriber for ordinary words. On a phone recording in a cafe, noticeably worse. This is the small English Whisper model, chosen because at 41 MB it can sit behind a one-time download rather than being the reason nobody uses the tool. The larger models are better at accents, crosstalk and proper nouns, and they are several hundred megabytes, which is a different product.',
+  },
+  {
+    q: 'Is my recording uploaded?',
+    a: 'No. The only network request is the model coming down to you, and it is served from this domain rather than from Hugging Face or any other third party. Nothing about the audio, its contents or even the fact that you opened this page reaches anyone. That is the reason to use this for a medical appointment, a legal call, an interview under embargo or anything else you would not paste into a website.',
+  },
+  {
+    q: 'What languages does it handle?',
+    a: 'English only. This is the English-specific model, which is meaningfully more accurate at English than the multilingual one of the same size, and multilingual would be a second download to no benefit for most people here. If you need another language, the tool will produce something for it and that something will be wrong.',
+  },
+  {
+    q: 'It invented a sentence that nobody said.',
+    a: 'That is a known and slightly unsettling behaviour called hallucination, and it happens most in silence. Whisper was trained on speech, so when it is handed a passage with no speech in it — a long pause, background hum, music — it sometimes produces the most probable thing a person might have said instead. Running the silence remover over the recording first genuinely helps, because it deletes the passages where there is nothing to transcribe.',
+  },
+  {
+    q: 'Two people are talking and it runs their words together.',
+    a: 'Whisper transcribes speech; it does not identify who is speaking. Separating a recording by speaker is a different task called diarisation and needs a different model. What you get here is an accurate account of what was said with no indication of by whom, so for an interview you will be adding the speaker labels yourself.',
+  },
+  {
+    q: 'How long can the recording be?',
+    a: 'There is no fixed limit, and it is chunked so memory stays flat regardless of length. Time is the real constraint: transcription runs several times faster than real time, so an hour of audio is a matter of minutes rather than an hour. Long recordings are the case this handles best relative to paid services, since there is no per-minute charge and no upload.',
+  },
+  {
+    q: 'Can I transcribe a video?',
+    a: 'Yes, drop the video file straight in and the audio is extracted from it. If the file is very large it is quicker to run it through the video to audio tool first and transcribe the result, since that avoids decoding the video twice.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} video exportBar={false} action="Transcribe">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Transcription</span>
+        <span class="hint">
+          English, running on your machine. Several times faster than real time.
+        </span>
+      </div>
+
+      <div class="field controls__full">
+        <label class="switch">
+          <input type="checkbox" data-control="paragraphs" checked />
+          Break into paragraphs where the speaker pauses
+        </label>
+        <p class="hint">
+          Off gives you one continuous block, which is easier to paste into
+          something that will reflow it anyway.
+        </p>
+      </div>
+
+      <AiSetup
+        bytes={tool.modelBytes ?? 0}
+        what="It is Whisper, OpenAI's speech recognition model, served from this domain rather than from Hugging Face."
+        speed="Transcription then runs several times faster than real time."
+      />
+
+      {/* The shared export bar is an audio-format picker, which is meaningless when
+          the output is text. So the action lives here, and it calls the same
+          runtime.run() the bar would have — keeping the progress reporting, the
+          cancel behaviour and the error surface that come with it. */}
+      <div class="controls__full">
+        <button type="button" class="btn btn--solid btn--lg" data-transcribe>
+          <Icon name="text-t" size={18} />
+          Transcribe
+        </button>
+      </div>
+
+      <div class="controls__full transcript" data-transcript hidden>
+        <div class="transcript__bar">
+          <span class="transcript__meta tnum" data-transcript-meta></span>
+          <div class="transcript__actions">
+            <button type="button" class="btn btn--quiet btn--sm" data-copy>
+              <Icon name="copy" size={15} />
+              Copy
+            </button>
+            <button type="button" class="btn btn--solid btn--sm" data-save-txt>
+              <Icon name="download-simple" size={15} />
+              Download .txt
+            </button>
+          </div>
+        </div>
+        <div class="transcript__text" data-transcript-text tabindex="0"></div>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>What the model is actually doing</h2>
+    <p>
+      Whisper does not recognise words the way older systems did, by matching sounds
+      against a dictionary of pronunciations. It was trained on a very large
+      quantity of audio paired with its transcript, and what it learned is closer to
+      translation: given this stretch of sound, what text most probably accompanies
+      it. That is why it punctuates, capitalises and spells out numbers without
+      being told to — those were in the transcripts it learned from.
+    </p>
+    <p>
+      It also explains the model's characteristic strength and its characteristic
+      failure. Because it is predicting probable text rather than decoding phonemes,
+      it copes remarkably well with accents, mumbling and background noise, filling
+      in from context the way a listener does. And because it is predicting probable
+      text, when there is nothing to go on it will still predict something. Silence
+      is the dangerous input, not noise.
+    </p>
+
+    <h2>Getting a better transcript</h2>
+    <p>
+      Clean the audio before transcribing, not after. Anything that makes speech
+      easier for a person to follow makes it easier for the model too: the noise
+      remover for a hissy or roomy recording, the silence remover to delete the
+      passages where nobody is talking, and the volume booster if the recording is
+      so quiet that the speech sits near the noise floor.
+    </p>
+    <p>
+      If the recording has music under the speech, running the vocal remover first
+      sounds like a strange idea and works surprisingly well, because it is built to
+      separate a voice from an arrangement.
+    </p>
+    <p>
+      Do not bother converting to a higher bitrate or a higher sample rate first.
+      The model works at 16 kHz mono and the audio is resampled down to that
+      regardless, so anything above it is discarded before the model sees it. A
+      pristine 96 kHz file and a decent MP3 produce the same transcript.
+    </p>
+
+    <h2>What to check before trusting it</h2>
+    <p>
+      Proper nouns first. Names of people, places, companies and products are where
+      errors concentrate, because the model is choosing the most probable spelling
+      of a sound and an unusual name is by definition not probable.
+    </p>
+    <p>
+      Numbers second, particularly where they matter. "Fifteen" and "fifty" are a
+      single vowel apart and both are plausible, so a figure in a transcript is
+      worth confirming against the audio if anything depends on it.
+    </p>
+    <p>
+      And read any passage that looks unusually fluent for its position in the
+      recording. A neat, well-formed sentence appearing where you remember a long
+      pause is the signature of the model filling a gap rather than reporting one.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<style>
+  .transcript {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s3);
+    border-top: 1px solid var(--line);
+    padding-top: var(--s5);
+  }
+
+  .transcript__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s3);
+    flex-wrap: wrap;
+  }
+
+  .transcript__meta {
+    font-size: var(--t-small);
+    color: var(--ink-2);
+  }
+
+  .transcript__actions {
+    display: flex;
+    gap: var(--s2);
+  }
+
+  /* A reading surface rather than a form field. It is prose, and the measure and
+     line height matter as much as they do in the article below. */
+  .transcript__text {
+    max-height: 22rem;
+    overflow-y: auto;
+    padding: var(--s4);
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    font-size: var(--t-body);
+    line-height: 1.7;
+    white-space: pre-wrap;
+    text-wrap: pretty;
+  }
+
+  .transcript__text:focus-visible {
+    outline: 2px solid var(--cat-vivid, var(--brand));
+    outline-offset: 2px;
+  }
+</style>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import type { ToolRuntime } from '../lib/tool';
+  import { createAiPanel } from '../lib/ai/panel';
+  import { transcribe, toParagraphs } from '../lib/ai/transcribe';
+  import { WHISPER } from '../lib/ai/models';
+  import { saveBlob } from '../lib/files';
+  import { baseName } from '../lib/format';
+
+  /**
+   * Whisper is a directory of files rather than one blob, so the panel is given the
+   * total as a single synthetic asset. Its own progress callback reports real bytes
+   * once the download starts; this is only what the offer quotes beforehand.
+   */
+  const WHISPER_ASSET = { file: `${WHISPER.dir}/onnx/encoder_model_quantized.onnx`, bytes: 40_843_851 };
+
+  const panels = new WeakMap<ToolRuntime, ReturnType<typeof createAiPanel>>();
+
+  const tool = createTool({
+    suffix: 'transcript',
+    video: true,
+
+    onReady(_ctx, runtime) {
+      panels.set(
+        runtime,
+        createAiPanel(runtime.root.querySelector<HTMLElement>('[data-ai-setup]'), [WHISPER_ASSET], {
+          download: 'Setting up AI audio studio',
+          start: 'Starting the engine',
+          work: 'Listening',
+        })
+      );
+
+      const button = runtime.root.querySelector<HTMLButtonElement>('[data-transcribe]');
+      button?.addEventListener('click', () => {
+        button.disabled = true;
+        void runtime.run().finally(() => {
+          button.disabled = false;
+        });
+      });
+    },
+
+    async process(ctx) {
+      const runtime = tool;
+      if (!runtime) throw new Error('tool not ready');
+      const panel = panels.get(runtime);
+      const root = runtime.root;
+
+      const result = await transcribe(ctx.buffer, {
+        signal: ctx.signal,
+        // Times are needed even here, because paragraph breaks come from the gaps
+        // between segments.
+        timestamps: true,
+        onStage: (stage) => {
+          if (stage.phase === 'downloading') {
+            panel?.setPhase('Setting up AI audio studio', stage.ratio);
+          } else if (stage.phase === 'starting') {
+            panel?.setPhase('Starting the engine', null);
+          } else {
+            panel?.setPhase('Listening to the recording', null);
+          }
+          if (stage.ratio !== null) ctx.progress(stage.ratio);
+        },
+      });
+
+      panel?.finish();
+
+      const wantParagraphs = runtime.flag('paragraphs');
+      const text = wantParagraphs
+        ? toParagraphs(result.segments, result.text)
+        : result.text;
+
+      if (!text.trim()) {
+        throw new Error(
+          'No speech was found in that file. If it is music or noise rather than ' +
+            'talking, there is nothing here to transcribe.'
+        );
+      }
+
+      const panelEl = root.querySelector<HTMLElement>('[data-transcript]');
+      const textEl = root.querySelector<HTMLElement>('[data-transcript-text]');
+      const metaEl = root.querySelector<HTMLElement>('[data-transcript-meta]');
+      if (textEl) textEl.textContent = text;
+      if (metaEl) {
+        const words = text.trim().split(/\s+/).length;
+        metaEl.textContent = `${words.toLocaleString()} words, ${result.segments.length} segments`;
+      }
+      if (panelEl) panelEl.hidden = false;
+
+      const name = `${baseName(ctx.files[0]?.name ?? 'transcript')}-transcript.txt`;
+      const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+
+      root.querySelector<HTMLButtonElement>('[data-save-txt]')?.addEventListener(
+        'click',
+        () => saveBlob(blob, name),
+        { once: true }
+      );
+
+      root.querySelector<HTMLButtonElement>('[data-copy]')?.addEventListener('click', () => {
+        void navigator.clipboard.writeText(text).then(
+          () => runtime.showNote('Transcript copied to the clipboard.', 'info'),
+          () =>
+            runtime.showNote(
+              'The browser would not let us write to the clipboard. Select the text and copy it.',
+              'warn'
+            )
+        );
+      });
+
+      // The transcript is the deliverable and it is on the page. Returning the blob
+      // hands the shared plumbing something to offer as a download too.
+      return blob;
+    },
+  });
+</script>

@@ -1,0 +1,351 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import AiSetup from '../components/AiSetup.astro';
+import Icon from '../components/Icon.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('subtitle-generator');
+
+const steps = [
+  'Drop the audio or the video file in. Video works directly — the audio is pulled out of it and the video itself is never uploaded or altered.',
+  'Press Generate. Whisper listens in overlapping windows and records when each phrase starts and stops, which is what turns a transcript into subtitles.',
+  'Check the cues in the list. Timing is where automatic subtitles go wrong, and the two things worth scanning for are cues that overlap and cues that flash past too quickly to read.',
+  'Download SRT for almost anything, or VTT for the web. Both contain the same cues; the formats differ only in punctuation and a header line.',
+];
+
+const faq = [
+  {
+    q: 'SRT or VTT?',
+    a: 'SRT if you are unsure. It is the older and more widely understood format, and YouTube, Premiere, Resolve, VLC and every social platform accept it. VTT is the format HTML video wants, so use it if the subtitles are going into a <track> element on a web page. The cues are identical either way — VTT adds a WEBVTT header and writes the fractional second with a full stop where SRT uses a comma.',
+  },
+  {
+    q: 'How accurate is the timing?',
+    a: 'Good enough to read along with, and not frame-accurate. Whisper produces timings by emitting timestamp tokens as it goes, at a resolution of about twenty milliseconds, and it is more confident about where speech starts than where it stops. In practice cues tend to land slightly early and run slightly long, which is the forgiving direction — a subtitle appearing a moment early is barely noticeable, while one appearing late is immediately wrong.',
+  },
+  {
+    q: 'The cues are too long to read.',
+    a: 'Whisper breaks at natural pauses in speech rather than at a comfortable reading length, so a long unbroken sentence becomes one long cue. Broadcast practice is roughly two lines of forty characters, held for at least a second and a bit. If you are subtitling something properly, splitting the long cues by hand afterwards is the step that separates readable subtitles from a transcript with times attached.',
+  },
+  {
+    q: 'Can I use this on a video without re-encoding it?',
+    a: 'Yes, and you should. A subtitle file sits alongside the video rather than inside it, so nothing about the video is touched. Most players load a .srt automatically if it has the same filename and sits in the same folder. Burning subtitles into the picture is a separate and irreversible step, and it is worth being sure of the text first.',
+  },
+  {
+    q: 'It wrote something during a silent passage.',
+    a: 'That is hallucination, and silence is where it happens. The model was trained on speech and will occasionally produce the most probable thing a person might have said when handed a stretch with no speech in it. In subtitles it is more visible than in a transcript, because the cue appears on screen over a silent shot. Running the silence remover first helps, though it shifts every timing, so for subtitles it is usually better to generate first and delete the spurious cues.',
+  },
+  {
+    q: 'Does it label who is speaking?',
+    a: 'No. Identifying speakers is a separate task called diarisation and needs a different model. For a two-person interview you will be adding the dashes or names yourself, which is quick in any text editor since the cues are already split at the pauses where speakers tend to change.',
+  },
+  {
+    q: 'What languages?',
+    a: 'English only. This is the English-specific Whisper model, which is more accurate at English than the multilingual one of the same size. It will produce output for other languages and that output will be wrong.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} video exportBar={false} action="Generate subtitles">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Subtitles</span>
+        <span class="hint">
+          English. The file never leaves the browser, video included.
+        </span>
+      </div>
+
+      <div class="controls__full">
+        <button type="button" class="btn btn--solid btn--lg" data-generate>
+          <Icon name="closed-captioning" size={18} />
+          Generate subtitles
+        </button>
+      </div>
+
+      <AiSetup
+        bytes={tool.modelBytes ?? 0}
+        what="It is Whisper, OpenAI's speech recognition model, served from this domain rather than from Hugging Face. It is shared with the transcriber."
+        speed="Generation then runs several times faster than real time."
+      />
+
+      <div class="controls__full cues" data-cues hidden>
+        <div class="cues__bar">
+          <span class="cues__meta tnum" data-cues-meta></span>
+          <div class="cues__actions">
+            <button type="button" class="btn btn--quiet btn--sm" data-save-vtt>
+              <Icon name="download-simple" size={15} />
+              .vtt
+            </button>
+            <button type="button" class="btn btn--solid btn--sm" data-save-srt>
+              <Icon name="download-simple" size={15} />
+              Download .srt
+            </button>
+          </div>
+        </div>
+        <ol class="cues__list" data-cues-list></ol>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>Where the timings come from</h2>
+    <p>
+      Whisper was trained to write out not only words but also timestamps, as tokens
+      in the same stream. So when it transcribes, it is periodically predicting "and
+      the time is now about here" alongside the text, which is why one model produces
+      both the words and the cues rather than needing a second alignment pass.
+    </p>
+    <p>
+      That design has a consequence worth knowing. Because the timestamps are
+      predictions rather than measurements, they are influenced by what the model
+      expects speech to look like, not only by what it heard. Cues therefore drift a
+      little on unusual material — very fast speech, heavy accents, overlapping
+      voices — in the same way the words do. When a transcript is accurate the
+      timings almost always are too, and when the words start going wrong the timings
+      go with them.
+    </p>
+
+    <h2>What makes subtitles readable rather than merely correct</h2>
+    <p>
+      Reading speed is the constraint nobody thinks about until they see their own
+      subtitles on screen. A cue needs to be on long enough to read at roughly
+      fifteen to twenty characters per second, which means a forty-character line
+      wants at least two seconds. Automatic cues follow the speech instead, so a
+      quickly-spoken clause gets a cue that is technically accurate and physically
+      unreadable.
+    </p>
+    <p>
+      Line length is the other one. Two lines of about forty characters is the
+      broadcast convention, and it exists because the eye takes in a short line in
+      one movement. A single long line forces a horizontal scan that competes with
+      watching the picture.
+    </p>
+    <p>
+      Neither of these is something a model can fix for you, because both are
+      trade-offs against fidelity: making subtitles readable means condensing what
+      was actually said. That is an editorial decision, and it is why professional
+      subtitling is a craft rather than a conversion.
+    </p>
+
+    <h2>Getting the text right first</h2>
+    <p>
+      Clean audio produces better subtitles, and the cheapest wins are the same as
+      for transcription: the noise remover if the recording is hissy or roomy, and
+      the volume booster if speech sits close to the noise floor. If there is music
+      under the dialogue, the vocal remover is unexpectedly effective, since
+      separating a voice from an arrangement is exactly what it does.
+    </p>
+    <p>
+      If you want the words without the timings, the audio transcriber produces the
+      same transcript as prose with paragraph breaks, which is the better starting
+      point for an article or a set of notes.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<style>
+  .cues {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s3);
+    border-top: 1px solid var(--line);
+    padding-top: var(--s5);
+  }
+
+  .cues__bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s3);
+    flex-wrap: wrap;
+  }
+
+  .cues__meta {
+    font-size: var(--t-small);
+    color: var(--ink-2);
+  }
+
+  .cues__actions {
+    display: flex;
+    gap: var(--s2);
+  }
+
+  .cues__list {
+    max-height: 22rem;
+    overflow-y: auto;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    background: var(--surface);
+  }
+
+  .cue {
+    display: grid;
+    grid-template-columns: 8.5rem 1fr;
+    gap: var(--s3);
+    padding: var(--s3) var(--s4);
+    font-size: var(--t-ui);
+    line-height: 1.55;
+  }
+
+  .cue + .cue {
+    border-top: 1px solid var(--line);
+  }
+
+  .cue__time {
+    font-variant-numeric: tabular-nums;
+    font-size: var(--t-small);
+    color: var(--ink-2);
+  }
+
+  /* A cue too short to read is the most common defect in automatic subtitles, so
+     it is flagged rather than left for someone to discover on screen. */
+  .cue[data-tight='true'] .cue__time {
+    color: var(--cat-vivid, var(--brand));
+    font-weight: 600;
+  }
+
+  @media (max-width: 560px) {
+    .cue {
+      grid-template-columns: 1fr;
+      gap: 2px;
+    }
+  }
+</style>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import type { ToolRuntime } from '../lib/tool';
+  import { createAiPanel } from '../lib/ai/panel';
+  import { transcribe, toSrt, toVtt } from '../lib/ai/transcribe';
+  import type { Segment } from '../lib/ai/transcribe';
+  import { WHISPER } from '../lib/ai/models';
+  import { saveBlob } from '../lib/files';
+  import { baseName, timecode } from '../lib/format';
+
+  const WHISPER_ASSET = {
+    file: `${WHISPER.dir}/onnx/encoder_model_quantized.onnx`,
+    bytes: 40_843_851,
+  };
+
+  const panels = new WeakMap<ToolRuntime, ReturnType<typeof createAiPanel>>();
+
+  /**
+   * Reading speed, in characters per second, below which a cue is too quick.
+   *
+   * Broadcast guidance sits around 15-20 characters per second for comfortable
+   * reading. 22 is a permissive threshold — flagging what is genuinely unreadable
+   * rather than everything that is merely brisk.
+   */
+  const MAX_CPS = 22;
+
+  const tool = createTool({
+    suffix: 'subtitles',
+    video: true,
+
+    onReady(_ctx, runtime) {
+      panels.set(
+        runtime,
+        createAiPanel(runtime.root.querySelector<HTMLElement>('[data-ai-setup]'), [WHISPER_ASSET], {
+          download: 'Setting up AI audio studio',
+          start: 'Starting the engine',
+          work: 'Listening',
+        })
+      );
+
+      const button = runtime.root.querySelector<HTMLButtonElement>('[data-generate]');
+      button?.addEventListener('click', () => {
+        button.disabled = true;
+        void runtime.run().finally(() => {
+          button.disabled = false;
+        });
+      });
+    },
+
+    async process(ctx) {
+      const runtime = tool;
+      if (!runtime) throw new Error('tool not ready');
+      const panel = panels.get(runtime);
+      const root = runtime.root;
+
+      const result = await transcribe(ctx.buffer, {
+        signal: ctx.signal,
+        timestamps: true,
+        onStage: (stage) => {
+          if (stage.phase === 'downloading') {
+            panel?.setPhase('Setting up AI audio studio', stage.ratio);
+          } else if (stage.phase === 'starting') {
+            panel?.setPhase('Starting the engine', null);
+          } else {
+            panel?.setPhase('Listening for the timings', null);
+          }
+          if (stage.ratio !== null) ctx.progress(stage.ratio);
+        },
+      });
+
+      panel?.finish();
+
+      const segments: Segment[] = result.segments;
+      if (segments.length === 0) {
+        throw new Error(
+          'No speech with usable timings was found. If the file is music or noise ' +
+            'rather than talking, there is nothing here to subtitle.'
+        );
+      }
+
+      const list = root.querySelector<HTMLElement>('[data-cues-list]');
+      const meta = root.querySelector<HTMLElement>('[data-cues-meta]');
+      const wrap = root.querySelector<HTMLElement>('[data-cues]');
+
+      let tight = 0;
+      if (list) {
+        list.innerHTML = '';
+        for (const segment of segments) {
+          const seconds = Math.max(0.001, segment.end - segment.start);
+          const cps = segment.text.length / seconds;
+          const isTight = cps > MAX_CPS;
+          if (isTight) tight += 1;
+
+          const row = document.createElement('li');
+          row.className = 'cue';
+          row.dataset.tight = String(isTight);
+
+          const time = document.createElement('span');
+          time.className = 'cue__time';
+          time.textContent = `${timecode(segment.start)} → ${timecode(segment.end)}`;
+          if (isTight) time.title = `About ${Math.round(cps)} characters a second — too quick to read`;
+
+          const text = document.createElement('span');
+          text.className = 'cue__text';
+          text.textContent = segment.text;
+
+          row.append(time, text);
+          list.append(row);
+        }
+      }
+
+      if (meta) {
+        meta.textContent =
+          `${segments.length} cue${segments.length === 1 ? '' : 's'}` +
+          (tight > 0 ? `, ${tight} too quick to read comfortably` : ', all readable');
+      }
+      if (wrap) wrap.hidden = false;
+
+      const stem = baseName(ctx.files[0]?.name ?? 'subtitles');
+      const srt = new Blob([toSrt(segments)], { type: 'text/plain;charset=utf-8' });
+      const vtt = new Blob([toVtt(segments)], { type: 'text/vtt;charset=utf-8' });
+
+      root
+        .querySelector<HTMLButtonElement>('[data-save-srt]')
+        ?.addEventListener('click', () => saveBlob(srt, `${stem}.srt`));
+      root
+        .querySelector<HTMLButtonElement>('[data-save-vtt]')
+        ?.addEventListener('click', () => saveBlob(vtt, `${stem}.vtt`));
+
+      return srt;
+    },
+  });
+</script>
