@@ -136,8 +136,24 @@ const schema = [
                 data-cat={tool.category}
                 data-search={`${tool.name} ${tool.short} ${tool.slug.replace(/-/g, ' ')} ${tool.keywords.join(' ')}`.toLowerCase()}
               >
-                <span class="tile__chip" aria-hidden="true">
-                  <Icon name={tool.icon} weight="duotone" size={24} />
+                <span
+                  class:list={['tile__chip', tool.icon3d && 'tile__chip--art']}
+                  aria-hidden="true"
+                >
+                  {
+                    tool.icon3d ? (
+                      <img
+                        src={`/icons3d/${tool.slug}.png`}
+                        alt=""
+                        width="56"
+                        height="56"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <Icon name={tool.icon} weight="duotone" size={24} />
+                    )
+                  }
                 </span>
                 <span class="tile__text">
                   <span class="tile__name">{tool.name}</span>

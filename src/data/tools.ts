@@ -72,8 +72,14 @@ export interface Tool {
   /** Card blurb on the homepage. */
   short: string;
   category: ToolCategory;
-  /** Phosphor icon name. */
+  /** Phosphor icon name. Used unless `icon3d` is set. */
   icon: string;
+  /**
+   * Custom 3D icon in /public/icons3d, named `<slug>.png`. Opt-in per tool so
+   * the set can roll out a category at a time without the grid going
+   * half-and-half mid-category.
+   */
+  icon3d?: boolean;
   /** Search synonyms — what people actually type, beyond the tool's name. */
   keywords: string[];
   /** Slugs of tools offered after an export, and in the sidebar. */
@@ -96,6 +102,7 @@ export const TOOLS: Tool[] = [
     short: "Snip a bit out of any audio file. Instantly.",
     category: 'cut',
     icon: 'scissors',
+    icon3d: true,
     keywords: ['cut crop shorten clip snip mp3 cutter song cutter trim music ringtone cut'],
     related: ['audio-joiner', 'fade-in-out', 'volume-booster', 'ringtone-maker'],
     instant: true,
@@ -110,6 +117,7 @@ export const TOOLS: Tool[] = [
     short: "Glue a few files into one, in whatever order you like.",
     category: 'cut',
     icon: 'arrows-merge',
+    icon3d: true,
     keywords: ['merge combine join concatenate stitch put together append songs one file'],
     related: ['audio-trimmer', 'crossfade-joiner', 'audio-splitter', 'fade-in-out'],
     instant: true,
@@ -124,6 +132,7 @@ export const TOOLS: Tool[] = [
     short: "Break a long recording into parts you can grab separately.",
     category: 'cut',
     icon: 'split-horizontal',
+    icon3d: true,
     keywords: ['split divide chop cut into parts chapters segments break up'],
     related: ['audio-trimmer', 'silence-remover', 'audio-joiner'],
     instant: true,
@@ -138,6 +147,7 @@ export const TOOLS: Tool[] = [
     short: "Kill the dead air in interviews, lectures and voice notes.",
     category: 'cut',
     icon: 'speaker-slash',
+    icon3d: true,
     keywords: ['remove silence dead air gaps pauses tighten podcast cleanup auto trim'],
     related: ['audio-normalizer', 'audio-trimmer', 'audio-splitter'],
     instant: true,
@@ -152,6 +162,7 @@ export const TOOLS: Tool[] = [
     short: "Give a track a soft opening and a soft landing.",
     category: 'cut',
     icon: 'wave-sine',
+    icon3d: true,
     keywords: ['fade in fade out fades smooth start end soften intro outro'],
     related: ['audio-trimmer', 'crossfade-joiner', 'volume-booster'],
     instant: true,
@@ -166,6 +177,7 @@ export const TOOLS: Tool[] = [
     short: "Flip a track so it runs end to start.",
     category: 'cut',
     icon: 'rewind',
+    icon3d: true,
     keywords: ['reverse backwards backmasking play in reverse flip'],
     related: ['speed-changer', 'pitch-shifter', 'audio-trimmer'],
     instant: true,
@@ -180,6 +192,7 @@ export const TOOLS: Tool[] = [
     short: "Turn a short clip into something much longer.",
     category: 'cut',
     icon: 'repeat',
+    icon3d: true,
     keywords: ['loop repeat extend seamless background music hour version'],
     related: ['audio-trimmer', 'audio-joiner', 'crossfade-joiner'],
     instant: true,
@@ -194,6 +207,7 @@ export const TOOLS: Tool[] = [
     short: "Merge tracks with a smooth handover between them.",
     category: 'cut',
     icon: 'intersect',
+    icon3d: true,
     keywords: ['crossfade blend mix transition dj smooth join overlap'],
     related: ['audio-joiner', 'fade-in-out', 'audio-trimmer'],
     instant: true,

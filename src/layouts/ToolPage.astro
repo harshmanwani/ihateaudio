@@ -96,8 +96,17 @@ const schema = [
         <span>{category?.name}</span>
       </nav>
       <div class="toolhead__title" data-cat={tool.category}>
-        <span class="toolhead__chip" aria-hidden="true">
-          <Icon name={tool.icon} weight="duotone" size={28} />
+        <span
+          class:list={['toolhead__chip', tool.icon3d && 'toolhead__chip--art']}
+          aria-hidden="true"
+        >
+          {
+            tool.icon3d ? (
+              <img src={`/icons3d/${tool.slug}.png`} alt="" width="72" height="72" />
+            ) : (
+              <Icon name={tool.icon} weight="duotone" size={28} />
+            )
+          }
         </span>
         <h1>{tool.name}</h1>
       </div>

@@ -301,6 +301,20 @@
   color: var(--cat-vivid, var(--brand));
 }
 
+.toolhead__chip--art {
+  width: 68px;
+  height: 68px;
+  background: none;
+  border-radius: 0;
+}
+
+.toolhead__chip--art img {
+  width: 72px;
+  height: 72px;
+  max-width: none;
+  filter: drop-shadow(0 4px 7px oklch(0.19 0.012 162 / 0.18));
+}
+
 .toolhead__sub {
   font-size: var(--t-lead);
   color: var(--ink-2);
@@ -702,6 +716,34 @@
 
 .tile:hover .tile__chip {
   transform: scale(1.06);
+}
+
+/* 3D icons carry their own light and material, so the tinted chip fill fights
+   them. They get a slightly larger frame and no background, and the art itself
+   overflows it a touch so the object reads at tile size. */
+.tile__chip--art {
+  width: 48px;
+  height: 48px;
+  background: none;
+  border-radius: 0;
+}
+
+.tile__chip--art img {
+  width: 56px;
+  height: 56px;
+  max-width: none;
+  /* A soft ground shadow puts the object on the page rather than floating. */
+  filter: drop-shadow(0 3px 5px oklch(0.19 0.012 162 / 0.16));
+}
+
+.tile:hover .tile__chip--art {
+  transform: scale(1.09) rotate(-3deg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tile:hover .tile__chip--art {
+    transform: none;
+  }
 }
 
 .tile__text {
