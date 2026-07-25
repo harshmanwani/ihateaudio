@@ -161,14 +161,20 @@ const SUBJECTS = {
    * no glowing edges — those read as stock AI clipart and would break the family
    * the other thirty-nine belong to.
    */
+  // The first attempt lost the stroke entirely and came back as a bare
+  // microphone, which made it indistinguishable from the acapella extractor. The
+  // stroke is described as its own object rather than as a modifier.
   'vocal-remover':
-    'a chunky rounded cream studio microphone standing upright, with a thick solid mint green diagonal bar crossing over it like a no-entry stroke, simple toy object',
+    'a chunky rounded cream studio microphone standing upright, and one thick solid mint green bar lying diagonally straight across the front of it corner to corner like a prohibition slash, the bar clearly in front and overlapping the microphone, two simple solid toy objects only',
   'acapella-extractor':
     'a chunky rounded cream studio microphone standing upright inside a thick rounded mint green spotlight cone shining down onto it, nothing else in frame',
+  // Came back pink first time. The palette is repeated inside the subject because
+  // the shared style string alone did not hold it.
   'stem-splitter':
-    'four thick rounded horizontal bars stacked in four separate parallel layers with clear gaps between them, the top two mint green and the bottom two cream, like separated tracks in a stack',
+    'four thick rounded horizontal slabs stacked in four separate parallel layers with clear gaps of empty space between them, strictly only mint green and deep forest green and warm cream colours, no pink, no purple, no blue, like separated tracks lifted apart',
+  // Also came back pink first time, hence the explicit exclusions.
   'audio-transcriber':
-    'a chunky rounded cream speech bubble standing upright with three thick solid mint green horizontal lines inside it representing lines of text, simple toy object',
+    'a single chunky rounded warm cream speech bubble standing upright with three thick solid mint green horizontal bars inside it like lines of text, strictly only cream and mint green colours, no pink, no purple, no blue, one object only',
   'subtitle-generator':
     'a chunky rounded cream rectangular screen standing upright with two thick solid mint green horizontal bars across its lower third, like a caption box on a video frame',
   'noise-remover':

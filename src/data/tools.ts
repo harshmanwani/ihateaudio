@@ -689,6 +689,7 @@ export const TOOLS: Tool[] = [
     short: "Work out the musical key of a track, and its Camelot code.",
     category: 'utility',
     icon: 'music-notes-simple',
+    icon3d: true,
     keywords: [
       'key finder what key is this song musical key detector camelot harmonic mixing key detection song key major minor',
     ],
@@ -740,6 +741,7 @@ export const TOOLS: Tool[] = [
     short: "Strip the vocals off a track and keep the instrumental.",
     category: 'ai',
     icon: 'microphone-slash',
+    icon3d: true,
     keywords: [
       'vocal remover remove vocals karaoke instrumental backing track minus one strip singer ai vocal removal',
     ],
@@ -758,6 +760,7 @@ export const TOOLS: Tool[] = [
     short: "Get the vocal on its own, with the music removed.",
     category: 'ai',
     icon: 'microphone-stage',
+    icon3d: true,
     keywords: [
       'acapella extractor isolate vocals extract vocal only voice separator vocal isolation get vocals from song ai',
     ],
@@ -781,6 +784,7 @@ export const TOOLS: Tool[] = [
     short: "Separate a song into vocals, drums, bass and the rest.",
     category: 'ai',
     icon: 'cards-three',
+    icon3d: true,
     keywords: [
       'stem splitter stem separation split song into stems drums bass vocals separator multitrack demix ai',
     ],
@@ -801,6 +805,7 @@ export const TOOLS: Tool[] = [
     short: "Turn a recording of someone talking into text.",
     category: 'ai',
     icon: 'text-t',
+    icon3d: true,
     keywords: [
       'audio to text transcribe transcription speech to text whisper convert voice to text dictation interview transcript free',
     ],
@@ -819,6 +824,7 @@ export const TOOLS: Tool[] = [
     short: "Make an SRT or VTT subtitle file from speech.",
     category: 'ai',
     icon: 'closed-captioning',
+    icon3d: true,
     keywords: [
       'subtitle generator srt vtt captions auto subtitles caption maker video subtitles timed transcript free auto captions',
     ],
