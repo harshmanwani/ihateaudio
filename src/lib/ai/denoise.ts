@@ -143,6 +143,29 @@ export async function denoise(
 
   node.destroy();
 
+  /**
+   * Refuse to hand back silence.
+   *
+   * The worklet does not report failure — if it produces nothing, the wet path is
+   * simply empty, and at full strength the dry path is muted, so the result is a
+   * silent file that looks perfectly valid. Handing that to somebody as their
+   * cleaned recording is the worst outcome available, so it is caught here.
+   */
+  let peak = 0;
+  for (let c = 0; c < rendered.numberOfChannels; c += 1) {
+    const data = rendered.getChannelData(c);
+    for (let i = 0; i < data.length; i += 1) {
+      const value = Math.abs(data[i]!);
+      if (value > peak) peak = value;
+    }
+  }
+  if (peak < 1e-6) {
+    throw new Error(
+      'The denoiser produced silence rather than cleaned audio, so nothing was ' +
+        'changed. This is a fault in the tool, not in your file.'
+    );
+  }
+
   if (rendered.sampleRate === buffer.sampleRate) return rendered;
 
   // Back to the source's own rate.
@@ -176,6 +199,11 @@ export function reductionDb(before: AudioBuffer, after: AudioBuffer): number {
 
   const a = rms(before);
   const b = rms(after);
-  if (a <= 0 || b <= 0) return 0;
+  // Silent output is a failure, not a perfect result, and returning 0 for it made
+  // the tool report "almost nothing was removed — the recording was already clean"
+  // while handing back an empty file. Infinity is the honest answer and the caller
+  // checks for it.
+  if (a <= 0) return 0;
+  if (b <= 0) return Infinity;
   return 20 * Math.log10(a / b);
 }

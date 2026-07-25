@@ -32,11 +32,52 @@ If a future tool needs WebGPU or a newer architecture, revisiting 4.x is a versi
 bump plus an API adjustment rather than a rewrite — the worker structure is what
 makes that cheap.
 
+## The noise remover
+
+`noise-remover.astro` is complete, as is `src/lib/ai/denoise.ts`. It is parked
+because it returns **silence**, not cleaned audio.
+
+Measured: input RMS 0.119, output RMS 0.000, over a fixture of speech with pink
+noise mixed in. The file is the right length and a perfectly valid WAV.
+
+The cause is almost certainly that `RnnoiseWorkletNode` produces nothing inside an
+`OfflineAudioContext`. At full strength the dry path is muted, so an empty wet path
+means an empty result, and the worklet reports no failure of its own.
+
+Two things were fixed on the way to finding this, and both are worth keeping:
+
+- `reductionDb` returned 0 for silent output, which the page rendered as "almost
+  nothing was removed — the recording was already clean". A tool that destroys the
+  file and then reassures you about it is the worst failure available. It now
+  returns Infinity for silence.
+- `denoise()` now refuses to return a silent buffer at all, throwing instead.
+
+Next: confirm the worklet runs offline by rendering a known tone through it and
+checking the output is non-zero. If AudioWorklet genuinely does not run under
+OfflineAudioContext in this browser, the fallbacks are a real-time render through a
+regular AudioContext (slow, but correct), or calling the RNNoise wasm frame by
+frame directly and skipping the worklet wrapper entirely — 480-sample frames at
+48 kHz, which is a small amount of code.
+
 ## Still open
 
-**The mixer on the acapella extractor.** Mounting the stem panel there froze the
-tab. Reverting it looked like the fix and was not: with the revert deployed and
-confirmed live, the extractor still timed out against production while passing
-locally. The vocal remover, same model and code path, passes in the same run. Next
-step is watching a production run with the console attached rather than inferring
-from the harness.
+**The mixer on the acapella extractor.** Mounting the stem panel there freezes the
+tab: no error, no console output, the page stops responding. The vocal remover and
+the song splitter mount the same panel and are fine.
+
+Eliminated so far:
+
+- **Not stem ordering.** The obvious difference was that this page listed the vocal
+  first while the vocal remover lists the instrumental first. Mounting with the
+  identical order to the vocal remover still freezes.
+- **Not the page structure.** Same ToolShell props, same `results` flag, same
+  `defaultFormat`, same single-buffer return, one `<StemPanel />` and one
+  `mountStemPanel` call each.
+- **Not which buffer is returned to the export bar.** Both pages return a buffer
+  that is also held by the panel's player.
+
+Still untried, and the obvious next step: instrument `StemPanel`'s constructor to
+find which stage it stops at — the AudioContext, the DOM build, the first
+`repaint()`, or the ResizeObserver. Everything so far has been inference from the
+outside, and the freeze means the page never gets to report anything, so the
+instrumentation has to write somewhere that survives it.
