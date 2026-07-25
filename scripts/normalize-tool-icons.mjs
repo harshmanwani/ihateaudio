@@ -53,11 +53,19 @@ for (const file of files) {
       const px = image.data;
       const at = (x, y) => (y * w + x) * 4;
 
+      const cornerIndices = [at(2, 2), at(w - 3, 2), at(2, h - 3), at(w - 3, h - 3)];
+
+      // Already normalized: transparent corners mean this file has been through
+      // here before. Running the knockout again would read the premultiplied
+      // black behind those pixels as the background colour and eat every dark
+      // part of the subject, so re-running the script has to be a no-op.
+      if (cornerIndices.every((i) => px[i + 3] < 8)) {
+        return { skipped: true, reason: 'already transparent' };
+      }
+
       // Sample the four corners to learn what "background" is for this image,
       // rather than assuming white: some come back light grey.
-      const corners = [
-        at(2, 2), at(w - 3, 2), at(2, h - 3), at(w - 3, h - 3),
-      ].map((i) => [px[i], px[i + 1], px[i + 2]]);
+      const corners = cornerIndices.map((i) => [px[i], px[i + 1], px[i + 2]]);
       const bg = [0, 1, 2].map(
         (c) => corners.reduce((s, v) => s + v[c], 0) / corners.length
       );

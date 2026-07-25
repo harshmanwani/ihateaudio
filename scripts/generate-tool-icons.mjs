@@ -64,7 +64,7 @@ const SUBJECTS = {
   'audio-joiner':
     'two thick rounded jigsaw puzzle pieces interlocking, one mint green and one cream',
   'audio-splitter':
-    'one thick rounded green bar sliced into three equal separated blocks with clear gaps between them, arranged in a row',
+    'one long thick rounded mint green bar lying horizontally, cleanly cut into three separate equal pieces with clear gaps between them, all three pieces still lined up in one straight row',
   'silence-remover':
     'a cute rounded cartoon head seen from the front, one chunky hand raised with a single index finger held vertically in front of its closed mouth, making a shush gesture, eyes closed',
   'fade-in-out':
@@ -75,6 +75,80 @@ const SUBJECTS = {
     'a thick rounded circular ring like a doughnut with a small arrowhead on it pointing clockwise',
   'crossfade-joiner':
     'two thick rounded flat ribbons crossing over each other in an X shape, one mint green and one cream',
+
+  // Convert. The nine converter pages are the highest-risk group for looking
+  // interchangeable, so each gets a distinct physical object rather than nine
+  // variations on an arrow.
+  'audio-converter':
+    'two thick rounded arrows chasing each other in a circle, one mint green and one cream, forming a two-way swap loop',
+  'mp3-converter':
+    'one single chunky rounded music note, mint green, standing upright as a solid toy object',
+  'wav-converter':
+    'a chunky rounded reel of magnetic studio tape seen at a three-quarter angle, cream reel with mint green tape wound around it',
+  'm4a-converter':
+    'a chunky rounded mint green apple with one small cream leaf on top, solid toy object',
+  'ogg-converter':
+    'one single chunky rounded egg standing upright in a small cream egg cup, the egg mint green',
+  'flac-converter':
+    'a thick rounded treasure chest with its domed lid propped slightly open, cream body with mint green bands',
+  'video-to-audio':
+    'a chunky rounded cream film clapperboard lying flat with one small solid mint green music note resting on top of it',
+  'audio-compressor':
+    'a thick rounded mint green block clamped in a cream C-shaped vise with its screw turned tight, the block visibly squashed narrower where the vise presses it',
+  'sample-rate-converter':
+    'three chunky rounded mint green blocks stacked into a small staircase of three steps, solid toy shape',
+
+  // Volume and loudness.
+  'volume-booster':
+    'a chunky rounded megaphone pointing up and to the right, mint green cone with a cream handle',
+  'audio-normalizer':
+    'a chunky rounded toy balance scale, mint green post with two cream pans hanging perfectly level with each other',
+  'bass-booster':
+    'a chunky rounded low wide speaker cabinet in mint green with one large deep cream speaker cone in the middle',
+  'dynamic-compressor':
+    'a chunky rounded mint green hand gripping and squeezing a soft cream ball, the ball dented where the fingers press',
+  'stereo-to-mono':
+    'a chunky rounded Y-shaped cable, two mint green plugs at the top joining down into one single cream plug at the bottom',
+
+  // Speed and pitch.
+  'speed-changer':
+    'a chunky rounded speedometer dial, cream face with a thick mint green needle pointing up and to the right',
+  'pitch-shifter':
+    'one single chunky rounded tuning fork standing upright, mint green, two thick tines and a short handle',
+  'tempo-changer':
+    'a chunky rounded metronome, cream pyramid body with a mint green pendulum arm tilted to one side',
+  'slowed-reverb':
+    'a chunky rounded crescent moon in mint green with two small solid cream stars beside it',
+  'nightcore-maker':
+    'a chunky rounded toy rocket tilted upward, mint green body with cream fins and a round window',
+  'voice-changer':
+    'two chunky rounded theatre masks standing side by side, one mint green with a smiling mouth and one cream with a frowning mouth, simple cut-out eyes',
+
+  // Effects.
+  'reverb-adder':
+    'a chunky rounded cream pebble sitting in mint green water with three thick concentric ripple rings spreading around it',
+  'echo-adder':
+    'a chunky rounded mint green ball with three smaller cream copies of itself trailing behind it along a curved bouncing path, each copy smaller than the one before',
+  '8d-audio-maker':
+    'a chunky rounded mint green globe with one thick cream ring orbiting around it at a tilt',
+  equalizer:
+    'a chunky rounded cream control panel with five thick vertical slider tracks, each with a mint green knob sitting at a different height',
+  'stereo-widener':
+    'one thick mint green double-headed arrow lying horizontally, with a large clear triangular arrowhead on its left end and another large triangular arrowhead on its right end, both pointing away from each other',
+
+  // Utility and analysis.
+  'ringtone-maker':
+    'a chunky rounded hand bell tilted as if ringing, mint green bell with a cream handle',
+  'android-ringtone-maker':
+    'a chunky rounded cream robot head with two short mint green antennae and two simple round eyes',
+  'voice-recorder':
+    'a chunky rounded studio microphone on a small cream desk stand, mint green capsule with a rounded grille',
+  'bpm-detector':
+    'a chunky rounded mint green heart with a thick cream zigzag pulse line running straight across its middle',
+  'loudness-meter':
+    'one single chunky rounded analogue VU meter gauge, a round cream dial face with a thick mint green needle swung to the upper right, set in a rounded mint green case, nothing else in the frame',
+  'waveform-generator':
+    'a chunky rounded cream picture frame standing upright with five solid mint green bars of different heights inside it',
 };
 
 const targets = process.argv.slice(2).length
