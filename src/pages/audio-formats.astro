@@ -1,0 +1,215 @@
+---
+import Base from '../layouts/Base.astro';
+import { SITE } from '../consts';
+
+interface Row {
+  format: string;
+  lossy: string;
+  typical: string;
+  support: string;
+  use: string;
+}
+
+const rows: Row[] = [
+  {
+    format: 'MP3',
+    lossy: 'Lossy',
+    typical: '1 MB/min at 128 kbps',
+    support: 'Universal',
+    use: 'Anything that has to play everywhere, on anything, including a 2006 car stereo.',
+  },
+  {
+    format: 'AAC / M4A',
+    lossy: 'Lossy',
+    typical: '0.9 MB/min at 128 kbps',
+    support: 'Very wide',
+    use: 'Better than MP3 at the same bitrate. The default for Apple devices and YouTube.',
+  },
+  {
+    format: 'Opus',
+    lossy: 'Lossy',
+    typical: '0.5 MB/min at 64 kbps',
+    support: 'Modern browsers, Discord, WhatsApp',
+    use: 'The best quality per byte by a wide margin, especially for speech. Poor legacy hardware support.',
+  },
+  {
+    format: 'OGG Vorbis',
+    lossy: 'Lossy',
+    typical: '1 MB/min at 128 kbps',
+    support: 'Wide except Apple',
+    use: 'Royalty-free. Standard in game engines like Unity and Godot.',
+  },
+  {
+    format: 'WMA',
+    lossy: 'Lossy',
+    typical: '1 MB/min at 128 kbps',
+    support: 'Windows-centric, declining',
+    use: 'Legacy only. Convert away from it rather than to it.',
+  },
+  {
+    format: 'FLAC',
+    lossy: 'Lossless',
+    typical: '5 MB/min',
+    support: 'Wide except older Apple',
+    use: 'Archiving and distribution where quality must be bit-perfect but size still matters.',
+  },
+  {
+    format: 'ALAC',
+    lossy: 'Lossless',
+    typical: '5.5 MB/min',
+    support: 'Apple ecosystem',
+    use: 'FLAC’s equivalent for people living inside Apple software.',
+  },
+  {
+    format: 'WAV',
+    lossy: 'Uncompressed',
+    typical: '10 MB/min at 44.1 kHz stereo',
+    support: 'Universal',
+    use: 'Editing and mastering. Never for distribution — it is ten times the size for no audible gain.',
+  },
+  {
+    format: 'AIFF',
+    lossy: 'Uncompressed',
+    typical: '10 MB/min',
+    support: 'Universal',
+    use: 'The Mac world’s WAV. Functionally interchangeable.',
+  },
+];
+
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: 'Audio format guide: which one should you use?',
+    description:
+      'MP3, AAC, Opus, FLAC, WAV and the rest compared by size, quality, compatibility and what each is actually for.',
+    author: { '@type': 'Organization', name: SITE.name },
+    publisher: { '@type': 'Organization', name: SITE.name },
+  },
+];
+---
+
+<Base
+  title="Audio Format Guide — MP3 vs AAC vs FLAC vs WAV vs Opus"
+  description="A plain comparison of every common audio format: file size per minute, quality, device support, and what each one is genuinely best at. Plus what bitrate to actually use."
+  path="/audio-formats"
+  schema={schema}
+>
+  <div class="wrap page">
+    <div class="prose" style="margin-bottom: var(--s10)">
+      <h1>Which audio format should you use?</h1>
+      <p class="toolhead__sub">
+        Nine formats, what each is actually for, and the two rules that settle
+        most decisions.
+      </p>
+    </div>
+
+    <div class="tablewrap" style="margin-bottom: var(--s12)">
+      <table class="datatable">
+        <thead>
+          <tr>
+            <th scope="col">Format</th>
+            <th scope="col">Type</th>
+            <th scope="col">Size</th>
+            <th scope="col">Support</th>
+            <th scope="col" style="white-space: normal; min-width: 24rem">Best for</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            rows.map((row) => (
+              <tr>
+                <th scope="row" style="font-weight: 600">
+                  {row.format}
+                </th>
+                <td>{row.lossy}</td>
+                <td>{row.typical}</td>
+                <td style="white-space: normal">{row.support}</td>
+                <td style="white-space: normal">{row.use}</td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="prose">
+      <h2>The two rules that settle most decisions</h2>
+      <p>
+        <strong>Edit in lossless, distribute in lossy.</strong> Every time you
+        decode and re-encode a lossy file you lose a little more, the way a
+        photocopy of a photocopy degrades. Keep WAV or FLAC while you are
+        working, and encode to MP3 or AAC exactly once, at the end.
+      </p>
+      <p>
+        <strong>Pick for the worst device that has to play it.</strong> Opus is
+        technically the best lossy codec available, but if the file needs to
+        play on a ten-year-old car stereo, its technical superiority is
+        irrelevant. MP3 remains the correct answer more often than audio people
+        like to admit.
+      </p>
+
+      <h2>What bitrate is actually enough?</h2>
+      <p>
+        For music in MP3, 192 kbps is where most listeners stop being able to
+        pick the compressed file out of a pair in a blind test, and 256 kbps is
+        comfortably transparent for nearly everyone. 320 kbps exists mostly for
+        peace of mind. Below 128 kbps you start hearing it on cymbals and
+        applause first — dense high-frequency noise is what MP3 handles worst.
+      </p>
+      <p>
+        For speech, the numbers drop dramatically. A voice recording at 64 kbps
+        mono AAC sounds fine, and Opus at 32 kbps is genuinely usable. A podcast
+        does not need 192 kbps stereo, and shipping one at that rate triples
+        your hosting bill for something nobody can hear.
+      </p>
+      <p>
+        AAC buys roughly a 20–30% bitrate advantage over MP3 at equivalent
+        quality; Opus roughly doubles it again at low bitrates. So 128 kbps AAC
+        is about the same as 160–192 kbps MP3, and 64 kbps Opus beats both for
+        voice.
+      </p>
+
+      <h2>Sample rate and bit depth</h2>
+      <p>
+        44.1 kHz is the CD standard and covers everything humans can hear —
+        sampling theory means it reproduces frequencies up to 22 kHz, which is
+        already above most adults' hearing. 48 kHz is the video and broadcast
+        standard. Higher rates matter during production, where processing
+        artefacts can fold back into the audible range, but they buy nothing in
+        a finished file.
+      </p>
+      <p>
+        Bit depth controls dynamic range, not fidelity: 16-bit gives 96 dB, more
+        than any listening environment can use, while 24-bit gives 144 dB and
+        exists so engineers can record with generous headroom and normalize
+        later without amplifying noise. Deliver 16-bit; work in 24-bit or float.
+      </p>
+
+      <h2>The formats to avoid</h2>
+      <p>
+        Do not distribute WAV. It is ten times the size of a transparent MP3 and
+        nobody can hear the difference on a finished master. Do not convert
+        <em>to</em> WMA in 2026 unless a specific device demands it. And do not
+        convert a lossy file to FLAC expecting improvement — you get a lossless
+        copy of the damage that was already done, at five times the size.
+      </p>
+      <p>
+        Converting between formats is free of extra loss only when the source is
+        lossless. If you have an MP3 and need an M4A, you will lose a small
+        amount; there is no way around that, and it is usually inaudible for a
+        single conversion at a decent bitrate.
+      </p>
+
+      <h2>Convert between any of these</h2>
+      <p>
+        The <a href="/audio-converter">audio converter</a> handles every format
+        on this page, in your browser, with nothing uploaded. MP3 and WAV are
+        instant; the rest load a converter once and then stay fast. If your goal
+        is a smaller file rather than a different format, the
+        <a href="/audio-compressor">file size reducer</a> shows the projected
+        size before you commit.
+      </p>
+    </div>
+  </div>
+</Base>

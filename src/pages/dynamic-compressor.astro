@@ -1,0 +1,427 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('dynamic-compressor');
+
+const steps = [
+  'Drop the recording onto the page. The transport plays the compressed result, so every change you make is audible immediately against the file you started with.',
+  'Start from a preset. Voice and podcast suits anything spoken; gentle is the least destructive place to begin on music.',
+  'Move the threshold until the loud moments are being caught and the quiet ones are left alone, then set the ratio to decide how firmly they are held down.',
+  'Shape the character with attack and release: a slower attack keeps the punch of consonants and transients, a longer release stops the level pumping between words.',
+  'Raise the makeup gain to bring the whole file back up to a usable level, then choose a format and download.',
+];
+
+const faq = [
+  {
+    q: 'What does the threshold actually set?',
+    a: 'The level at which the compressor starts working. Anything below it passes through completely untouched; anything above it gets turned down according to the ratio. Lowering the threshold means more of the recording is being processed, which is why very low thresholds on quiet material sound squashed rather than controlled.',
+  },
+  {
+    q: 'What ratio should I use?',
+    a: 'For speech, 3:1 to 5:1 evens out a delivery without drawing attention to itself. Around 2:1 is barely audible and useful for gentle glue on music. Above about 10:1 the compressor is functioning as a limiter — nothing gets past the threshold by much at all, which is right for peak control and wrong for tone.',
+  },
+  {
+    q: 'Why does a fast attack make things sound dull?',
+    a: 'Because the first few milliseconds of a sound carry most of its identity. Clamping down in 1 ms removes the transient of every consonant, drum hit and pick attack, so the result sounds soft and distant. Setting the attack to 15–30 ms lets the transient through and compresses only the body behind it, which keeps the punch.',
+  },
+  {
+    q: 'My voice sounds like it is breathing between words. What is that?',
+    a: 'That is pumping, and it is a release time set too short. The compressor recovers fully during each pause, so the room noise underneath the voice audibly swells and drops with every syllable. Take the release up towards 200–300 ms and the movement becomes too slow to hear as an effect.',
+  },
+  {
+    q: 'Is this the same as normalizing?',
+    a: 'No, and the two solve opposite problems. Normalizing applies one fixed gain to the entire file and leaves the dynamics exactly as they were. Compression continuously changes the gain based on what the signal is doing, which is what reduces the distance between the loud and quiet parts. Compress first if you need it, then normalize.',
+  },
+  {
+    q: 'What does the knee do?',
+    a: 'It controls how abruptly the ratio comes into effect around the threshold. A hard knee of 0 dB means the compressor is entirely off one decibel below and fully engaged one decibel above, which is audible on material that hovers near the line. A soft knee of 10 dB or more eases the ratio in gradually and suits voice and acoustic sources.',
+  },
+  {
+    q: 'Should I compress before or after removing silence?',
+    a: 'Remove the silence first. A silence remover works from a level threshold, and compression raises the quiet parts — including room tone — which can lift background noise above that threshold and stop the gaps from being detected at all. Cut first, compress second, set the final level last.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Download">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Compressor</span>
+        <span class="hint">Preview plays the processed audio.</span>
+      </div>
+
+      <div class="field controls__full">
+        <label class="label" for="dc-preset">Preset</label>
+        <select class="select" id="dc-preset" data-control="preset">
+          <option value="voice" selected>Voice / podcast</option>
+          <option value="music">Music</option>
+          <option value="gentle">Gentle</option>
+          <option value="heavy">Heavy</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="label" for="dc-threshold">
+          Threshold <span class="label__value" data-out="threshold">−20 dB</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="dc-threshold"
+            data-control="threshold"
+            type="range"
+            min="-60"
+            max="0"
+            step="1"
+            value="-20"
+          />
+          <input
+            class="num"
+            data-control="threshold-num"
+            type="number"
+            min="-60"
+            max="0"
+            step="1"
+            value="-20"
+            aria-label="Threshold in decibels"
+          />
+        </div>
+        <span class="hint">
+          Where the compressor starts working. Louder than this gets turned down; quieter than
+          this passes through untouched.
+        </span>
+      </div>
+
+      <div class="field">
+        <label class="label" for="dc-ratio">
+          Ratio <span class="label__value" data-out="ratio">4.0:1</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="dc-ratio"
+            data-control="ratio"
+            type="range"
+            min="1"
+            max="20"
+            step="0.5"
+            value="4"
+          />
+          <input
+            class="num"
+            data-control="ratio-num"
+            type="number"
+            min="1"
+            max="20"
+            step="0.5"
+            value="4"
+            aria-label="Compression ratio"
+          />
+        </div>
+        <span class="hint">
+          How firmly it is held. At 4:1, four decibels above the threshold come out as one.
+          Past 10:1 you have a limiter.
+        </span>
+      </div>
+
+      <div class="field">
+        <label class="label" for="dc-attack">
+          Attack <span class="label__value" data-out="attack">5 ms</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="dc-attack"
+            data-control="attack"
+            type="range"
+            min="0"
+            max="200"
+            step="1"
+            value="5"
+          />
+          <input
+            class="num"
+            data-control="attack-num"
+            type="number"
+            min="0"
+            max="200"
+            step="1"
+            value="5"
+            aria-label="Attack time in milliseconds"
+          />
+        </div>
+        <span class="hint">
+          How long it waits before clamping down. Fast removes the bite of consonants and
+          drum hits; 15–30 ms leaves the punch intact.
+        </span>
+      </div>
+
+      <div class="field">
+        <label class="label" for="dc-release">
+          Release <span class="label__value" data-out="release">120 ms</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="dc-release"
+            data-control="release"
+            type="range"
+            min="10"
+            max="1000"
+            step="10"
+            value="120"
+          />
+          <input
+            class="num"
+            data-control="release-num"
+            type="number"
+            min="10"
+            max="1000"
+            step="10"
+            value="120"
+            aria-label="Release time in milliseconds"
+          />
+        </div>
+        <span class="hint">
+          How long it takes to let go again. Too short and the noise floor breathes between
+          words; too long and one loud moment ducks everything after it.
+        </span>
+      </div>
+
+      <div class="field">
+        <label class="label" for="dc-knee">
+          Knee <span class="label__value" data-out="knee">6 dB</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="dc-knee"
+            data-control="knee"
+            type="range"
+            min="0"
+            max="40"
+            step="1"
+            value="6"
+          />
+          <input
+            class="num"
+            data-control="knee-num"
+            type="number"
+            min="0"
+            max="40"
+            step="1"
+            value="6"
+            aria-label="Knee width in decibels"
+          />
+        </div>
+        <span class="hint">
+          How gradually the ratio comes in around the threshold. 0 dB switches abruptly;
+          10 dB and up eases in and suits voices.
+        </span>
+      </div>
+
+      <div class="field">
+        <label class="label" for="dc-makeup">
+          Makeup gain <span class="label__value" data-out="makeup">+4.0 dB</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="dc-makeup"
+            data-control="makeup"
+            type="range"
+            min="0"
+            max="24"
+            step="0.5"
+            value="4"
+          />
+          <input
+            class="num"
+            data-control="makeup-num"
+            type="number"
+            min="0"
+            max="24"
+            step="0.5"
+            value="4"
+            aria-label="Makeup gain in decibels"
+          />
+        </div>
+        <span class="hint">
+          Compression lowers the peaks, so this puts the level back. Roughly match how much
+          gain reduction you are asking for.
+        </span>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>What a compressor is actually doing</h2>
+    <p>
+      A compressor is an automatic volume control with a rule. It watches the level of the
+      signal, and whenever that level rises above the <strong>threshold</strong> it turns the
+      signal down — not all the way down, only by the fraction set by the
+      <strong>ratio</strong>. At 4:1, four decibels of input above the threshold come out as
+      one. Below the threshold nothing happens at all, so quiet passages are passed through
+      exactly as they arrived.
+    </p>
+    <p>
+      The consequence is that the distance between the loudest and quietest parts of the
+      recording shrinks. That is the entire point. A file where someone leans into the
+      microphone and then drifts away is unusable not because it is too loud or too quiet but
+      because it is both, in the same file. Pull the peaks down, then use
+      <strong>makeup gain</strong> to lift the whole thing back up, and the quiet parts finish
+      louder than they started while the loud parts land roughly where they were.
+    </p>
+
+    <h2>Attack and release, the two people get wrong</h2>
+    <p>
+      Attack is how long the compressor waits before clamping down once the signal crosses the
+      threshold. Release is how long it takes to let go afterwards. Both are measured in
+      milliseconds, and both change the character of a recording far more than the ratio does.
+    </p>
+    <p>
+      A very fast attack of one to three milliseconds catches the initial transient of every
+      consonant, drum hit and pick stroke. That transient is where most of the perceived
+      clarity lives, which is why heavily compressed material sounds soft and far away.
+      Setting the attack to 15–30 ms lets the transient escape and compresses only the body of
+      the sound behind it, which controls the level while keeping the punch.
+    </p>
+    <p>
+      Release is where the audible artefacts come from. Too short, and the compressor fully
+      recovers during every pause, so the room noise under the voice swells and drops with
+      each syllable — the effect usually described as pumping or breathing. Too long, and it
+      never recovers, so a single loud moment holds everything after it down for seconds. For
+      speech, 100–250 ms is a dependable range. For music, a release roughly in step with the
+      tempo stops the compressor fighting the groove.
+    </p>
+
+    <h2>When not to compress</h2>
+    <p>
+      If the only problem is that a file is quiet from end to end, compression is the wrong
+      tool: that is a gain or loudness-normalization job and it costs you nothing in dynamics.
+      If a recording is dynamic on purpose — a classical performance, a sound effect, anything
+      where the contrast is the content — compressing it removes the thing that made it work.
+      And if you are delivering to a streaming platform, they normalize loudness at playback,
+      so compressing harder to be louder does not make you louder. It makes you flatter, at
+      the same volume as everybody else.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { applyCompressor } from '../lib/audio/effects';
+  import { db } from '../lib/format';
+
+  interface Params {
+    threshold: number;
+    ratio: number;
+    attack: number;
+    release: number;
+    knee: number;
+    makeup: number;
+  }
+
+  /** Attack and release are in milliseconds here; the node wants seconds. */
+  const PRESETS: Record<string, Params> = {
+    voice: { threshold: -20, ratio: 4, attack: 5, release: 120, knee: 6, makeup: 4 },
+    music: { threshold: -18, ratio: 3, attack: 15, release: 250, knee: 10, makeup: 3 },
+    gentle: { threshold: -12, ratio: 2, attack: 20, release: 300, knee: 12, makeup: 1.5 },
+    heavy: { threshold: -28, ratio: 10, attack: 2, release: 80, knee: 3, makeup: 8 },
+  };
+
+  const tool = createTool({
+    suffix: 'compressed',
+    defaultFormat: 'mp3',
+
+    onReady(_ctx, runtime) {
+      const root = runtime.root;
+      const preset = root.querySelector<HTMLSelectElement>('[data-control="preset"]');
+      const setters: Record<string, (value: number) => void> = {};
+
+      /** Slider and number input stay in step; the slider is authoritative. */
+      const pair = (name: string, format: (value: number) => string): void => {
+        const slider = root.querySelector<HTMLInputElement>(`[data-control="${name}"]`);
+        const num = root.querySelector<HTMLInputElement>(`[data-control="${name}-num"]`);
+        const out = root.querySelector<HTMLElement>(`[data-out="${name}"]`);
+        if (!slider) return;
+
+        const paint = (): void => {
+          if (out) out.textContent = format(Number(slider.value));
+        };
+
+        // A compressor pass is a full offline render, so it waits for the
+        // slider to be released rather than firing on every pixel.
+        const commit = (): void => runtime.refreshPreview();
+
+        // Moving a control by hand means the preset no longer describes it.
+        const detach = (): void => {
+          if (preset) preset.value = 'custom';
+        };
+
+        slider.addEventListener('input', () => {
+          if (num) num.value = slider.value;
+          detach();
+          paint();
+        });
+        slider.addEventListener('change', commit);
+
+        num?.addEventListener('input', () => {
+          slider.value = num.value;
+          detach();
+          paint();
+        });
+        num?.addEventListener('change', commit);
+
+        setters[name] = (value: number): void => {
+          slider.value = String(value);
+          if (num) num.value = String(value);
+          paint();
+        };
+
+        paint();
+      };
+
+      pair('threshold', (value) => `${value < 0 ? '−' : ''}${Math.abs(value).toFixed(0)} dB`);
+      pair('ratio', (value) => `${value.toFixed(1)}:1`);
+      pair('attack', (value) => `${Math.round(value)} ms`);
+      pair('release', (value) => `${Math.round(value)} ms`);
+      pair('knee', (value) => `${Math.round(value)} dB`);
+      pair('makeup', (value) => db(value));
+
+      preset?.addEventListener('change', () => {
+        const chosen = PRESETS[preset.value];
+        if (!chosen) return;
+        // Setting .value in code fires no input event, so the "custom" fallback
+        // above does not trip and the select keeps the name just chosen.
+        for (const [name, value] of Object.entries(chosen)) {
+          setters[name]?.(value);
+        }
+        runtime.refreshPreview();
+      });
+    },
+
+    preview(ctx) {
+      return render(ctx.buffer);
+    },
+
+    process(ctx) {
+      return render(ctx.buffer);
+    },
+  });
+
+  function render(buffer: AudioBuffer): Promise<AudioBuffer> {
+    return applyCompressor(buffer, {
+      threshold: tool?.value('threshold', -20) ?? -20,
+      ratio: tool?.value('ratio', 4) ?? 4,
+      attack: (tool?.value('attack', 5) ?? 5) / 1000,
+      release: (tool?.value('release', 120) ?? 120) / 1000,
+      knee: tool?.value('knee', 6) ?? 6,
+      makeup: tool?.value('makeup', 4) ?? 4,
+    });
+  }
+</script>

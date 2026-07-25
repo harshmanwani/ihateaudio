@@ -1,0 +1,329 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import Icon from '../components/Icon.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('8d-audio-maker');
+
+const steps = [
+  'Put on headphones before you start. The effect is built from the way sound reaches two ears separately, and speakers deliver both channels to both ears, which cancels most of it.',
+  'Drop a song onto the page. It is decoded in your browser, so a full-length track loads without an upload and without a size cap.',
+  'Set how long one full orbit takes. Twelve seconds is the value most 8D uploads use; slower feels like drifting, faster starts to sound seasick.',
+  'Adjust the distance to move the sound closer to your ears or further out, press play to hear the orbit, then choose a format and download.',
+];
+
+const faq = [
+  {
+    q: 'Why does it barely work on speakers?',
+    a: 'Because both speakers reach both ears. The effect depends on each ear receiving a different signal — one delayed and filtered relative to the other — and on speakers that separation is destroyed by crosstalk before it reaches you. On laptop speakers, where the drivers are centimetres apart, almost nothing survives. Headphones and earbuds keep the two channels isolated, which is the whole requirement.',
+  },
+  {
+    q: 'Is there really such a thing as 8D audio?',
+    a: 'No. There is no eight-channel format, no eight-speaker layout, and nothing being decoded. The name was invented on YouTube around 2018 and stuck because it sounds like an upgrade on 3D. The underlying technique is binaural panning, which has been used in radio drama and audio research since the 1970s. The file this tool produces is an ordinary stereo file.',
+  },
+  {
+    q: 'What is HRTF, and why does it sound like the music left my head?',
+    a: 'A head-related transfer function describes how your head, torso and the folds of your outer ear change a sound before it reaches the eardrum, and those changes differ for every direction. Web Audio ships a measured set of these filters. Plain left-right panning only changes level, which your brain reads as "inside the head, off to one side"; applying the direction-dependent filtering supplies the delay, level and spectral cues your brain uses to place a source outside the skull.',
+  },
+  {
+    q: 'Why does the vocal sound thinner or more distant than the original?',
+    a: 'Two reasons. The HRTF filters are not flat — they carve the notches your ear anatomy actually produces, which removes some energy. And the panner uses an inverse distance model, so anything past the reference distance is attenuated. Pulling the distance control back toward 1 recovers most of the level and body.',
+  },
+  {
+    q: 'Can I 8D a mono recording?',
+    a: 'Yes. A mono file is copied to two identical channels before the panner runs, because the panner needs a stereo destination to write its two different ear signals into. The result is a stereo file even though the input was mono, so it will be roughly twice the size.',
+  },
+  {
+    q: 'How is this different from the stereo widener?',
+    a: 'The widener rescales the difference between the existing left and right channels — it stretches an image that is already there and does not move anything. This creates a moving virtual source and synthesises both channels from scratch through direction-dependent filters. The widener is subtle and mono-safe; this is dramatic and headphone-only.',
+  },
+  {
+    q: 'Does exporting to MP3 damage the effect?',
+    a: 'Joint stereo encoding at low bitrates can, because it saves space by treating the two channels as a mid and a side signal and spending fewer bits on the side. The direction cues live in the differences between channels, so that is exactly the part being thrown away. Export at 192 kbps or above, or use WAV or FLAC if you plan to re-edit.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <div class="note note--info">
+    <Icon name="headphones" size={22} />
+    <div class="note__body">
+      <div class="note__title">Headphones required</div>
+      <p>
+        The orbit is created by feeding each ear a different signal. Speakers send
+        both channels to both ears, which cancels most of the effect — on a phone
+        or laptop speaker the result will sound like the volume is wobbling rather
+        than like the music is moving around you. Any wired or wireless headphones
+        or earbuds will do.
+      </p>
+    </div>
+  </div>
+
+  <ToolShell tool={tool} action="Download">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Orbit</span>
+        <span class="hint">Twelve seconds per turn is the sound most 8D uploads use.</span>
+      </div>
+
+      <div class="field">
+        <label class="label" for="eightd-speed">
+          Time per turn <span class="label__value" data-out="speed">12 s</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="eightd-speed"
+            data-control="speed"
+            type="range"
+            min="6"
+            max="20"
+            step="0.5"
+            value="12"
+          />
+          <input
+            class="num"
+            data-control="speed-num"
+            type="number"
+            min="6"
+            max="20"
+            step="0.5"
+            value="12"
+            aria-label="Seconds per full rotation"
+          />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="eightd-radius">
+          Distance <span class="label__value" data-out="radius">3.00</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="eightd-radius"
+            data-control="radius"
+            type="range"
+            min="1"
+            max="8"
+            step="0.25"
+            value="3"
+          />
+          <input
+            class="num"
+            data-control="radius-num"
+            type="number"
+            min="1"
+            max="8"
+            step="0.25"
+            value="3"
+            aria-label="Orbit radius"
+          />
+        </div>
+      </div>
+
+      <p class="hint controls__full" data-orbit-note aria-live="polite">
+        Roughly 5 turns a minute, circling at about arm's length.
+      </p>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>"8D audio" is a name, not a format</h2>
+    <p>
+      Nothing about this is eight-dimensional, and there is no eight-channel
+      file involved. The term appeared on YouTube around 2018, applied to
+      uploads where a song appeared to circle the listener's head, and it spread
+      because it sounded like a bigger number than 3D. What you download here is
+      an ordinary two-channel stereo file. It will play on anything. Nothing has
+      to be decoded, and no special hardware is required — only headphones,
+      because of how the effect is constructed.
+    </p>
+    <p>
+      The technique underneath is binaural panning, and it is genuinely old.
+      Binaural recording with a dummy head dates to the 1930s, and research labs
+      have been measuring head-related transfer functions since the 1970s. The
+      only thing that changed recently is that a browser can do the filtering in
+      real time, which put it in reach of anyone with a laptop.
+    </p>
+
+    <h2>What HRTF panning actually does</h2>
+    <p>
+      Your brain works out where a sound came from using a handful of physical
+      cues. A source on your right reaches the right ear a few hundred
+      microseconds earlier than the left — the interaural time difference. It
+      also arrives louder there, because your head casts an acoustic shadow that
+      grows stronger with frequency. And the folds of your outer ear filter
+      incoming sound differently depending on the angle it arrives from,
+      creating notches and peaks in the spectrum that resolve the front-back
+      ambiguity the first two cues leave open.
+    </p>
+    <p>
+      A head-related transfer function is the measured combination of all three
+      for one direction. Web Audio ships a set of them and interpolates between
+      the nearest measurements as a virtual source moves, so this tool can place
+      the audio at a point on a circle and step that point around the listener
+      continuously. That is the whole effect: a position automated in a slow
+      circle, and a filter pair applied for each position.
+    </p>
+    <p>
+      It matters that this is not the same as ordinary panning. Turning a pan
+      knob only changes relative level, and your brain interprets a pure level
+      difference as a sound sitting on a line drawn between your ears — inside
+      your head. Restore the timing and spectral cues and the source escapes the
+      skull. That leap from "in my head" to "in the room" is what people are
+      reacting to when they call it 8D.
+    </p>
+
+    <h2>Choosing a speed, and what it costs</h2>
+    <p>
+      Below about eight seconds per turn the movement starts to compete with the
+      music for attention, and for some listeners it produces the same discomfort
+      as a moving horizon. Above sixteen it becomes a slow drift you stop
+      noticing. Twelve is the convention because it is roughly the point where
+      the movement is obvious but never urgent.
+    </p>
+    <p>
+      There is a real cost to be aware of. HRTF filters are not flat, and the
+      distance model attenuates anything beyond the reference radius, so an 8D
+      version is quieter and slightly duller than the original. That is inherent
+      to the process, not a flaw in this implementation. Keep the distance low
+      if the track already sounds thin, and if you plan to publish the result,
+      run it through the loudness meter afterwards rather than assuming it still
+      hits the same level as the source.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { apply8D } from '../lib/audio/effects';
+  import { setChannels } from '../lib/audio/dsp';
+  import { clamp, pct } from '../lib/format';
+
+  interface Pair {
+    get(): number;
+    set(value: number): void;
+  }
+
+  function bindPair(
+    root: HTMLElement,
+    name: string,
+    render: (value: number) => string,
+    onLive: () => void,
+    onCommit: () => void
+  ): Pair | null {
+    const slider = root.querySelector<HTMLInputElement>(`[data-control="${name}"]`);
+    const num = root.querySelector<HTMLInputElement>(`[data-control="${name}-num"]`);
+    const out = root.querySelector<HTMLElement>(`[data-out="${name}"]`);
+    if (!slider || !num) return null;
+
+    const min = Number(slider.min);
+    const max = Number(slider.max);
+
+    const paint = (): void => {
+      slider.style.setProperty('--pct', `${pct(Number(slider.value), min, max)}%`);
+      if (out) out.textContent = render(Number(slider.value));
+    };
+
+    slider.addEventListener('input', () => {
+      num.value = slider.value;
+      paint();
+      onLive();
+    });
+    slider.addEventListener('change', onCommit);
+
+    num.addEventListener('input', () => {
+      const raw = Number(num.value);
+      if (num.value === '' || !Number.isFinite(raw)) return;
+      slider.value = String(clamp(raw, min, max));
+      paint();
+      onLive();
+    });
+    num.addEventListener('change', () => {
+      const value = clamp(Number(num.value), min, max);
+      num.value = String(value);
+      slider.value = String(value);
+      paint();
+      onLive();
+      onCommit();
+    });
+
+    paint();
+
+    return {
+      get: () => Number(slider.value),
+      set: (value: number) => {
+        const v = clamp(value, min, max);
+        slider.value = String(v);
+        num.value = String(v);
+        paint();
+      },
+    };
+  }
+
+  let speed: Pair | null = null;
+  let radius: Pair | null = null;
+  let wired = false;
+
+  function distanceWords(value: number): string {
+    if (value <= 1.5) return 'close enough to brush your ears';
+    if (value <= 3) return "about arm's length";
+    if (value <= 5) return 'out across the room';
+    return 'far off in the distance';
+  }
+
+  /**
+   * The HRTF panner writes two different ear signals, so it needs a stereo
+   * destination. A mono source would collapse them back together and lose the
+   * whole effect, so it is duplicated to two channels first.
+   */
+  function orbit(buffer: AudioBuffer): Promise<AudioBuffer> {
+    const stereo = buffer.numberOfChannels < 2 ? setChannels(buffer, 2) : buffer;
+    return apply8D(stereo, speed?.get() ?? 12, radius?.get() ?? 3);
+  }
+
+  createTool({
+    suffix: '8d',
+    defaultFormat: 'mp3',
+
+    onReady(_ctx, runtime) {
+      if (wired) return;
+      wired = true;
+
+      const root = runtime.root;
+      const note = root.querySelector<HTMLElement>('[data-orbit-note]');
+
+      // HRTF convolution over a whole track is the most expensive effect here,
+      // so the preview re-renders once a control is released rather than on
+      // every step of a drag.
+      let timer = 0;
+      const commit = (): void => {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(() => runtime.refreshPreview(), 250);
+      };
+
+      const describe = (): void => {
+        if (!note) return;
+        const turns = 60 / (speed?.get() ?? 12);
+        note.textContent =
+          `Roughly ${turns.toFixed(1)} turns a minute, circling ` +
+          `${distanceWords(radius?.get() ?? 3)}.`;
+      };
+
+      speed = bindPair(root, 'speed', (v) => `${v} s`, describe, commit);
+      radius = bindPair(root, 'radius', (v) => v.toFixed(2), describe, commit);
+
+      describe();
+    },
+
+    preview(ctx) {
+      return orbit(ctx.buffer);
+    },
+
+    process(ctx) {
+      return orbit(ctx.buffer);
+    },
+  });
+</script>

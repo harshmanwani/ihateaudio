@@ -1,0 +1,365 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('android-ringtone-maker');
+
+const steps = [
+  'Drop the track onto the page. The file is decoded by the browser itself, so nothing is uploaded and there is no queue to wait in.',
+  'Drag the handles across the section you want. Android imposes no length limit, but a call only rings for about 25 seconds before it goes to voicemail, so anything past that is never heard.',
+  'Play the selection on loop and check the first second. That is the part that has to be recognisable from a pocket.',
+  'Add a fade-out if the clip ends abruptly, then click Download ringtone to save an MP3.',
+  'Move the MP3 to your phone and add it from Settings — the exact menu path for Samsung, Pixel and other Android phones appears under the tool once the file has saved.',
+];
+
+const faq = [
+  {
+    q: 'Is there a length limit on Android?',
+    a: 'No. Android will happily set a ten-minute file as a ringtone. The practical limit is that an unanswered call rings for roughly 25 to 30 seconds before it diverts to voicemail, so the tail is simply never played. Anything between 15 and 30 seconds is a sensible target.',
+  },
+  {
+    q: 'Why MP3 rather than M4R?',
+    a: 'M4R is an Apple-only convention and Android ringtone pickers generally will not list one. Android reads MP3, OGG, M4A, WAV and FLAC for tones, and MP3 is the one that works on every phone made in the last fifteen years without argument. It also encodes instantly here, with no converter download.',
+  },
+  {
+    q: 'I copied the file to my phone but it is not in the ringtone list.',
+    a: 'Two likely causes. Either the media scanner has not indexed it yet — a reboot forces a rescan — or the file is in a folder the picker does not search. The reliable fix is to ignore folders entirely and use the plus or "Add ringtone" button inside the ringtone picker, which opens a file browser and lets you point at the file wherever it landed, usually Downloads.',
+  },
+  {
+    q: 'How is this different on Samsung and Pixel phones?',
+    a: 'Only in wording. On a Samsung running One UI the path is Settings → Sounds and vibration → Ringtone, then the plus button at the top right. On a Pixel it is Settings → Sound & vibration → Phone ringtone → My Sounds, then the plus button. Both open the same system file picker underneath.',
+  },
+  {
+    q: 'Can I set a different ringtone for one contact?',
+    a: 'Yes, and it is the most useful thing you can do with a custom tone. Open the Contacts app, choose the person, tap Edit or the three-dot menu, then Set ringtone. Contact-specific tones override the default and are what let you tell who is calling without looking.',
+  },
+  {
+    q: 'Can I use the same file for notifications or alarms?',
+    a: 'Yes — Android does not tag a file by purpose, so one MP3 can serve as a ringtone, a notification sound and an alarm. Cut a much shorter clip for notifications, though; two to four seconds is right, and anything longer becomes irritating after the tenth message of the day.',
+  },
+  {
+    q: 'Will a dual-SIM phone let me set a tone per SIM?',
+    a: 'On most Android builds, yes. The ringtone entry in Settings splits into one row per SIM once both are active, and each row takes its own file. The steps to add the file are otherwise identical.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} selection action="Download ringtone">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Ringtone</span>
+        <span class="hint">Drag the handles, or type exact times.</span>
+      </div>
+
+      <div class="field">
+        <label class="label" for="droid-start">Start</label>
+        <input
+          class="input tnum"
+          id="droid-start"
+          data-control="start"
+          type="text"
+          inputmode="decimal"
+          placeholder="0:00.00"
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </div>
+
+      <div class="field">
+        <label class="label" for="droid-end">End</label>
+        <input
+          class="input tnum"
+          id="droid-end"
+          data-control="end"
+          type="text"
+          inputmode="decimal"
+          placeholder="0:00.00"
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </div>
+
+      <div class="field">
+        <span class="label">
+          Length <span class="label__value tnum" data-out="length">0:00.00</span>
+        </span>
+        <span class="hint">No limit, but a call stops ringing after about 25 seconds.</span>
+      </div>
+
+      <div class="field controls__full">
+        <label class="switch">
+          <input type="checkbox" data-control="fadeout" />
+          <span>Fade out at the end</span>
+        </label>
+      </div>
+
+      <div class="field controls__full" data-fade-field hidden>
+        <label class="label" for="droid-fade">
+          Fade length <span class="label__value" data-out="fade">2.0 s</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="droid-fade"
+            data-control="fade"
+            type="range"
+            min="0.2"
+            max="10"
+            step="0.1"
+            value="2"
+          />
+          <input
+            class="num"
+            data-control="fade-num"
+            type="number"
+            min="0.2"
+            max="10"
+            step="0.1"
+            value="2"
+            aria-label="Fade-out length in seconds"
+          />
+        </div>
+      </div>
+
+      <div class="note note--info controls__full" data-long-note hidden>
+        <div class="note__body">
+          That selection is longer than a call rings for. Android will accept it,
+          but the last part will only ever be heard if someone lets the phone
+          ring out to voicemail.
+        </div>
+      </div>
+    </div>
+  </ToolShell>
+
+  <section class="card" data-install hidden aria-labelledby="droid-install-heading">
+    <div class="prose">
+      <h2 id="droid-install-heading" style="font-size: var(--t-h3)">
+        Setting the MP3 as your ringtone
+      </h2>
+
+      <ol>
+        <li>
+          Get the file onto the phone. If you downloaded it on the phone it is
+          already in Downloads. From a computer, use a USB cable, Google Drive,
+          Nearby Share, or email it to yourself — anything that leaves a real
+          file in storage rather than a streaming link.
+        </li>
+        <li>
+          Open the ringtone setting for your phone:
+          <ul>
+            <li>
+              <strong>Samsung (One UI):</strong> Settings → Sounds and vibration
+              → Ringtone.
+            </li>
+            <li>
+              <strong>Pixel (stock Android):</strong> Settings → Sound &amp;
+              vibration → Phone ringtone → My Sounds.
+            </li>
+            <li>
+              <strong>Xiaomi, OnePlus, Motorola and others:</strong> Settings →
+              Sound (or Sound &amp; vibration) → Ringtone. The wording differs,
+              the screen does not.
+            </li>
+          </ul>
+        </li>
+        <li>
+          Tap the plus button — usually top right on Samsung, at the end of the
+          list on a Pixel — and pick the MP3 from Downloads. This is the step
+          that matters: it copies the file into the system tone library, which
+          is why it works even when the file is in a folder the picker would
+          never have scanned.
+        </li>
+        <li>
+          Select the new tone and confirm with Save or the back gesture. It now
+          appears in the list permanently, alongside the built-in tones.
+        </li>
+      </ol>
+
+      <p class="hint">
+        For one contact only: Contacts → the person → Edit or the three-dot menu
+        → Set ringtone. For a notification sound, the same file appears under
+        Settings → Sound → Notification sound.
+      </p>
+    </div>
+  </section>
+
+  <Fragment slot="about">
+    <h2>Android does not care what the file is called</h2>
+    <p>
+      An Android ringtone is just an audio file. There is no special container,
+      no reserved extension, and no equivalent of the M4R sleight of hand that
+      iPhones require. The system reads MP3, OGG, M4A, WAV and FLAC for tones,
+      and it decides what a file is by asking its decoder, not by reading the
+      last three letters of the name.
+    </p>
+    <p>
+      That is why this page exports plain MP3 and nothing else. It encodes
+      instantly in the browser with no converter to download, it plays on every
+      Android build still in use, and a 30-second clip at 192 kbps is under a
+      megabyte. A lossless tone would be pointless: no phone speaker resolves
+      the difference, and the file would be twenty times the size for a sound
+      you hear across a room.
+    </p>
+
+    <h2>How long a ringtone should actually be</h2>
+    <p>
+      There is no technical limit, which is precisely why people get this wrong.
+      A carrier diverts an unanswered call to voicemail after roughly 25
+      seconds, and most people reach the phone in five. A 90-second ringtone is
+      not a longer ringtone; it is a 25-second ringtone with a minute of audio
+      nobody has ever heard attached to the end.
+    </p>
+    <p>
+      Cut somewhere between 15 and 30 seconds, and put the recognisable part
+      first. Vocal hooks and riffs work; ambient intros and slow builds do not,
+      because the call is answered before they arrive. Loop the selection while
+      you audition it and listen to the join — a ringtone repeats until it is
+      answered, so the transition from end back to start is heard as often as
+      the clip itself. A short fade-out smooths that join and makes an arbitrary
+      cut point sound deliberate.
+    </p>
+
+    <h2>Where Android keeps tones, and why that changed</h2>
+    <p>
+      Older Android versions expected ringtones in a <code>Ringtones</code>
+      folder on internal storage or an SD card, and a media scanner indexed
+      anything it found there. Plenty of guides still tell you to create that
+      folder. It usually works, but it is no longer the mechanism the system
+      relies on.
+    </p>
+    <p>
+      Android 10 introduced scoped storage, which stopped apps from browsing the
+      whole filesystem and moved tone selection onto the system file picker
+      instead. The plus button in the ringtone list opens that picker, copies
+      your file into the phone's tone library, and registers it properly. It is
+      one extra tap and it removes every folder question, every "why is my file
+      not showing up", and every wait for the media scanner to notice. Use it
+      even if the folder trick would have worked.
+    </p>
+    <p>
+      One consequence worth knowing: because the file is copied into the tone
+      library, deleting the original from Downloads afterwards does not remove
+      the ringtone. Tidying up your Downloads folder is safe.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { slice, applyFade } from '../lib/audio/dsp';
+  import { timecode, parseTimecode } from '../lib/format';
+
+  /** Roughly how long a call rings before the carrier takes a voicemail. */
+  const RING_SECONDS = 30;
+
+  const tool = createTool({
+    suffix: 'ringtone',
+    selection: true,
+    formats: ['mp3'],
+    defaultFormat: 'mp3',
+
+    onReady(_ctx, runtime) {
+      const root = runtime.root;
+      const startInput = root.querySelector<HTMLInputElement>('[data-control="start"]');
+      const endInput = root.querySelector<HTMLInputElement>('[data-control="end"]');
+      const lengthOut = root.querySelector<HTMLElement>('[data-out="length"]');
+      const longNote = root.querySelector<HTMLElement>('[data-long-note]');
+      const install = document.querySelector<HTMLElement>('[data-install]');
+
+      if (install) install.hidden = true;
+
+      const sync = (): void => {
+        const selection = runtime.getSelection();
+        if (startInput && document.activeElement !== startInput) {
+          startInput.value = timecode(selection.start);
+        }
+        if (endInput && document.activeElement !== endInput) {
+          endInput.value = timecode(selection.end);
+        }
+        const span = selection.end - selection.start;
+        if (lengthOut) lengthOut.textContent = timecode(span);
+        // Advice, not a limit — Android will take any length.
+        if (longNote) longNote.hidden = span <= RING_SECONDS;
+      };
+
+      root.addEventListener('selectionchange', sync);
+      sync();
+
+      const commit = (): void => {
+        const start = parseTimecode(startInput?.value ?? '');
+        const end = parseTimecode(endInput?.value ?? '');
+        const current = runtime.getSelection();
+        runtime.setSelection({
+          start: start ?? current.start,
+          end: end ?? current.end,
+        });
+        sync();
+      };
+
+      for (const input of [startInput, endInput]) {
+        input?.addEventListener('change', commit);
+        input?.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            commit();
+          }
+        });
+      }
+
+      const fadeSwitch = root.querySelector<HTMLInputElement>('[data-control="fadeout"]');
+      const fadeField = root.querySelector<HTMLElement>('[data-fade-field]');
+      const fadeSlider = root.querySelector<HTMLInputElement>('[data-control="fade"]');
+      const fadeNum = root.querySelector<HTMLInputElement>('[data-control="fade-num"]');
+      const fadeOut = root.querySelector<HTMLElement>('[data-out="fade"]');
+
+      const paintFade = (): void => {
+        if (!fadeSlider) return;
+        const min = Number(fadeSlider.min);
+        const max = Number(fadeSlider.max);
+        const value = Number(fadeSlider.value);
+        fadeSlider.style.setProperty('--pct', `${((value - min) / (max - min)) * 100}%`);
+        if (fadeOut) fadeOut.textContent = `${value.toFixed(1)} s`;
+      };
+
+      fadeSlider?.addEventListener('input', () => {
+        if (fadeNum) fadeNum.value = fadeSlider.value;
+        paintFade();
+      });
+      fadeNum?.addEventListener('input', () => {
+        if (fadeSlider) fadeSlider.value = fadeNum.value;
+        paintFade();
+      });
+      fadeSwitch?.addEventListener('change', () => {
+        if (fadeField) fadeField.hidden = !fadeSwitch.checked;
+      });
+      paintFade();
+      if (fadeField && fadeSwitch) fadeField.hidden = !fadeSwitch.checked;
+    },
+
+    process(ctx) {
+      const { buffer, selection } = ctx;
+      const clip = slice(buffer, selection.start, selection.end);
+
+      const fadeOut = tool?.flag('fadeout')
+        ? Math.min(Math.max(tool.value('fade', 2), 0.2), clip.duration)
+        : 0.02;
+
+      return applyFade(clip, 0.02, fadeOut, 'exponential');
+    },
+  });
+
+  // Reveal the phone instructions the moment an export actually lands.
+  const downloadBtn = document.querySelector<HTMLButtonElement>('[data-download]');
+  const installPanel = document.querySelector<HTMLElement>('[data-install]');
+  if (downloadBtn && installPanel) {
+    new MutationObserver(() => {
+      if (downloadBtn.classList.contains('btn--ready')) installPanel.hidden = false;
+    }).observe(downloadBtn, { attributes: true, attributeFilter: ['class'] });
+  }
+
+  document.querySelector<HTMLButtonElement>('[data-reset]')?.addEventListener('click', () => {
+    if (installPanel) installPanel.hidden = true;
+  });
+</script>

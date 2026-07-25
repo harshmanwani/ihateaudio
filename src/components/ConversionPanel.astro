@@ -1,0 +1,53 @@
+---
+/**
+ * Purpose-built UI for the converter pages.
+ *
+ * A format select alone tells you nothing about what you are about to get. This
+ * puts the source and the output side by side — codec, bitrate, sample rate,
+ * channels, size — and says plainly when a conversion will cost quality or
+ * gain nothing. It is the one piece of interface a converter genuinely needs
+ * beyond the export bar.
+ */
+import Icon from './Icon.astro';
+
+interface Props {
+  /** Extra guidance under the comparison, specific to the target format. */
+  hint?: string;
+}
+
+const { hint } = Astro.props;
+---
+
+<div class="convert" data-convert>
+  <div class="convert__row">
+    <div class="convert__side">
+      <div class="convert__label">You have</div>
+      <div class="convert__format" data-src-format>—</div>
+      <dl class="convert__specs">
+        <div><dt>Length</dt><dd data-src-length>—</dd></div>
+        <div><dt>Sample rate</dt><dd data-src-rate>—</dd></div>
+        <div><dt>Channels</dt><dd data-src-channels>—</dd></div>
+        <div><dt>Size</dt><dd data-src-size>—</dd></div>
+      </dl>
+    </div>
+
+    <div class="convert__arrow" aria-hidden="true">
+      <Icon name="arrow-right" size={20} />
+    </div>
+
+    <div class="convert__side convert__side--out">
+      <div class="convert__label">You will get</div>
+      <div class="convert__format" data-out-format>—</div>
+      <dl class="convert__specs">
+        <div><dt>Length</dt><dd data-out-length>—</dd></div>
+        <div><dt>Sample rate</dt><dd data-out-rate>—</dd></div>
+        <div><dt>Channels</dt><dd data-out-channels>—</dd></div>
+        <div><dt>Size</dt><dd data-out-size>—</dd></div>
+      </dl>
+    </div>
+  </div>
+
+  <div data-convert-verdict></div>
+
+  {hint && <p class="hint">{hint}</p>}
+</div>

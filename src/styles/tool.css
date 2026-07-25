@@ -1,0 +1,665 @@
+/* The tool workspace: dropzone, dark stage, transport, controls, export, chaining. */
+
+.tool {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+}
+
+/* ---------- Dropzone ---------- */
+
+.drop {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s3);
+  min-height: 260px;
+  padding: var(--s8) var(--s5);
+  text-align: center;
+  background: var(--surface);
+  border: 2px dashed var(--line-strong);
+  border-radius: var(--r-lg);
+  transition:
+    border-color var(--dur) var(--ease),
+    background-color var(--dur) var(--ease),
+    transform var(--dur) var(--ease);
+}
+
+.drop[data-armed='true'] {
+  border-color: var(--brand);
+  background: var(--brand-soft);
+  transform: translateY(-2px);
+}
+
+.drop__icon {
+  color: var(--ink-3);
+  transition: color var(--dur) var(--ease);
+}
+
+.drop[data-armed='true'] .drop__icon {
+  color: var(--brand);
+}
+
+.drop__title {
+  font-size: var(--t-lead);
+  font-weight: 600;
+}
+
+.drop__hint {
+  font-size: var(--t-small);
+  color: var(--ink-2);
+  max-width: 46ch;
+}
+
+.drop__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s2);
+  justify-content: center;
+}
+
+.drop__formats {
+  font-size: var(--t-micro);
+  color: var(--ink-3);
+  letter-spacing: 0.01em;
+}
+
+.drop input[type='file'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Full-window drag overlay so users can drop anywhere on the page */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-overlay);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  background: color-mix(in oklch, var(--bg) 82%, transparent);
+  backdrop-filter: blur(2px);
+  font-size: var(--t-lead);
+  font-weight: 600;
+  color: var(--brand);
+}
+
+body[data-dragging='true'] .drop-overlay {
+  display: flex;
+}
+
+/* ---------- File header ---------- */
+
+.filebar {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  min-width: 0;
+}
+
+.filebar__icon {
+  color: var(--brand);
+  flex: none;
+}
+
+.filebar__text {
+  min-width: 0;
+  flex: 1;
+}
+
+.filebar__name {
+  font-size: var(--t-ui);
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filebar__meta {
+  font-size: var(--t-small);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- Stage: the dark workspace ---------- */
+
+.stage {
+  background: var(--stage);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.stage__ruler {
+  height: 22px;
+  background: var(--stage-2);
+  border-bottom: 1px solid var(--stage-line);
+  position: relative;
+  font-size: var(--t-micro);
+  color: var(--stage-ink-2);
+}
+
+.stage__canvas-wrap {
+  position: relative;
+  height: 180px;
+  touch-action: pan-y;
+  cursor: crosshair;
+}
+
+.stage__canvas-wrap[data-mode='view'] {
+  cursor: default;
+}
+
+.stage canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* The "it worked" moment — bars grow from the centreline once, on decode */
+.stage canvas[data-enter='true'] {
+  animation: wave-in var(--dur-panel) var(--ease-expo);
+  transform-origin: center;
+}
+
+@keyframes wave-in {
+  from {
+    transform: scaleY(0.04);
+    opacity: 0.4;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage canvas[data-enter='true'] {
+    animation: fade-in var(--dur) var(--ease);
+  }
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+  }
+}
+
+.stage__playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--playhead);
+  pointer-events: none;
+  transform: translateX(-1px);
+  will-change: left;
+  display: none;
+}
+
+.stage__playhead[data-visible='true'] {
+  display: block;
+}
+
+/* Selection handles */
+.stage__handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 13px;
+  margin-left: -6px;
+  cursor: ew-resize;
+  touch-action: none;
+  display: flex;
+  justify-content: center;
+  z-index: 2;
+}
+
+.stage__handle::before {
+  content: '';
+  width: 3px;
+  background: var(--wave);
+  border-radius: var(--r-full);
+  transition:
+    width var(--dur-micro) var(--ease),
+    background-color var(--dur-micro) var(--ease);
+}
+
+.stage__handle:hover::before,
+.stage__handle[data-grabbed='true']::before {
+  width: 5px;
+  background: var(--playhead);
+}
+
+.stage__handle:focus-visible {
+  outline: 2px solid var(--playhead);
+  outline-offset: 1px;
+}
+
+@media (pointer: coarse) {
+  .stage__handle {
+    width: 28px;
+    margin-left: -14px;
+  }
+}
+
+.stage__handle-tip {
+  position: absolute;
+  top: 4px;
+  padding: 2px var(--s2);
+  border-radius: var(--r-sm);
+  background: var(--stage-2);
+  color: var(--stage-ink);
+  font-size: var(--t-micro);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity var(--dur-micro) var(--ease);
+  pointer-events: none;
+}
+
+.stage__handle:hover .stage__handle-tip,
+.stage__handle[data-grabbed='true'] .stage__handle-tip {
+  opacity: 1;
+}
+
+/* Dimmed regions outside the selection */
+.stage__mask {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in oklch, var(--stage) 68%, transparent);
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* ---------- Transport ---------- */
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s2) var(--s3);
+  background: var(--stage-2);
+  border-top: 1px solid var(--stage-line);
+  flex-wrap: wrap;
+}
+
+.transport__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--r-md);
+  border: 0;
+  background: none;
+  color: var(--stage-ink);
+  cursor: pointer;
+  flex: none;
+  transition:
+    background-color var(--dur-micro) var(--ease),
+    color var(--dur-micro) var(--ease);
+}
+
+.transport__btn:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--stage-ink) 12%, transparent);
+}
+
+.transport__btn:disabled {
+  color: var(--stage-ink-2);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.transport__btn[aria-pressed='true'] {
+  background: var(--wave);
+  color: var(--stage);
+}
+
+.transport__btn:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 1px;
+}
+
+@media (pointer: coarse) {
+  .transport__btn {
+    width: 44px;
+    height: 44px;
+  }
+}
+
+.transport__time {
+  font-size: var(--t-small);
+  color: var(--stage-ink);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.01em;
+  padding-inline: var(--s2);
+}
+
+.transport__time span {
+  color: var(--stage-ink-2);
+}
+
+.transport__spacer {
+  flex: 1;
+  min-width: var(--s2);
+}
+
+/* ---------- Controls ---------- */
+
+.controls {
+  display: grid;
+  gap: var(--s4) var(--s6);
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  padding: var(--s5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+
+.controls--single {
+  grid-template-columns: 1fr;
+}
+
+.controls__full {
+  grid-column: 1 / -1;
+}
+
+.controls__head {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--s3);
+  flex-wrap: wrap;
+}
+
+.controls__title {
+  font-size: var(--t-ui);
+  font-weight: 600;
+}
+
+.hint {
+  font-size: var(--t-small);
+  color: var(--ink-2);
+  line-height: 1.5;
+}
+
+/* ---------- Export bar ---------- */
+
+.export {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--s4);
+  flex-wrap: wrap;
+  padding: var(--s5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+
+.export__field {
+  min-width: 130px;
+  flex: 0 1 auto;
+}
+
+.export__spacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.export__size {
+  font-size: var(--t-small);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  padding-bottom: var(--s2);
+}
+
+@media (max-width: 560px) {
+  .export {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .export .btn {
+    width: 100%;
+  }
+  .export__size {
+    padding-bottom: 0;
+  }
+}
+
+/* ---------- Chain bar: never a dead end ---------- */
+
+.chain {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  padding: var(--s4) var(--s5);
+  background: var(--brand-soft);
+  border: 1px solid color-mix(in oklch, var(--brand) 20%, transparent);
+  border-radius: var(--r-lg);
+  animation: chain-in var(--dur-panel) var(--ease-expo);
+}
+
+@keyframes chain-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chain {
+    animation: none;
+  }
+}
+
+.chain__label {
+  font-size: var(--t-ui);
+  font-weight: 600;
+  color: var(--brand);
+}
+
+.chain__links {
+  display: flex;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+
+/* ---------- Multi-file list (merger, batch convert) ---------- */
+
+.filelist {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+}
+
+.filelist__item {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  background: var(--bg);
+  border-bottom: 1px solid var(--line);
+  min-width: 0;
+}
+
+.filelist__item:last-child {
+  border-bottom: 0;
+}
+
+.filelist__item[data-dragging='true'] {
+  background: var(--brand-soft);
+}
+
+.filelist__grip {
+  color: var(--ink-3);
+  cursor: grab;
+  flex: none;
+  background: none;
+  border: 0;
+  padding: var(--s1);
+  display: flex;
+}
+
+.filelist__grip:active {
+  cursor: grabbing;
+}
+
+.filelist__idx {
+  font-size: var(--t-small);
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+  width: 1.5em;
+  flex: none;
+}
+
+.filelist__name {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--t-ui);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filelist__dur {
+  font-size: var(--t-small);
+  color: var(--ink-2);
+  font-variant-numeric: tabular-nums;
+  flex: none;
+}
+
+/* ---------- Conversion panel (source vs output) ---------- */
+
+.convert {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+  padding: var(--s5);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+}
+
+.convert__row {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: var(--s4);
+  align-items: stretch;
+}
+
+.convert__side {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+}
+
+/* The output side is the answer to the question the page asks, so it gets the
+   brand tint while the source stays neutral. */
+.convert__side--out .convert__format {
+  color: var(--brand);
+}
+
+.convert__label {
+  font-size: var(--t-micro);
+  font-weight: 500;
+  color: var(--ink-3);
+}
+
+.convert__format {
+  font-size: var(--t-ui);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.convert__arrow {
+  display: flex;
+  align-items: center;
+  color: var(--ink-3);
+  padding-top: var(--s5);
+}
+
+.convert__specs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+}
+
+.convert__specs > div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--s3);
+  font-size: var(--t-small);
+  padding-block: 3px;
+  border-bottom: 1px solid var(--line);
+}
+
+.convert__specs > div:last-child {
+  border-bottom: 0;
+}
+
+.convert__specs dt {
+  color: var(--ink-2);
+}
+
+.convert__specs dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  .convert__row {
+    grid-template-columns: 1fr;
+  }
+
+  .convert__arrow {
+    padding-top: 0;
+    justify-content: center;
+    transform: rotate(90deg);
+  }
+}
+
+/* ---------- Result list (splitter output) ---------- */
+
+.results {
+  display: grid;
+  gap: var(--s2);
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+
+.result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s3);
+  padding: var(--s3) var(--s4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  font-size: var(--t-small);
+  min-width: 0;
+}
+
+.result__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

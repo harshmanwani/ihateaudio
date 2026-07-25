@@ -1,0 +1,417 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('ringtone-maker');
+
+const steps = [
+  'Drop the song onto the page. It is read straight off your disk, so an unreleased mix is exactly as private here as it is in your own music folder.',
+  'Drag the handles over the part you want. The selection is capped at 30 seconds because iOS refuses to install anything longer, and the tool trims it for you rather than letting you find out after syncing.',
+  'Press play with loop turned on and listen to the first second. A ringtone is judged almost entirely on how it starts, so land the beginning on a beat rather than halfway through a word.',
+  'Turn on the fade-out if the clip stops mid-phrase, then click Download ringtone to get an M4R file.',
+  'Sync the M4R to the iPhone with Finder on macOS or iTunes on Windows — the full instructions appear under the tool once the file has saved.',
+];
+
+const faq = [
+  {
+    q: 'Why is 30 seconds the limit?',
+    a: 'It is enforced by iOS, not by this page. A tone longer than 30 seconds is accepted by the sync but never appears in Settings → Sounds & Haptics, so you end up troubleshooting a file that was never going to work. The tool clamps the selection instead, which is why the end handle stops following your cursor once you hit half a minute.',
+  },
+  {
+    q: 'What actually is an M4R file?',
+    a: 'An AAC audio stream inside an MP4 container — byte for byte the same thing as an M4A. iOS decides whether a file is a song or a ringtone purely from the extension, which is why renaming an M4A to M4R works and renaming an MP3 does not. The container has to be MP4 to start with.',
+  },
+  {
+    q: 'Can I install the ringtone directly from my iPhone?',
+    a: 'No, and nobody else can either. Safari on iOS will happily download the .m4r into the Files app, but iOS provides no route from Files to the ringtone list. The only two supported paths are syncing from a computer, or importing the audio into GarageBand on the phone and using Share → Ringtone. Any site that claims otherwise is describing a step that does not exist.',
+  },
+  {
+    q: 'Why does this tool take longer than the trimmer?',
+    a: 'Browsers ship an AAC decoder but not an AAC encoder, so writing a real M4R needs a proper encoder. The first export downloads a WebAssembly build of ffmpeg — roughly 31 MB — and the browser caches it afterwards, so a second ringtone exports immediately. The audio itself still never leaves your device; the code comes to the file.',
+  },
+  {
+    q: 'Where does the name in the ringtone list come from?',
+    a: 'From the filename, minus the extension. The download is named after your source file with "-ringtone" appended, so rename it before you sync if you want something tidier in the list. Renaming it later on the phone is not possible without re-syncing.',
+  },
+  {
+    q: 'Will an M4R work on an Android phone?',
+    a: 'No. Android does not recognise the extension and most ringtone pickers will not even list the file. Use the Android ringtone maker instead, which produces an MP3 and has no length limit.',
+  },
+  {
+    q: 'Can I use the same file as a text tone or an alarm?',
+    a: 'Yes. Tones synced to an iPhone appear in every tone list, so the same M4R can be picked under Ringtone, Text Tone or New Voicemail. For a text tone, cut something closer to two or three seconds — a 30-second alert repeated through a workday gets old quickly.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} selection action="Download ringtone">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Ringtone</span>
+        <span class="hint">Drag the handles, or type exact times.</span>
+      </div>
+
+      <div class="field">
+        <label class="label" for="ring-start">Start</label>
+        <input
+          class="input tnum"
+          id="ring-start"
+          data-control="start"
+          type="text"
+          inputmode="decimal"
+          placeholder="0:00.00"
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </div>
+
+      <div class="field">
+        <label class="label" for="ring-end">End</label>
+        <input
+          class="input tnum"
+          id="ring-end"
+          data-control="end"
+          type="text"
+          inputmode="decimal"
+          placeholder="0:00.00"
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </div>
+
+      <div class="field">
+        <span class="label">
+          Length <span class="label__value tnum" data-out="length">0:00.00</span>
+        </span>
+        <span class="hint">Maximum 30 seconds. iOS will not list a longer tone.</span>
+      </div>
+
+      <div class="field controls__full">
+        <label class="switch">
+          <input type="checkbox" data-control="fadeout" />
+          <span>Fade out at the end</span>
+        </label>
+      </div>
+
+      <div class="field controls__full" data-fade-field hidden>
+        <label class="label" for="ring-fade">
+          Fade length <span class="label__value" data-out="fade">2.0 s</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="ring-fade"
+            data-control="fade"
+            type="range"
+            min="0.2"
+            max="10"
+            step="0.1"
+            value="2"
+          />
+          <input
+            class="num"
+            data-control="fade-num"
+            type="number"
+            min="0.2"
+            max="10"
+            step="0.1"
+            value="2"
+            aria-label="Fade-out length in seconds"
+          />
+        </div>
+      </div>
+
+      <div class="note note--warn controls__full" data-limit-note hidden>
+        <div class="note__body">
+          <div class="note__title">Trimmed to 30 seconds</div>
+          <div>
+            iOS only installs ringtones of 30 seconds or less. Anything longer
+            syncs without an error and then never shows up in the tone list, so
+            the selection is capped here instead. Move the start handle to
+            choose which 30 seconds you keep.
+          </div>
+        </div>
+      </div>
+
+      <div class="note note--info controls__full">
+        <div class="note__body">
+          M4R needs a real AAC encoder, which browsers do not include. The first
+          export downloads one (about 31 MB) and caches it, so the next ringtone
+          is immediate. Your audio is still never uploaded.
+        </div>
+      </div>
+    </div>
+  </ToolShell>
+
+  <section class="card" data-install hidden aria-labelledby="install-heading">
+    <div class="prose">
+      <h2 id="install-heading" style="font-size: var(--t-h3)">
+        Installing the ringtone on your iPhone
+      </h2>
+
+      <div class="note note--warn">
+        <div class="note__body">
+          There is no way to install a custom ringtone from a browser on iOS.
+          Safari can save the .m4r into Files, but iOS gives Files no route into
+          the ringtone list. You need either a computer or GarageBand. Both
+          methods are below.
+        </div>
+      </div>
+
+      <h3>With a Mac (macOS Catalina 10.15 or later)</h3>
+      <ol>
+        <li>Move the .m4r file to the Mac if you downloaded it elsewhere.</li>
+        <li>Connect the iPhone by cable and open Finder. The phone appears in
+          the sidebar under Locations; click it and trust the computer if
+          prompted.</li>
+        <li>Drag the .m4r file from Finder straight onto the iPhone in the
+          sidebar. It copies across in a second or two — there is no separate
+          Tones tab in Finder.</li>
+        <li>On the phone, open Settings → Sounds &amp; Haptics → Ringtone. The
+          new tone sits at the top of the list, above the built-in ones.</li>
+      </ol>
+
+      <h3>With Windows, or macOS Mojave and earlier</h3>
+      <ol>
+        <li>Install iTunes, or the Apple Devices app on Windows 11, and open
+          it.</li>
+        <li>Connect the iPhone and click the device icon in the toolbar.</li>
+        <li>Select Tones in the sidebar, then drag the .m4r file into the tone
+          list.</li>
+        <li>Click Sync. When it finishes, pick the tone under Settings → Sounds
+          &amp; Haptics → Ringtone on the phone.</li>
+      </ol>
+
+      <h3>With no computer at all</h3>
+      <ol>
+        <li>Install GarageBand from the App Store — it is free and this is the
+          only Apple-supported route that does not involve a cable.</li>
+        <li>GarageBand does not import .m4r files. Convert your clip to M4A or
+          MP3 first with the audio converter, and save it into Files.</li>
+        <li>Create an empty Audio Recorder project, open the loop browser
+          (the loop icon), choose Files, and bring the clip in.</li>
+        <li>Go back to My Songs, press and hold the project, choose Share →
+          Ringtone, name it and tap Export. GarageBand enforces the same
+          30-second limit and will offer to trim for you.</li>
+      </ol>
+
+      <p class="hint">
+        The name shown in the ringtone list is the filename without its
+        extension, so rename the file before you sync if you want something
+        shorter.
+      </p>
+    </div>
+  </section>
+
+  <Fragment slot="about">
+    <h2>What an M4R file really is</h2>
+    <p>
+      An M4R is an AAC audio stream in an MP4 container — the same thing as an
+      M4A, with three different letters on the end. iOS never looks inside the
+      file to decide what it is; it looks at the extension. That is why renaming
+      an M4A to M4R works, why renaming an MP3 to M4R does not, and why the
+      whole ringtone format is less a format than a naming convention that
+      stuck.
+    </p>
+    <p>
+      The consequence is an encoding step. Every browser can decode AAC, because
+      it has to play video, but none of them expose an AAC encoder to
+      JavaScript. Producing a genuine M4R therefore needs a real encoder, and
+      this page loads a WebAssembly build of ffmpeg the first time you export
+      one. It is a sizeable download and it happens once, after which the
+      browser caches it. Decoding, trimming and the fade all happen instantly
+      before that point, and the audio still never leaves the tab: the encoder
+      travels to your file rather than your file travelling to a server.
+    </p>
+
+    <h2>Choosing 30 seconds that work as a ringtone</h2>
+    <p>
+      A ringtone is not a short song. It is heard from a pocket, usually across
+      a room, and almost always for less time than it lasts — most people answer
+      or silence a call within five or six seconds. Everything that matters is
+      at the front.
+    </p>
+    <p>
+      That argues for starting on a downbeat with something recognisable
+      immediately: a vocal hook, a riff, a drop. Long intros, held notes and
+      slow builds are wasted, because the call is answered before they resolve.
+      Avoid starting on a breath or a room-tone gap, which reads as a delay in
+      the phone rather than part of the music. Loop the selection while you
+      audition it — the loop button in the transport is there for this — and
+      listen specifically to the seam where the end meets the start again.
+    </p>
+    <p>
+      The fade-out matters less than you would think, since the tone rarely
+      reaches its end, but it is worth turning on when a clip stops mid-phrase.
+      Two seconds is enough to make an arbitrary cut sound intentional without
+      swallowing the part you chose.
+    </p>
+
+    <h2>Why iOS makes this harder than it should be</h2>
+    <p>
+      Android treats a ringtone as an ordinary audio file: put an MP3 anywhere
+      the phone can see it, point the picker at it, done. iOS treats tones as a
+      synced device library, so a file on the phone is not a tone until
+      something tells the system it is one — and nothing in iOS does that. The
+      Files app cannot, Safari cannot, and no web page can, whatever it claims
+      in its instructions.
+    </p>
+    <p>
+      The two routes Apple does support are syncing from a computer, which works
+      identically on a Mac and a PC once you find the right window, and
+      GarageBand on the phone, which can export any project it holds as a
+      ringtone. Neither is difficult. Both are unnecessary steps that exist
+      because tones remain one of the last corners of iOS that never moved off
+      the desktop-sync model.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { slice, applyFade } from '../lib/audio/dsp';
+  import { timecode, parseTimecode } from '../lib/format';
+
+  /** iOS silently ignores any tone longer than this. */
+  const LIMIT = 30;
+
+  const tool = createTool({
+    suffix: 'ringtone',
+    selection: true,
+    formats: ['m4r'],
+    defaultFormat: 'm4r',
+
+    onReady(_ctx, runtime) {
+      const root = runtime.root;
+      const startInput = root.querySelector<HTMLInputElement>('[data-control="start"]');
+      const endInput = root.querySelector<HTMLInputElement>('[data-control="end"]');
+      const lengthOut = root.querySelector<HTMLElement>('[data-out="length"]');
+      const limitNote = root.querySelector<HTMLElement>('[data-limit-note]');
+      const install = document.querySelector<HTMLElement>('[data-install]');
+
+      if (install) install.hidden = true;
+
+      // Re-entrancy guard: clamping the selection dispatches selectionchange,
+      // which would call this handler again.
+      let clamping = false;
+      let clamped = false;
+
+      const sync = (): void => {
+        const selection = runtime.getSelection();
+        if (startInput && document.activeElement !== startInput) {
+          startInput.value = timecode(selection.start);
+        }
+        if (endInput && document.activeElement !== endInput) {
+          endInput.value = timecode(selection.end);
+        }
+        if (lengthOut) {
+          lengthOut.textContent = timecode(selection.end - selection.start);
+        }
+      };
+
+      const enforce = (): void => {
+        if (clamping) return;
+        const selection = runtime.getSelection();
+        const span = selection.end - selection.start;
+
+        if (span > LIMIT + 0.005) {
+          clamping = true;
+          runtime.setSelection({
+            start: selection.start,
+            end: selection.start + LIMIT,
+          });
+          clamping = false;
+          clamped = true;
+        } else if (span < LIMIT - 0.02) {
+          clamped = false;
+        }
+
+        if (limitNote) limitNote.hidden = !clamped;
+        sync();
+      };
+
+      root.addEventListener('selectionchange', enforce);
+      enforce();
+
+      const commit = (): void => {
+        const start = parseTimecode(startInput?.value ?? '');
+        const end = parseTimecode(endInput?.value ?? '');
+        const current = runtime.getSelection();
+        runtime.setSelection({
+          start: start ?? current.start,
+          end: end ?? current.end,
+        });
+        sync();
+      };
+
+      for (const input of [startInput, endInput]) {
+        input?.addEventListener('change', commit);
+        input?.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter') {
+            event.preventDefault();
+            commit();
+          }
+        });
+      }
+
+      const fadeSwitch = root.querySelector<HTMLInputElement>('[data-control="fadeout"]');
+      const fadeField = root.querySelector<HTMLElement>('[data-fade-field]');
+      const fadeSlider = root.querySelector<HTMLInputElement>('[data-control="fade"]');
+      const fadeNum = root.querySelector<HTMLInputElement>('[data-control="fade-num"]');
+      const fadeOut = root.querySelector<HTMLElement>('[data-out="fade"]');
+
+      const paintFade = (): void => {
+        if (!fadeSlider) return;
+        const min = Number(fadeSlider.min);
+        const max = Number(fadeSlider.max);
+        const value = Number(fadeSlider.value);
+        fadeSlider.style.setProperty('--pct', `${((value - min) / (max - min)) * 100}%`);
+        if (fadeOut) fadeOut.textContent = `${value.toFixed(1)} s`;
+      };
+
+      fadeSlider?.addEventListener('input', () => {
+        if (fadeNum) fadeNum.value = fadeSlider.value;
+        paintFade();
+      });
+      fadeNum?.addEventListener('input', () => {
+        if (fadeSlider) fadeSlider.value = fadeNum.value;
+        paintFade();
+      });
+      fadeSwitch?.addEventListener('change', () => {
+        if (fadeField) fadeField.hidden = !fadeSwitch.checked;
+      });
+      paintFade();
+      if (fadeField && fadeSwitch) fadeField.hidden = !fadeSwitch.checked;
+    },
+
+    process(ctx) {
+      const { buffer, selection } = ctx;
+      const end = Math.min(selection.end, selection.start + LIMIT);
+      const clip = slice(buffer, selection.start, end);
+
+      // A 20 ms edge fade is inaudible as a fade but removes the click a cut
+      // mid-waveform would otherwise produce.
+      const fadeOut = tool?.flag('fadeout')
+        ? Math.min(Math.max(tool.value('fade', 2), 0.2), clip.duration)
+        : 0.02;
+
+      return applyFade(clip, 0.02, fadeOut, 'exponential');
+    },
+  });
+
+  // The install steps are only useful once a file exists. markReady() re-adds
+  // btn--ready after every successful export, which is the precise moment.
+  const downloadBtn = document.querySelector<HTMLButtonElement>('[data-download]');
+  const installPanel = document.querySelector<HTMLElement>('[data-install]');
+  if (downloadBtn && installPanel) {
+    new MutationObserver(() => {
+      if (downloadBtn.classList.contains('btn--ready')) installPanel.hidden = false;
+    }).observe(downloadBtn, { attributes: true, attributeFilter: ['class'] });
+  }
+
+  document.querySelector<HTMLButtonElement>('[data-reset]')?.addEventListener('click', () => {
+    if (installPanel) installPanel.hidden = true;
+  });
+</script>

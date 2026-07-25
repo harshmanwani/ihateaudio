@@ -1,0 +1,355 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('crossfade-joiner');
+
+const steps = [
+  'Drop every file you want blended together in one go. They are decoded on your machine, so a set of full-length tracks opens as fast as a set of clips.',
+  'Arrange them in playing order. Drag a row by its handle, or move it with the up and down buttons, which work from the keyboard.',
+  'Set the crossfade length. Each join overlaps by that amount, so the finished file is shorter than the parts added together — the running total shows by how much.',
+  'Choose a format and download. Every join is rendered with an equal-power blend, so the level stays steady straight through the transition.',
+];
+
+const faq = [
+  {
+    q: 'What does "equal-power" mean, and why not just fade one down while the other comes up?',
+    a: 'That simpler approach — equal-gain — makes both tracks 50 percent at the midpoint. For unrelated material, power adds rather than amplitude, so 0.5 plus 0.5 gives half the power you started with: an audible 3 dB dip right in the middle of every transition. An equal-power crossfade uses cosine and sine curves instead, and because cos² plus sin² is always 1, the total power stays constant the whole way across. You hear one thing become another rather than a dip between them.',
+  },
+  {
+    q: 'Why is the merged file shorter than the sum of the parts?',
+    a: 'Because the tracks overlap rather than queue up. Each join eats one crossfade length out of the total, so joining four four-minute tracks with an eight-second crossfade gives 16 minutes minus three lots of eight seconds — 15 minutes 36 seconds. The running total in the panel already accounts for this.',
+  },
+  {
+    q: 'How long should the crossfade be?',
+    a: 'For beat-matched dance music, four to twelve seconds, which is roughly eight to sixteen bars at club tempos. For ambience and drones, three to five seconds, long enough that no single moment is the transition. For speech and podcast segments, 0.3 to 1 second — anything longer and two people are talking over each other, which sounds like a mistake rather than a blend.',
+  },
+  {
+    q: 'Does it beat-match or align the tempos for me?',
+    a: 'No. The crossfade is purely a level operation; it does not analyse tempo, detect downbeats or time-stretch anything. If two tracks are at different tempos you will hear both tempos at once through the overlap. Detect the tempo of each with the BPM detector and bring them together with the tempo changer first, then come back here.',
+  },
+  {
+    q: 'What if the crossfade is longer than one of my files?',
+    a: 'The slider will not let you get there. Its maximum is set to half the length of your shortest file once everything has decoded, because an overlap longer than the file it is overlapping has no sensible meaning — the track would begin fading out before it had finished fading in. If you need a long crossfade, the short file is the thing to fix.',
+  },
+  {
+    q: 'When would I use the plain joiner instead?',
+    a: 'Whenever the boundary should be a boundary. Album tracks, audiobook chapters, separate takes and anything with applause or announcements between segments all want a hard join, sometimes with a gap. A crossfade is for material meant to feel continuous — sets, mixes, ambience beds, and montages.',
+  },
+  {
+    q: 'The overlap sounds hollow or phasey rather than smooth.',
+    a: 'That happens when the two files contain the same or similar recorded material — two exports of one mix, or two takes of the same instrument. Overlapping them makes the copies interfere, cancelling some frequencies and reinforcing others, which is comb filtering and it sounds metallic. Crossfading works best between genuinely different audio. If both sides are the same source, use a hard cut.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell
+    tool={tool}
+    multiple
+    action="Download blended file"
+    dropTitle="Drop the files you want to blend"
+    dropHint="Choose them all at once — you can reorder them afterwards. Nothing is uploaded."
+  >
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Order and blend</span>
+        <span class="hint" data-total>Drag a row, or use the arrows.</span>
+      </div>
+
+      <div class="field controls__full">
+        <div class="filelist" data-list role="list" aria-label="Files to blend, in play order"></div>
+        <p class="hint">
+          The player above previews the first file only. The blended result is built when you
+          download.
+        </p>
+      </div>
+
+      <div class="field">
+        <label class="label" for="xf-length">
+          Crossfade length
+          <span class="label__value" data-out="fade">2.0 s</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="xf-length"
+            data-control="fade"
+            type="range"
+            min="0.1"
+            max="12"
+            step="0.1"
+            value="2"
+          />
+          <input
+            class="num"
+            data-control="fade-num"
+            type="number"
+            min="0.1"
+            max="12"
+            step="0.1"
+            value="2"
+            aria-label="Crossfade length in seconds"
+          />
+        </div>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>Equal power, not equal gain</h2>
+    <p>
+      There are two ways to fade one piece of audio into another, and the obvious
+      one is wrong. Equal-gain crossfading turns the outgoing track down along a
+      straight line while turning the incoming one up along the mirror image, so at
+      the halfway point both sit at 50 percent. That reads as balanced, and it is —
+      in amplitude. The problem is that loudness follows power, not amplitude, and
+      for two unrelated signals power adds. Half plus half gives half the power you
+      started with, which is a 3 dB hole in the middle of every transition.
+    </p>
+    <p>
+      An equal-power crossfade replaces the straight lines with a quarter of a
+      cosine and a quarter of a sine. The outgoing track is scaled by cos(t·π/2) and
+      the incoming one by sin(t·π/2) as <em>t</em> runs from 0 to 1. Since cos² plus
+      sin² equals 1 for every value of t, the summed power is constant across the
+      whole overlap. That is the crossfade every DAW uses by default for unrelated
+      material, and it is the one applied at each join here.
+    </p>
+    <p>
+      The exception worth knowing about is correlated audio — two copies of the same
+      recording, or two takes of the same part. There, amplitude adds rather than
+      power, so equal-power gives you a 3 dB <em>bump</em> instead of a dip, plus
+      comb filtering from the two nearly-identical signals interfering. That is not
+      a fixable setting; it is a sign that a crossfade is the wrong join.
+    </p>
+
+    <h2>Length is the only creative decision</h2>
+    <p>
+      Everything else about a crossfade is arithmetic, so length is where the
+      judgement goes. The useful way to think about it is how long you want the
+      listener to be uncertain about which track they are hearing. In a dance mix,
+      eight to sixteen bars of uncertainty is the point — that ambiguity is the
+      craft, and at 128 BPM sixteen bars is thirty seconds. Between two ambient beds,
+      three to five seconds is enough that no single instant is the seam.
+    </p>
+    <p>
+      Speech is the opposite case. Two voices overlapping for more than about a
+      second stop sounding like a transition and start sounding like a mistake in
+      the edit, so podcast and interview joins want 300 milliseconds to a second at
+      most — long enough to remove the click, short enough that nobody notices.
+    </p>
+
+    <h2>What the overlap costs you</h2>
+    <p>
+      Every join consumes one crossfade length from the running time, because the
+      end of one track and the start of the next occupy the same seconds. With
+      <em>n</em> files there are <em>n</em>−1 joins, so the result runs the sum of
+      the parts minus the crossfade times <em>n</em>−1. This is worth checking when
+      you are aiming at a target duration, and it is why a long crossfade across many
+      short clips can remove a surprising amount of material.
+    </p>
+    <p>
+      It also means the audio inside the overlap is gone as an independent thing.
+      If the last eight seconds of a track contain something you need to hear
+      clearly, an eight-second crossfade will bury it under whatever comes next.
+      Trim the tracks so that the overlapping regions are the parts you are happy to
+      lose — intros and outros usually are, which is exactly why they exist.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { concat } from '../lib/audio/dsp';
+  import { duration as fmtDuration } from '../lib/format';
+
+  /** Indices into ctx.buffers. The buffer array is fixed; this is the order. */
+  let order: number[] = [];
+  let names: string[] = [];
+  let lengths: number[] = [];
+
+  const tool = createTool({
+    suffix: 'blended',
+    multiple: true,
+    defaultFormat: 'mp3',
+
+    onReady(ctx, runtime) {
+      const root = runtime.root;
+      const list = root.querySelector<HTMLElement>('[data-list]');
+      const totalOut = root.querySelector<HTMLElement>('[data-total]');
+      if (!list) return;
+
+      order = ctx.buffers.map((_, index) => index);
+      names = ctx.files.map((file, index) => file?.name ?? `Track ${index + 1}`);
+      lengths = ctx.buffers.map((buffer) => buffer.duration);
+
+      const showTotal = (): void => {
+        if (!totalOut) return;
+        const fade = runtime.value('fade', 2);
+        const sum = lengths.reduce((total, value) => total + value, 0);
+        const overlap = fade * Math.max(0, order.length - 1);
+        totalOut.textContent =
+          order.length === 1
+            ? 'One file — add more to blend them.'
+            : `${order.length} files · ${fmtDuration(Math.max(0, sum - overlap))} after ${order.length - 1} crossfade${order.length === 2 ? '' : 's'}`;
+      };
+
+      const draw = (): void => {
+        list.textContent = '';
+
+        order.forEach((source, position) => {
+          const row = document.createElement('div');
+          row.className = 'filelist__item';
+          row.setAttribute('role', 'listitem');
+          row.draggable = true;
+          row.dataset.pos = String(position);
+
+          const grip = document.createElement('span');
+          grip.className = 'filelist__grip';
+          grip.setAttribute('aria-hidden', 'true');
+          grip.textContent = '≡';
+
+          const idx = document.createElement('span');
+          idx.className = 'filelist__idx';
+          idx.textContent = String(position + 1);
+
+          const name = document.createElement('span');
+          name.className = 'filelist__name';
+          name.textContent = names[source] ?? '';
+          name.title = names[source] ?? '';
+
+          const dur = document.createElement('span');
+          dur.className = 'filelist__dur';
+          dur.textContent = fmtDuration(lengths[source] ?? 0);
+
+          row.append(grip, idx, name, dur);
+
+          const arrow = (direction: 'up' | 'down'): HTMLButtonElement => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'btn btn--ghost btn--sm btn--icon';
+            button.dataset.move = direction;
+            button.textContent = direction === 'up' ? '↑' : '↓';
+            button.setAttribute(
+              'aria-label',
+              `Move ${names[source] ?? 'track'} ${direction}`
+            );
+            button.disabled =
+              direction === 'up' ? position === 0 : position === order.length - 1;
+            button.addEventListener('click', () => {
+              move(position, direction === 'up' ? position - 1 : position + 1, direction);
+            });
+            return button;
+          };
+
+          row.append(arrow('up'), arrow('down'));
+
+          row.addEventListener('dragstart', (event) => {
+            row.dataset.dragging = 'true';
+            event.dataTransfer?.setData('text/plain', String(position));
+            if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+          });
+
+          row.addEventListener('dragend', () => {
+            delete row.dataset.dragging;
+          });
+
+          row.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+          });
+
+          row.addEventListener('drop', (event) => {
+            event.preventDefault();
+            // The page-wide file drop handler must not see an internal drag.
+            event.stopPropagation();
+            const from = Number(event.dataTransfer?.getData('text/plain'));
+            if (!Number.isInteger(from)) return;
+            move(from, position);
+          });
+
+          list.append(row);
+        });
+
+        showTotal();
+      };
+
+      /** Moves a row and keeps keyboard focus on the button that did it. */
+      const move = (from: number, to: number, focus?: 'up' | 'down'): void => {
+        if (to < 0 || to >= order.length || from === to) return;
+        const [moved] = order.splice(from, 1);
+        order.splice(to, 0, moved);
+        draw();
+
+        if (!focus) return;
+        const row = list.querySelector<HTMLElement>(`[data-pos="${to}"]`);
+        const wanted = row?.querySelector<HTMLButtonElement>(`[data-move="${focus}"]`);
+        if (wanted && !wanted.disabled) {
+          wanted.focus();
+          return;
+        }
+        const other = focus === 'up' ? 'down' : 'up';
+        row?.querySelector<HTMLButtonElement>(`[data-move="${other}"]`)?.focus();
+      };
+
+      draw();
+
+      const fade = root.querySelector<HTMLInputElement>('[data-control="fade"]');
+      const fadeNum = root.querySelector<HTMLInputElement>('[data-control="fade-num"]');
+      const fadeOut = root.querySelector<HTMLElement>('[data-out="fade"]');
+
+      // An overlap longer than half the shortest file has no coherent meaning,
+      // and would make the join maths run past the end of that file.
+      const ceiling = Math.max(
+        0.1,
+        Math.min(12, Math.min(...lengths.map((value) => value / 2)))
+      );
+
+      const paintFade = (): void => {
+        if (!fade) return;
+        const max = Number(fade.max) || 1;
+        const value = Number(fade.value);
+        fade.style.setProperty('--pct', `${(value / max) * 100}%`);
+        if (fadeOut) fadeOut.textContent = `${value.toFixed(1)} s`;
+        showTotal();
+      };
+
+      if (fade) {
+        fade.max = String(ceiling.toFixed(1));
+        if (Number(fade.value) > ceiling) fade.value = String(ceiling.toFixed(1));
+      }
+      if (fadeNum && fade) {
+        fadeNum.max = fade.max;
+        fadeNum.value = fade.value;
+      }
+
+      fade?.addEventListener('input', () => {
+        if (fadeNum) fadeNum.value = fade.value;
+        paintFade();
+      });
+
+      fadeNum?.addEventListener('input', () => {
+        if (fade) fade.value = fadeNum.value;
+        paintFade();
+      });
+
+      fadeNum?.addEventListener('change', () => {
+        if (fade && fadeNum) fadeNum.value = fade.value;
+      });
+
+      paintFade();
+    },
+
+    process(ctx) {
+      const source = order.length > 0 ? order : ctx.buffers.map((_, index) => index);
+      const ordered = source
+        .map((index) => ctx.buffers[index])
+        .filter((buffer): buffer is AudioBuffer => Boolean(buffer));
+
+      const shortest = Math.min(...ordered.map((buffer) => buffer.duration));
+      const fade = Math.min(tool?.value('fade', 2) ?? 2, shortest / 2);
+      return concat(ordered, Math.max(0, fade));
+    },
+  });
+</script>

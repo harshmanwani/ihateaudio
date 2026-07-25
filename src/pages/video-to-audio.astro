@@ -1,0 +1,168 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+import ConversionPanel from '../components/ConversionPanel.astro';
+
+const tool = getTool('video-to-audio');
+
+const steps = [
+  'Drop a video file onto the page — MP4, MOV, M4V or WEBM go straight through, because your browser can already read the audio track inside them.',
+  'The soundtrack is decoded and drawn as a waveform. The picture is ignored entirely; only the audio track is touched.',
+  'Play it back to confirm you have the right file and the right track before you spend time encoding.',
+  'Choose an output format and click Download. MP3 and WAV write immediately; M4A, OGG and FLAC load a converter once.',
+];
+
+const faq = [
+  {
+    q: 'Which video files work without downloading anything?',
+    a: 'Anything your browser can already play: MP4, M4V and MOV carrying AAC audio, which covers iPhone and Android recordings, GoPro and drone footage, QuickTime screen recordings and almost every MP4 downloaded from the web; plus WEBM carrying Vorbis or Opus, which covers most browser-based screen recorders. For these the audio is extracted immediately with no converter download at all.',
+  },
+  {
+    q: 'Which ones need the converter?',
+    a: 'MKV, AVI, WMV, FLV and MPEG program streams, none of which browsers demux. Also MP4 and MOV files whose audio track is something unusual — AC-3 or E-AC-3 from a Blu-ray rip, DTS, or uncompressed PCM in a ProRes master. If a file cannot be read, the page says so rather than failing silently, and the audio converter loads a fuller decoder on demand.',
+  },
+  {
+    q: 'Does the video get uploaded?',
+    a: 'No. The file is read from your disk into this tab and the audio is decoded there. You can check by opening your browser\'s network panel while you use the page, or by disconnecting from the internet entirely — extraction still works. That matters more here than on most tools, since video files are often personal recordings.',
+  },
+  {
+    q: 'Is there a length limit?',
+    a: 'The limit is your device\'s memory, because decoded audio is uncompressed in RAM at roughly 0.35 MB per second. A desktop typically manages around an hour; an iPhone or iPad refuses at somewhere around eight or nine minutes. The page checks the duration before it decodes and tells you, instead of crashing the tab halfway through.',
+  },
+  {
+    q: 'My video is several gigabytes. Will that work?',
+    a: 'Probably not. The whole file has to be read into memory before the audio track can be located, so a very large video costs you its full size in RAM even though the picture is discarded. Files above about 2 GB are refused outright. Trim the video in a video editor first, or extract the audio with a desktop tool.',
+  },
+  {
+    q: 'Does extracting audio re-encode it?',
+    a: 'Yes. The audio track is decoded to raw samples and then encoded into the format you choose, so a video with a 128 kbps AAC soundtrack turned into a 128 kbps MP3 loses a little more. Choose a bitrate at or above the source\'s, or export to WAV or FLAC if you plan to edit the result before you compress it.',
+  },
+  {
+    q: 'The tool says there is no audio. What does that mean?',
+    a: 'The container was read but no audio track was found in it. Silent screen recordings are the usual cause — many capture tools default to no system audio and no microphone. Some downloaded videos also arrive as video-only streams, with the audio in a separate file that has to be merged first.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell
+    tool={tool}
+    video
+    action="Extract audio"
+    dropTitle="Drop a video file here"
+    dropHint="Or click to browse. The video never leaves this tab — only its soundtrack is read."
+  >
+    <ConversionPanel
+      hint="Only the soundtrack is read — the picture is discarded. The output length matches the video exactly."
+    />
+
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Extraction</span>
+        <span class="hint">The picture is ignored; only the audio track is read.</span>
+      </div>
+
+      <div class="controls__full">
+        <div class="note note--info">
+          <div class="note__body">
+            <div class="note__title">Most videos need no converter download</div>
+            <div>
+              MP4, M4V, MOV and WEBM are read by the browser's own media engine,
+              so their soundtracks are extracted instantly. MKV, AVI, WMV and FLV
+              are not, and neither are MP4 files whose audio is AC-3 or DTS — for
+              those, the audio converter loads a fuller decoder on demand.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls__full">
+        <p class="hint">
+          Pick MP3 for something you just want to listen to, or WAV if the audio
+          is going into an editor next. Both write without any download.
+        </p>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>A video file is a box with two things in it</h2>
+    <p>
+      The extension on a video tells you about the container, not the audio. An
+      .mp4 is an ISO base media file: a structure of nested boxes holding one or
+      more tracks, each track compressed with its own codec, plus a table saying
+      which chunk belongs to which moment. Extracting the sound means reading
+      that table, walking to the audio track, and ignoring everything else. The
+      video frames are never decoded, which is why pulling audio out of a
+      twenty-minute recording takes a second or two rather than the minutes a
+      full transcode would.
+    </p>
+    <p>
+      Browsers already contain a demultiplexer and a set of audio decoders,
+      because playing video on the web requires both. Handing an MP4 to the audio
+      decoding API takes advantage of exactly that machinery: it finds the AAC
+      track, decodes it, and hands back raw samples. No extra code is needed and
+      nothing large has to be downloaded. The same is true of WEBM, where the
+      audio is Vorbis or Opus.
+    </p>
+
+    <h2>Where the browser stops helping</h2>
+    <p>
+      Support is narrower than most people expect, and it is not about the file
+      being exotic. Matroska is the clearest example: WEBM is a deliberately
+      restricted subset of Matroska that browsers implement, but a full .mkv —
+      the format most desktop recorders and rips default to — is not something
+      any browser will open, even when the audio inside is ordinary AAC. AVI,
+      WMV and FLV are legacy containers no browser has ever supported.
+    </p>
+    <p>
+      The other failure mode is a supported container with an unsupported codec
+      inside. An MP4 ripped from a Blu-ray often carries AC-3 or DTS surround
+      audio, which browsers do not license. A ProRes master from an editing suite
+      usually carries uncompressed PCM in a MOV, which some browsers handle and
+      others do not. In both cases the container opens fine and the audio track
+      cannot be read, and the honest answer is to use the converter path, which
+      loads a full ffmpeg build on demand.
+    </p>
+
+    <h2>Choosing what comes out</h2>
+    <p>
+      Whatever you pick, the soundtrack is being re-encoded, because there is no
+      way to hand a decoded signal back to a new container without compressing it
+      again. If the video's audio was already lossy — and in a phone recording or
+      a download it certainly was — you are on your second generation. Keep the
+      output bitrate at or above whatever the source was using so the second pass
+      has room to work; 192 kbps MP3 is a safe floor for a video that had 128 or
+      160 kbps AAC in it.
+    </p>
+    <p>
+      If the audio is going anywhere near an editor, a transcription tool or a
+      podcast workflow, export WAV instead and compress once at the end. And if
+      you only need a fragment — a quote, a piece of music, a sound effect —
+      extract the whole thing here and trim it afterwards, rather than trying to
+      guess boundaries from the video timeline.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { wireConversionPanel } from '../lib/conversion';
+
+  createTool({
+    suffix: 'audio',
+    onReady(_ctx, runtime) {
+      wireConversionPanel(runtime);
+    },
+    video: true,
+    defaultFormat: 'mp3',
+    formats: ['mp3', 'wav', 'm4a', 'ogg', 'opus', 'flac'],
+
+    // Browsers decode the audio track of MP4, MOV and WEBM natively, so the
+    // shared decode path already produced the soundtrack — nothing to do here.
+    process(ctx) {
+      return ctx.buffer;
+    },
+  });
+</script>

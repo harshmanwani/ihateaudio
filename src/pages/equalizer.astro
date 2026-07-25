@@ -1,0 +1,370 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('equalizer');
+
+/** Band centres, low to high. Kept in step with the list in the script below. */
+const BANDS = [
+  { hz: 60, label: '60 Hz' },
+  { hz: 150, label: '150 Hz' },
+  { hz: 400, label: '400 Hz' },
+  { hz: 1000, label: '1 kHz' },
+  { hz: 2400, label: '2.4 kHz' },
+  { hz: 6000, label: '6 kHz' },
+  { hz: 12000, label: '12 kHz' },
+  { hz: 16000, label: '16 kHz' },
+];
+
+const steps = [
+  'Drop an audio file onto the page. It is decoded by your browser, so a long DJ set opens as fast as a voice memo and nothing is uploaded.',
+  'Pick a preset as a starting point, or leave it on Flat and go straight to the sliders.',
+  'Move individual bands between -12 and +12 dB. The number beside each label is the current gain, and the box next to each slider takes an exact value if you know what you want.',
+  'Press play — the preview is re-rendered with the current curve — and compare against the original by setting the preset back to Flat.',
+  'Choose an output format and click Download.',
+];
+
+const faq = [
+  {
+    q: 'Why do the top and bottom bands behave differently from the rest?',
+    a: 'The 60 Hz and 16 kHz controls are shelving filters: they lift or drop everything beyond their corner frequency rather than making a bump at one point. The six bands in between are peaking filters with roughly a one-third-octave-wide skirt, so they affect a band around the centre and leave the neighbours alone. Shelves at the extremes are what hardware equalizers do too, because a narrow peak at 16 kHz would be almost inaudible.',
+  },
+  {
+    q: 'Should I boost or cut?',
+    a: 'Cut where you can. A cut costs nothing in headroom, whereas every decibel of boost brings the file closer to clipping, and the ear finds a subtractive change less obvious than an additive one. If a mix sounds dull, try cutting 400 Hz before reaching for 12 kHz — the result is usually the same perceived brightness with more room left.',
+  },
+  {
+    q: 'Why does the file distort after I boost the bass?',
+    a: 'Digital audio has a hard ceiling at 0 dBFS. A track mastered close to that ceiling has no room for another 9 dB at 60 Hz, so the peaks flatten and you hear crackle on every kick. Either pull the other bands down by a similar amount instead of pushing one up, or run the result through the normalizer afterwards to bring the whole file back under the ceiling.',
+  },
+  {
+    q: 'Boosting 16 kHz does nothing to my MP3. Why?',
+    a: 'Most lossy encoders discard everything above a cutoff to save bits — around 16 kHz at 128 kbps and 19 to 20 kHz at higher rates. If the content was thrown away at encode time there is nothing up there to lift, and all you gain is a little hiss. Check the source with the waveform or loudness tools, or start from a lossless file if the top octave matters.',
+  },
+  {
+    q: 'What is the Radio preset doing?',
+    a: 'It imitates the band-limiting of a broadcast chain: a steep loss at the bottom, a lift through the 1 to 2.4 kHz range where speech intelligibility lives, and a cut above 12 kHz. It is a stylistic effect rather than a corrective one. For an actual telephone or walkie-talkie sound, the voice changer has a tighter band-limited preset.',
+  },
+  {
+    q: 'Can EQ clean up a noisy recording?',
+    a: 'Only when the noise sits in a different part of the spectrum from what you want to keep. Mains hum at 50 or 60 Hz, air-conditioning rumble, and traffic noise all live below the voice and can be reduced with the bottom band. Broadband hiss overlaps the voice completely, so cutting it also removes the recording. EQ moves the balance between frequencies; it cannot separate two sounds sharing one.',
+  },
+  {
+    q: 'Does equalizing change the timing of the audio?',
+    a: 'Slightly. These are minimum-phase biquad filters, the same kind used in every analogue and most digital equalizers, and they shift phase around each band they touch. At the gentle settings here it is inaudible. It becomes noticeable only with several large overlapping boosts, which is one more reason to make small moves across a few bands rather than one extreme one.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Download">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Curve</span>
+        <span class="hint">Presets are a starting point — move any band and the curve becomes custom.</span>
+      </div>
+
+      <div class="field controls__full">
+        <label class="label" for="eq-preset">Preset</label>
+        <select class="select" id="eq-preset" data-control="preset">
+          <option value="flat" selected>Flat — no change</option>
+          <option value="voice">Voice / podcast — clarity for speech</option>
+          <option value="music">Music — gentle smile curve</option>
+          <option value="bass">Bass boost — weight at the bottom</option>
+          <option value="treble">Treble boost — detail and air</option>
+          <option value="podcast">Podcast — rumble cut, mid forward</option>
+          <option value="radio">Radio — band-limited broadcast tone</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+
+      {
+        BANDS.map((band) => (
+          <div class="field">
+            <label class="label" for={`eq-${band.hz}`}>
+              {band.label}
+              <span class="label__value" data-out={`hz${band.hz}`}>0.0 dB</span>
+            </label>
+            <div class="slider-row">
+              <input
+                class="slider"
+                id={`eq-${band.hz}`}
+                data-control={`hz${band.hz}`}
+                type="range"
+                min="-12"
+                max="12"
+                step="0.5"
+                value="0"
+              />
+              <input
+                class="num"
+                data-control={`hz${band.hz}-num`}
+                type="number"
+                min="-12"
+                max="12"
+                step="0.5"
+                value="0"
+                aria-label={`${band.label} gain in decibels`}
+              />
+            </div>
+          </div>
+        ))
+      }
+
+      <p class="hint controls__full" data-headroom aria-live="polite">
+        Flat — the export will be identical to the source apart from the format change.
+      </p>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>What each band is for</h2>
+    <p>
+      An eight-band equalizer covers the audible range in steps of roughly one
+      and a third octaves, which is coarse enough to be quick and fine enough to
+      fix most tonal problems. Knowing what lives where saves a lot of blind
+      dragging.
+    </p>
+    <p>
+      <strong>60 Hz</strong> is weight — the body of a kick drum, the bottom of
+      a bass guitar, and the rumble of a truck outside the window. Phone
+      speakers cannot reproduce it at all, so boosting here only pays off on
+      headphones and real speakers. <strong>150 Hz</strong> is warmth, and also
+      where a small room adds its boom; a cut here is the single most common fix
+      for a recording that sounds muddy. <strong>400 Hz</strong> is the
+      boxiness region — too much and a voice sounds like it is coming from
+      inside a cupboard. <strong>1 kHz</strong> carries the honk and nasal
+      quality; it is rarely a place to boost.
+    </p>
+    <p>
+      <strong>2.4 kHz</strong> is presence, and the ear is more sensitive here
+      than anywhere else, which is why a small lift makes a voice jump forward
+      and a large one becomes fatiguing within a minute.
+      <strong>6 kHz</strong> holds consonant edge and sibilance; the difference
+      between crisp and harsh is often two decibels here.
+      <strong>12 kHz</strong> is air, the sense of open space around cymbals and
+      breath. <strong>16 kHz</strong> is sparkle, and frequently missing
+      entirely from lossy files, because encoders discard the top octave first.
+    </p>
+
+    <h2>Cut first, boost second</h2>
+    <p>
+      Two identical-sounding results are available for most problems: boost what
+      is missing, or cut what is masking it. The cut is almost always the better
+      move. It costs no headroom, so nothing is pushed toward the 0 dBFS
+      ceiling; it tends to sound less processed, because the ear notices added
+      resonance faster than it notices removed resonance; and it leaves you room
+      to raise the whole file afterwards, which is the same perceived change
+      with none of the risk.
+    </p>
+    <p>
+      Move in small amounts. Three decibels is a clearly audible change on a
+      single band; six is a heavy one; twelve is a special effect. If a curve
+      needs more than a few decibels on several bands at once, the problem is
+      usually the source rather than the tone — a microphone in the wrong place,
+      or a room that needed treating.
+    </p>
+
+    <h2>Shelves, peaks, and why the ends are different</h2>
+    <p>
+      The six middle bands are peaking filters. Each one makes a bell-shaped
+      bump or dip centred on its frequency, tapering off toward its neighbours,
+      so the bands overlap slightly and a smooth curve can be drawn across them.
+      The 60 Hz and 16 kHz controls are shelves instead: they act on everything
+      below or above their corner rather than around a centre point.
+    </p>
+    <p>
+      That is a deliberate choice, not a shortcut. A bell centred at 16 kHz has
+      most of its energy above the top of human hearing, so it would be nearly
+      inaudible; a shelf lifts the whole top octave and does what "more air"
+      actually means. The same logic applies at the bottom, where "more bass"
+      means everything under the corner, not a single resonant note at 60 Hz.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { applyEq, type EqBand } from '../lib/audio/effects';
+  import { clamp, db, pct } from '../lib/format';
+
+  interface BandSpec {
+    hz: number;
+    type: BiquadFilterType;
+    q: number;
+  }
+
+  // Shelves at the extremes, peaks in between — a bell centred at 16 kHz would
+  // put most of its energy above the top of hearing.
+  const BANDS: BandSpec[] = [
+    { hz: 60, type: 'lowshelf', q: 0.7 },
+    { hz: 150, type: 'peaking', q: 1.1 },
+    { hz: 400, type: 'peaking', q: 1.1 },
+    { hz: 1000, type: 'peaking', q: 1.1 },
+    { hz: 2400, type: 'peaking', q: 1.1 },
+    { hz: 6000, type: 'peaking', q: 1.1 },
+    { hz: 12000, type: 'peaking', q: 1.1 },
+    { hz: 16000, type: 'highshelf', q: 0.7 },
+  ];
+
+  /** Gains in band order: 60, 150, 400, 1k, 2.4k, 6k, 12k, 16k. */
+  const PRESETS: Record<string, number[]> = {
+    flat: [0, 0, 0, 0, 0, 0, 0, 0],
+    voice: [-3, -1, 0, 2, 4, 3, 0, -2],
+    music: [4, 2, -1, -1, 0, 2, 3, 2],
+    bass: [9, 6, 2, 0, 0, 0, 0, 0],
+    treble: [0, 0, 0, 0, 2, 5, 7, 6],
+    podcast: [-12, -6, -1, 1, 3, 2, -2, -5],
+    radio: [-10, -4, 2, 5, 6, 3, -6, -12],
+  };
+
+  interface Pair {
+    get(): number;
+    set(value: number): void;
+  }
+
+  function bindPair(
+    root: HTMLElement,
+    name: string,
+    render: (value: number) => string,
+    onLive: () => void,
+    onCommit: () => void
+  ): Pair | null {
+    const slider = root.querySelector<HTMLInputElement>(`[data-control="${name}"]`);
+    const num = root.querySelector<HTMLInputElement>(`[data-control="${name}-num"]`);
+    const out = root.querySelector<HTMLElement>(`[data-out="${name}"]`);
+    if (!slider || !num) return null;
+
+    const min = Number(slider.min);
+    const max = Number(slider.max);
+
+    const paint = (): void => {
+      slider.style.setProperty('--pct', `${pct(Number(slider.value), min, max)}%`);
+      if (out) out.textContent = render(Number(slider.value));
+    };
+
+    slider.addEventListener('input', () => {
+      num.value = slider.value;
+      paint();
+      onLive();
+    });
+    slider.addEventListener('change', onCommit);
+
+    num.addEventListener('input', () => {
+      const raw = Number(num.value);
+      if (num.value === '' || !Number.isFinite(raw)) return;
+      slider.value = String(clamp(raw, min, max));
+      paint();
+      onLive();
+    });
+    num.addEventListener('change', () => {
+      const value = clamp(Number(num.value), min, max);
+      num.value = String(value);
+      slider.value = String(value);
+      paint();
+      onLive();
+      onCommit();
+    });
+
+    paint();
+
+    return {
+      get: () => Number(slider.value),
+      set: (value: number) => {
+        const v = clamp(value, min, max);
+        slider.value = String(v);
+        num.value = String(v);
+        paint();
+      },
+    };
+  }
+
+  const pairs: (Pair | null)[] = [];
+  let wired = false;
+
+  function curve(): EqBand[] {
+    return BANDS.map((band, index) => ({
+      frequency: band.hz,
+      gain: pairs[index]?.get() ?? 0,
+      q: band.q,
+      type: band.type,
+    }));
+  }
+
+  createTool({
+    suffix: 'eq',
+    defaultFormat: 'mp3',
+
+    onReady(_ctx, runtime) {
+      if (wired) return;
+      wired = true;
+
+      const root = runtime.root;
+      const select = root.querySelector<HTMLSelectElement>('[data-control="preset"]');
+      const headroom = root.querySelector<HTMLElement>('[data-headroom]');
+
+      // Eight biquads render quickly, but replacing the transport's buffer
+      // restarts playback — so it waits until a slider is released.
+      let timer = 0;
+      const commit = (): void => {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(() => runtime.refreshPreview(), 120);
+      };
+
+      const describe = (): void => {
+        if (!headroom) return;
+        const bands = curve();
+        const boost = bands.reduce(
+          (top, band) => (band.gain > top.gain ? band : top),
+          bands[0]
+        );
+        if (bands.every((band) => Math.abs(band.gain) < 0.01)) {
+          headroom.textContent =
+            'Flat — the export will be identical to the source apart from the format change.';
+          return;
+        }
+        if (boost.gain <= 0) {
+          headroom.textContent =
+            'Cuts only, so there is no risk of clipping and the file will come out a little quieter.';
+          return;
+        }
+        const label = boost.frequency >= 1000
+          ? `${boost.frequency / 1000} kHz`
+          : `${boost.frequency} Hz`;
+        headroom.textContent =
+          `Largest boost is ${db(boost.gain)} at ${label}. If the source was already ` +
+          'close to full scale, normalize the result afterwards to avoid clipping.';
+      };
+
+      const goCustom = (): void => {
+        if (select) select.value = 'custom';
+        describe();
+      };
+
+      for (const band of BANDS) {
+        pairs.push(
+          bindPair(root, `hz${band.hz}`, (v) => db(v), goCustom, commit)
+        );
+      }
+
+      select?.addEventListener('change', () => {
+        const preset = PRESETS[select.value];
+        if (!preset) return;
+        preset.forEach((gain, index) => pairs[index]?.set(gain));
+        describe();
+        commit();
+      });
+
+      describe();
+    },
+
+    preview(ctx) {
+      return applyEq(ctx.buffer, curve());
+    },
+
+    process(ctx) {
+      return applyEq(ctx.buffer, curve());
+    },
+  });
+</script>

@@ -1,0 +1,276 @@
+---
+import Base from '../layouts/Base.astro';
+import { SITE } from '../consts';
+
+/**
+ * A reference page rather than a tool. Tool pages rarely earn links; a table
+ * people cite does. Every number here is a published platform target.
+ */
+
+interface Target {
+  platform: string;
+  lufs: string;
+  truePeak: string;
+  kind: string;
+  note: string;
+}
+
+const music: Target[] = [
+  {
+    platform: 'Spotify',
+    lufs: '-14',
+    truePeak: '-1 dBTP',
+    kind: 'Music',
+    note: 'Normalization is on by default. Louder masters are turned down; quieter ones are turned up only in the “Loud” setting.',
+  },
+  {
+    platform: 'Apple Music',
+    lufs: '-16',
+    truePeak: '-1 dBTP',
+    kind: 'Music',
+    note: 'Sound Check is on by default on iOS. Apple’s mastering guidance also asks for -1 dBTP.',
+  },
+  {
+    platform: 'YouTube',
+    lufs: '-14',
+    truePeak: '-1 dBTP',
+    kind: 'Music & video',
+    note: 'Turns loud uploads down but never turns quiet ones up, so undershooting costs you real loudness.',
+  },
+  {
+    platform: 'Amazon Music',
+    lufs: '-14',
+    truePeak: '-2 dBTP',
+    kind: 'Music',
+    note: 'Slightly more conservative peak ceiling than most.',
+  },
+  {
+    platform: 'Tidal',
+    lufs: '-14',
+    truePeak: '-1 dBTP',
+    kind: 'Music',
+    note: 'Normalization can be switched off by the listener.',
+  },
+  {
+    platform: 'Deezer',
+    lufs: '-15',
+    truePeak: '-1 dBTP',
+    kind: 'Music',
+    note: 'Sits between the streaming consensus and Apple’s target.',
+  },
+  {
+    platform: 'SoundCloud',
+    lufs: '-14',
+    truePeak: '-1 dBTP',
+    kind: 'Music',
+    note: 'Applies normalization on playback for most listeners.',
+  },
+];
+
+const spoken: Target[] = [
+  {
+    platform: 'Apple Podcasts',
+    lufs: '-16',
+    truePeak: '-1 dBTP',
+    kind: 'Podcast (stereo)',
+    note: 'The de facto podcast standard. Use -19 LUFS for mono files.',
+  },
+  {
+    platform: 'Spotify Podcasts',
+    lufs: '-14',
+    truePeak: '-1 dBTP',
+    kind: 'Podcast',
+    note: 'Matches Spotify’s music target rather than the podcast convention.',
+  },
+  {
+    platform: 'Google / YouTube Podcasts',
+    lufs: '-16',
+    truePeak: '-1 dBTP',
+    kind: 'Podcast',
+    note: 'Follows the -16 convention.',
+  },
+  {
+    platform: 'Audible / ACX',
+    lufs: '-18 to -23 RMS',
+    truePeak: '-3 dBTP',
+    kind: 'Audiobook',
+    note: 'ACX specifies RMS, not LUFS, and requires a noise floor below -60 dBFS. Its check is strict and automated.',
+  },
+];
+
+const broadcast: Target[] = [
+  {
+    platform: 'EBU R128 (Europe)',
+    lufs: '-23',
+    truePeak: '-1 dBTP',
+    kind: 'Broadcast',
+    note: 'Tolerance ±0.5 LU. The origin of the modern LUFS approach.',
+  },
+  {
+    platform: 'ATSC A/85 (US)',
+    lufs: '-24',
+    truePeak: '-2 dBTP',
+    kind: 'Broadcast',
+    note: 'The CALM Act enforces this for US television.',
+  },
+  {
+    platform: 'Netflix',
+    lufs: '-27',
+    truePeak: '-2 dBTP',
+    kind: 'Streaming video',
+    note: 'Measured with dialogue gating rather than programme loudness.',
+  },
+];
+
+const groups = [
+  { name: 'Music streaming', rows: music },
+  { name: 'Podcasts and spoken word', rows: spoken },
+  { name: 'Broadcast and video', rows: broadcast },
+];
+
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: 'Loudness targets for every streaming platform (LUFS)',
+    description:
+      'The integrated loudness and true peak targets used by Spotify, Apple Music, YouTube, podcasts and broadcast, with what each platform does to files that miss them.',
+    author: { '@type': 'Organization', name: SITE.name },
+    publisher: { '@type': 'Organization', name: SITE.name },
+  },
+];
+---
+
+<Base
+  title="Loudness Targets by Platform — LUFS Reference Table"
+  description="Every streaming and broadcast loudness target in one table — Spotify, Apple Music, YouTube, podcasts, EBU R128 — with LUFS and true peak values."
+  path="/loudness-targets"
+  schema={schema}
+>
+  <div class="wrap page">
+    <div class="prose" style="margin-bottom: var(--s10)">
+      <h1>Loudness targets by platform</h1>
+      <p class="toolhead__sub">
+        What every major platform expects, in LUFS and true peak — and what it
+        does to your file if you miss.
+      </p>
+    </div>
+
+    <div class="prose" style="margin-bottom: var(--s10)">
+      <p>
+        Every streaming service normalizes playback loudness. That single fact
+        makes the loudness war pointless: if you master a track four decibels
+        louder than the target, Spotify turns it down four decibels on the way
+        out, and all you have achieved is squashing your own dynamic range for
+        nothing.
+      </p>
+      <p>
+        The number that matters is <strong>integrated LUFS</strong> — loudness
+        averaged across the whole programme, weighted for how human hearing
+        actually works and gated so that silence between phrases does not drag
+        the reading down. It is defined by ITU-R BS.1770, and it is what all of
+        these platforms measure.
+      </p>
+    </div>
+
+    {
+      groups.map((group) => (
+        <section style="margin-bottom: var(--s12)">
+          <h2 style="margin-bottom: var(--s4)">{group.name}</h2>
+          <div class="tablewrap">
+            <table class="datatable">
+              <thead>
+                <tr>
+                  <th scope="col">Platform</th>
+                  <th scope="col">Target</th>
+                  <th scope="col">True peak</th>
+                  <th scope="col">Type</th>
+                  <th scope="col" style="white-space: normal; min-width: 22rem">
+                    Notes
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {group.rows.map((row) => (
+                  <tr>
+                    <th scope="row" style="font-weight: 600">
+                      {row.platform}
+                    </th>
+                    <td>{row.lufs} LUFS</td>
+                    <td>{row.truePeak}</td>
+                    <td>{row.kind}</td>
+                    <td style="white-space: normal">{row.note}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ))
+    }
+
+    <div class="prose">
+      <h2>Which number should you actually aim for?</h2>
+      <p>
+        If you are releasing music to every service at once, master to
+        <strong>-14 LUFS integrated with a -1 dBTP ceiling</strong>. That satisfies
+        the majority outright, and Apple Music turning it down a further two
+        decibels is inaudible and harmless. Chasing each platform separately is
+        not worth the effort for anything other than a dedicated Apple release.
+      </p>
+      <p>
+        For podcasts, use <strong>-16 LUFS for stereo</strong> and
+        <strong>-19 LUFS for mono</strong>. The difference exists because a mono
+        file played through two speakers measures roughly 3 LU louder than the
+        same material in stereo, so mono needs a lower target to sound equally
+        loud.
+      </p>
+      <p>
+        For anything going to broadcast, use the number the broadcaster gives
+        you and do not improvise. Broadcast delivery is automatically checked
+        and rejected.
+      </p>
+
+      <h2>True peak is not the same as peak</h2>
+      <p>
+        A digital file stores samples, but playback reconstructs a continuous
+        waveform that passes through them — and that curve can rise higher than
+        any individual sample. A file that shows 0.0 dBFS on a normal peak meter
+        can genuinely reach +1.5 dB once a converter or an MP3 encoder
+        reconstructs it, which clips.
+      </p>
+      <p>
+        That is why every target above specifies a true peak ceiling below zero.
+        Lossy encoding makes it worse: the encoder discards information and the
+        decoded waveform is not the one you measured, so peaks move. A -1 dBTP
+        ceiling is the standard insurance, and -2 dBTP is safer if you are
+        encoding to a low bitrate.
+      </p>
+
+      <h2>Loudness range, and why quiet passages matter</h2>
+      <p>
+        Loudness range (LRA, measured in LU) describes how much the loudness
+        varies across a programme. A heavily compressed pop master might sit
+        around 3–5 LU; an orchestral recording can exceed 15 LU; a well-produced
+        podcast usually lands between 5 and 8 LU.
+      </p>
+      <p>
+        There is no correct value, but there are wrong ones for a context. A
+        podcast with an 18 LU range is unlistenable in a car, because the quiet
+        parts vanish under road noise while the loud parts make you reach for
+        the volume. If that is your situation, compression before normalization
+        is the fix, not a louder target.
+      </p>
+
+      <h2>Measure and fix</h2>
+      <p>
+        You can check any file against this table with the
+        <a href="/loudness-meter">loudness meter</a>, which reports integrated
+        LUFS, loudness range and true peak using the same BS.1770-4 measurement
+        described above. The <a href="/audio-normalizer">audio normalizer</a>
+        will then move a file to any target on this page while holding the true
+        peak below its ceiling. Both run entirely in your browser.
+      </p>
+    </div>
+  </div>
+</Base>

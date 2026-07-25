@@ -1,0 +1,409 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('audio-normalizer');
+
+const steps = [
+  'Drop your file onto the page. It is measured immediately with the ITU-R BS.1770-4 algorithm, and the panel fills in with integrated loudness, loudness range and true peak.',
+  'Choose the platform you are delivering to, or set a target in LUFS by hand if you are working to a spec of your own.',
+  'Leave the true-peak ceiling at −1 dBTP unless you have a reason not to. It protects against inter-sample peaks that only appear once the file has been encoded.',
+  'Read the summary line. It states the exact gain about to be applied, and says so plainly when the ceiling stops that gain short of your target.',
+  'Download. Normalizing applies one static gain to the whole file, so the balance and dynamics of the recording are untouched.',
+];
+
+const faq = [
+  {
+    q: 'What does LUFS actually measure?',
+    a: 'Loudness averaged over the whole programme, weighted to match human hearing rather than raw voltage. The signal is passed through a K-weighting filter, chopped into overlapping 400 ms blocks, and the quiet blocks are gated out so that pauses and fade-outs do not drag the figure down. The result is a single number that tracks how loud something sounds.',
+  },
+  {
+    q: 'Which target should I use?',
+    a: 'Music going to Spotify, Apple Music, YouTube, Amazon Music or Tidal wants −14 LUFS. Podcasts want −16 LUFS. Broadcast under EBU R128 wants −23 LUFS. If you are not sure and it is going online, −14 LUFS with a −1 dBTP ceiling is the safe default.',
+  },
+  {
+    q: 'What happens if I deliver something louder than the target?',
+    a: 'The platform turns it down. Every major service measures on ingest and applies a static playback gain, so a −8 LUFS master plays back at exactly the same volume as a −14 LUFS one. The only difference is that you sacrificed dynamic range to get to −8 and received nothing in exchange.',
+  },
+  {
+    q: 'Why did the tool apply less gain than reaching the target needed?',
+    a: 'Because the true-peak ceiling caught it first. Raising a quiet-but-peaky file to −14 LUFS can push its peaks past 0 dBTP, so the gain is capped at whatever keeps it under the ceiling and the summary tells you where the file actually landed. If you need the full amount, compress or limit the peaks first, then normalize.',
+  },
+  {
+    q: 'What is true peak, and why is it higher than the peak my editor shows?',
+    a: 'Your editor usually shows sample peak: the largest stored value. True peak estimates the waveform between the samples, which a digital-to-analogue converter reconstructs and which can rise above every sample it was built from. This tool oversamples four times to find it, which is why a file that looks safe at −0.2 dBFS may read +0.3 dBTP.',
+  },
+  {
+    q: 'Does normalizing change the dynamics of my recording?',
+    a: 'No. Loudness normalization is a single multiplication applied identically to every sample, so the difference between the loudest and quietest moments is exactly what it was. Compression is what changes dynamics, and it is a separate tool. The loudness range figure in the panel is reported before and stays the same after.',
+  },
+  {
+    q: 'Is this the same measurement the platforms use?',
+    a: 'It is the same standard: ITU-R BS.1770-4, with K-weighting, 400 ms blocks at 75 percent overlap, and both the −70 LUFS absolute gate and the −10 LU relative gate. Readings should land within a few tenths of a LU of any compliant meter. True peak here uses 4× oversampling, where some meters use 8×, so that figure can differ by a tenth or two.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Download normalized">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Measured</span>
+        <span class="hint">ITU-R BS.1770-4, the same algorithm the platforms run.</span>
+      </div>
+
+      <div class="controls__full">
+        <div class="tablewrap">
+          <table class="datatable">
+            <caption class="visually-hidden">Loudness measurements for the loaded file</caption>
+            <thead>
+              <tr>
+                <th scope="col">Measurement</th>
+                <th scope="col">Value</th>
+                <th scope="col">What it tells you</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Integrated loudness</th>
+                <td data-m="lufs">—</td>
+                <td>How loud the whole file sounds</td>
+              </tr>
+              <tr>
+                <th scope="row">Loudness range</th>
+                <td data-m="range">—</td>
+                <td>How much the level moves across it</td>
+              </tr>
+              <tr>
+                <th scope="row">True peak</th>
+                <td data-m="truepeak">—</td>
+                <td>The highest point after reconstruction</td>
+              </tr>
+              <tr>
+                <th scope="row">Sample peak</th>
+                <td data-m="peak">—</td>
+                <td>The largest value actually stored</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="an-preset">Platform</label>
+        <select class="select" id="an-preset" data-control="preset">
+          <option value="spotify" selected>Spotify — −14 LUFS</option>
+          <option value="apple">Apple Music — −14 LUFS</option>
+          <option value="youtube">YouTube — −14 LUFS</option>
+          <option value="amazon">Amazon Music — −14 LUFS</option>
+          <option value="tidal">Tidal — −14 LUFS</option>
+          <option value="podcast">Podcasts, Apple and Spotify — −16 LUFS</option>
+          <option value="aes">AES streaming recommendation — −16 LUFS</option>
+          <option value="ebu">Broadcast, EBU R128 — −23 LUFS</option>
+          <option value="custom">Custom target</option>
+        </select>
+        <span class="hint">Picking a platform sets both the target and its peak ceiling.</span>
+      </div>
+
+      <div class="field">
+        <label class="label" for="an-target">
+          Target loudness <span class="label__value" data-out="target">−14.0 LUFS</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="an-target"
+            data-control="target"
+            type="range"
+            min="-30"
+            max="-6"
+            step="0.1"
+            value="-14"
+          />
+          <input
+            class="num"
+            data-control="target-num"
+            type="number"
+            min="-30"
+            max="-6"
+            step="0.1"
+            value="-14"
+            aria-label="Target loudness in LUFS"
+          />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="an-ceiling">
+          True-peak ceiling <span class="label__value" data-out="ceiling">−1.0 dBTP</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="an-ceiling"
+            data-control="ceiling"
+            type="range"
+            min="-6"
+            max="0"
+            step="0.1"
+            value="-1"
+          />
+          <input
+            class="num"
+            data-control="ceiling-num"
+            type="number"
+            min="-6"
+            max="0"
+            step="0.1"
+            value="-1"
+            aria-label="True-peak ceiling in dBTP"
+          />
+        </div>
+        <span class="hint">Gain stops here even if the target is not reached.</span>
+      </div>
+
+      <div class="controls__full">
+        <div class="note note--info">
+          <div class="note__body">
+            <div class="note__title">What will be applied</div>
+            <div data-plan>Waiting for a file.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls__full" data-limited hidden>
+        <div class="note note--warn" role="status">
+          <div class="note__body">
+            <div class="note__title">The peak ceiling limited the gain</div>
+            <div data-limited-detail></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>What integrated loudness measures</h2>
+    <p>
+      LUFS stands for Loudness Units relative to Full Scale, and the figure this tool reports
+      is an <strong>integrated</strong> one: a single number for the whole programme, first
+      sample to last. It comes from the ITU-R BS.1770-4 algorithm, which does three things an
+      ordinary level meter does not. It applies K-weighting, a filter pair that trims deep
+      bass and lifts the presence region, because a 40 Hz rumble and a 3 kHz voice at the same
+      electrical level are nowhere near equally loud to a person. It works in overlapping
+      400-millisecond blocks rather than instant by instant. And it gates: blocks below
+      −70 LUFS are thrown out, and then blocks more than 10 LU below the average of what
+      remains are thrown out too, so pauses between sentences and the fade at the end do not
+      drag the number down.
+    </p>
+    <p>
+      That gating is why integrated loudness tracks what people report hearing, and why it
+      replaced peak normalization everywhere it mattered. A peak meter describes one sample —
+      the single loudest instant in a file of forty million — and says nothing about the rest.
+      Two tracks can both peak at −0.1 dBFS while one is a heavily limited pop master and the
+      other a solo piano recording, and still differ by 12 LU in how loud they sound. Once
+      services began playing material from thousands of sources back to back, matching peaks
+      stopped being useful.
+    </p>
+
+    <h2>Why delivering louder than the target buys nothing</h2>
+    <p>
+      Every major platform measures your file on ingest and applies a static gain at playback
+      so it lands on their target. Deliver a master at −8 LUFS to a service targeting −14 and
+      it does not play back 6 dB louder than anyone else; it plays back at −14, with 6 dB of
+      attenuation applied. Everything you gave up to reach −8 — the transients you limited
+      away, the dynamic range you compressed out — is gone, and it bought you nothing. You are
+      left with a flatter, more fatiguing version of your own mix, playing at the same volume
+      as the version you did not squash.
+    </p>
+    <p>
+      The reverse is safer than most people expect. Platforms turn quiet material up as well
+      as loud material down, though several will decline to raise a track when doing so would
+      push its true peak past their ceiling. That is exactly the case this tool reports: when
+      the ceiling stops the gain short, the file lands above target on purpose, and the
+      platform finishes the job at playback.
+    </p>
+
+    <h2>True peak versus sample peak</h2>
+    <p>
+      A digital file stores samples, not a waveform. The waveform is what a converter
+      reconstructs between those samples on the way to a speaker, and that reconstruction can
+      rise above the highest sample it was built from. A file whose largest stored value reads
+      −0.2 dBFS can reach +0.4 dBTP when played, and a lossy encoder pushes it further still,
+      because MP3 and AAC do not decode back to precisely the samples they were handed. This
+      tool oversamples four times to estimate the peak between samples. Holding the ceiling at
+      −1 dBTP costs a decibel nobody will ever hear and prevents the crunch that otherwise
+      shows up only after encoding, on someone else's playback chain.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import {
+    measureLoudness,
+    normalizeLoudness,
+    type LoudnessResult,
+  } from '../lib/audio/analysis';
+  import { applyGain } from '../lib/audio/dsp';
+  import { db } from '../lib/format';
+
+  /** Published delivery targets. Ceilings are the platforms' own, not ours. */
+  const PRESETS: Record<string, { lufs: number; ceiling: number }> = {
+    spotify: { lufs: -14, ceiling: -1 },
+    apple: { lufs: -14, ceiling: -1 },
+    youtube: { lufs: -14, ceiling: -1 },
+    amazon: { lufs: -14, ceiling: -2 },
+    tidal: { lufs: -14, ceiling: -1 },
+    podcast: { lufs: -16, ceiling: -1 },
+    aes: { lufs: -16, ceiling: -1 },
+    ebu: { lufs: -23, ceiling: -1 },
+  };
+
+  /** Measured once per file — measuring is O(n) and the preview reuses it. */
+  let measured: LoudnessResult | null = null;
+
+  function signed(value: number, unit: string, digits = 1): string {
+    if (!Number.isFinite(value)) return '—';
+    // A true peak above zero is the whole point of the warning, so it needs a
+    // visible plus rather than a bare number.
+    const sign = value < 0 ? '−' : value > 0 ? '+' : '';
+    return `${sign}${Math.abs(value).toFixed(digits)} ${unit}`;
+  }
+
+  /** What normalizeLoudness will do, worked out ahead of time. */
+  function plan(): { wanted: number; applied: number; limited: boolean } {
+    const target = tool?.value('target', -14) ?? -14;
+    const ceiling = tool?.value('ceiling', -1) ?? -1;
+    if (!measured || !Number.isFinite(measured.integrated)) {
+      return { wanted: 0, applied: 0, limited: false };
+    }
+    const wanted = target - measured.integrated;
+    const headroom = ceiling - measured.truePeak;
+    const limited = Number.isFinite(headroom) && wanted > headroom;
+    return { wanted, applied: limited ? headroom : wanted, limited };
+  }
+
+  const tool = createTool({
+    suffix: 'normalized',
+    defaultFormat: 'mp3',
+
+    onReady(ctx, runtime) {
+      const root = runtime.root;
+      measured = measureLoudness(ctx.buffer);
+
+      const cell = (key: string, text: string): void => {
+        const el = root.querySelector<HTMLElement>(`[data-m="${key}"]`);
+        if (el) el.textContent = text;
+      };
+
+      cell('lufs', signed(measured.integrated, 'LUFS'));
+      cell('range', Number.isFinite(measured.range) ? `${measured.range.toFixed(1)} LU` : '—');
+      cell('truepeak', signed(measured.truePeak, 'dBTP'));
+      cell('peak', signed(measured.peak, 'dBFS'));
+
+      const planEl = root.querySelector<HTMLElement>('[data-plan]');
+      const limitedEl = root.querySelector<HTMLElement>('[data-limited]');
+      const limitedDetail = root.querySelector<HTMLElement>('[data-limited-detail]');
+
+      const refresh = (): void => {
+        const target = runtime.value('target', -14);
+        const { wanted, applied, limited } = plan();
+
+        if (limitedEl) limitedEl.hidden = !limited;
+
+        if (!measured || !Number.isFinite(measured.integrated)) {
+          if (planEl) planEl.textContent = 'This file is silent, so there is nothing to normalize.';
+          return;
+        }
+
+        const after = measured.integrated + applied;
+        const peakAfter = measured.truePeak + applied;
+
+        if (planEl) {
+          planEl.textContent =
+            `${db(applied)} of gain, landing the file at ${signed(after, 'LUFS')} ` +
+            `with a true peak of ${signed(peakAfter, 'dBTP')}. ` +
+            `The loudness range of ${measured.range.toFixed(1)} LU is unchanged — ` +
+            'this is one static gain, not compression.';
+        }
+
+        if (limited && limitedDetail) {
+          limitedDetail.textContent =
+            `Reaching ${signed(target, 'LUFS')} needs ${db(wanted)}, which would put the true ` +
+            `peak at ${signed(measured.truePeak + wanted, 'dBTP')} — past your ceiling. ` +
+            `Only ${db(applied)} is applied, so the file finishes ` +
+            `${Math.abs(target - after).toFixed(1)} LU below target. To get the rest, ` +
+            'compress or limit the peaks first, then normalize again.';
+        }
+      };
+
+      /** Slider and number input stay in step; the slider is authoritative. */
+      const pair = (name: string, format: (value: number) => string): ((v: number) => void) => {
+        const slider = root.querySelector<HTMLInputElement>(`[data-control="${name}"]`);
+        const num = root.querySelector<HTMLInputElement>(`[data-control="${name}-num"]`);
+        const out = root.querySelector<HTMLElement>(`[data-out="${name}"]`);
+
+        const paint = (): void => {
+          if (out && slider) out.textContent = format(Number(slider.value));
+          refresh();
+        };
+
+        slider?.addEventListener('input', () => {
+          if (num && slider) num.value = slider.value;
+          paint();
+        });
+        slider?.addEventListener('change', () => runtime.refreshPreview());
+
+        num?.addEventListener('input', () => {
+          if (slider && num) slider.value = num.value;
+          paint();
+        });
+        num?.addEventListener('change', () => runtime.refreshPreview());
+
+        return (value: number): void => {
+          if (slider) slider.value = String(value);
+          if (num) num.value = String(value);
+          paint();
+        };
+      };
+
+      const setTarget = pair('target', (value) => signed(value, 'LUFS'));
+      const setCeiling = pair('ceiling', (value) => signed(value, 'dBTP'));
+
+      // Typing a target by hand means the platform choice no longer describes it.
+      const preset = root.querySelector<HTMLSelectElement>('[data-control="preset"]');
+      root
+        .querySelectorAll<HTMLInputElement>('[data-control^="target"], [data-control^="ceiling"]')
+        .forEach((input) => {
+          input.addEventListener('input', () => {
+            if (preset) preset.value = 'custom';
+          });
+        });
+
+      preset?.addEventListener('change', () => {
+        const chosen = PRESETS[preset.value];
+        if (!chosen) return;
+        setTarget(chosen.lufs);
+        setCeiling(chosen.ceiling);
+        runtime.refreshPreview();
+      });
+
+      refresh();
+    },
+
+    preview(ctx) {
+      // Reuses the cached measurement, so dragging a slider does not re-analyse.
+      return applyGain(ctx.buffer, plan().applied);
+    },
+
+    process(ctx) {
+      return normalizeLoudness(
+        ctx.buffer,
+        tool?.value('target', -14) ?? -14,
+        tool?.value('ceiling', -1) ?? -1
+      ).buffer;
+    },
+  });
+</script>

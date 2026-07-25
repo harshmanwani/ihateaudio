@@ -1,0 +1,30 @@
+# Cloudflare Pages headers.
+
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+  Permissions-Policy: geolocation=(), camera=(), payment=(), interest-cohort=()
+  # Everything is same-origin and self-hosted, so the policy can be strict.
+  # 'unsafe-inline' on styles covers Astro's scoped style blocks; 'wasm-unsafe-eval'
+  # is required for the ffmpeg core to instantiate.
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; media-src 'self' blob:; connect-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
+
+# Content-hashed, so they can never go stale.
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable
+
+/fonts/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# The core is versioned by the package, not by filename, so revalidate daily.
+/ffmpeg/*
+  Cache-Control: public, max-age=86400
+  Cross-Origin-Resource-Policy: same-origin
+
+/sw.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+/manifest.webmanifest
+  Content-Type: application/manifest+json
+  Cache-Control: public, max-age=3600

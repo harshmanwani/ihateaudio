@@ -1,0 +1,286 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('bass-booster');
+
+const steps = [
+  'Drop the track onto the page. The waveform redraws as the boosted version and the transport plays that version, so you are auditioning the result rather than the source.',
+  'Set the amount. Around 6 dB is a firm, obvious lift; past 10 dB you are making an effect rather than a correction.',
+  'Move the corner frequency to decide how much of the low midrange comes along: lower for sub weight only, higher for body and warmth.',
+  'Leave the level switch on unless you intend to manage the peak yourself. Boosting a band raises the whole file with it, and the extra has to go somewhere.',
+  'Choose a format and download. The file on your disk is never touched.',
+];
+
+const faq = [
+  {
+    q: 'Why does the bass sound worse on my phone after boosting it?',
+    a: 'Because a phone speaker cannot physically move enough air to reproduce 60 Hz. Feeding it a boosted low end drives the driver into its mechanical limits, and what comes back is harmonic distortion smeared across the midrange — a rattle sitting on top of the vocal. The bass is not louder, it is just breaking the speaker.',
+  },
+  {
+    q: 'What does the corner frequency actually change?',
+    a: 'It sets where the shelf starts lifting. Everything below the corner gets the full boost; the transition above it is gradual, so a 100 Hz shelf still adds several decibels at 150 Hz. Lower corners keep the boost in sub territory, higher corners bring in the low mids, which reads as body and warmth.',
+  },
+  {
+    q: 'Can this add bass that was never recorded?',
+    a: 'No. A filter can only amplify what is already in the signal. If a recording was made on a phone with a high-pass filter baked in, there is nothing below 100 Hz to raise, and turning the shelf up just amplifies noise. Boosting a band that contains nothing produces louder nothing.',
+  },
+  {
+    q: 'How much boost is too much?',
+    a: 'On full-range speakers or headphones, 3 to 6 dB is a musical adjustment and 12 dB is a deliberate effect. On laptop and phone speakers, anything past about 4 dB below 100 Hz tends to make things worse rather than better — a smaller boost at a higher corner does more for perceived weight.',
+  },
+  {
+    q: 'My file distorts after boosting even on good speakers. Why?',
+    a: 'Adding gain to a band adds gain to the file. A track already peaking near full scale has no room for another 9 dB, so the peaks get squared off on export. Keep the level switch on and the whole file is scaled back after the shelf, which keeps the tonal change and discards only the level you could not have stored anyway.',
+  },
+  {
+    q: 'Why a shelf instead of a normal EQ band?',
+    a: 'A peaking band is a hump centred on one frequency with a dip either side. That is a correction tool. "More bass" means everything below a point should be bigger, which is exactly what a low shelf does: full gain below the corner, flat all the way down. If you want per-band control instead, the equalizer has eight of them.',
+  },
+  {
+    q: 'Does this work on a car stereo or a subwoofer?',
+    a: 'Yes, and that is where deep boosts belong. Systems with a real woofer can reproduce what you are adding, so a 60–80 Hz shelf does what you expect. Just remember that most car and phone playback chains already apply their own bass shaping, so you may be stacking two boosts.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Download">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Low shelf</span>
+        <span class="hint">Everything below the corner is lifted by the full amount.</span>
+      </div>
+
+      <div class="field">
+        <label class="label" for="bb-amount">
+          Amount <span class="label__value" data-out="amount">+6.0 dB</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="bb-amount"
+            data-control="amount"
+            type="range"
+            min="0"
+            max="15"
+            step="0.5"
+            value="6"
+          />
+          <input
+            class="num"
+            data-control="amount-num"
+            type="number"
+            min="0"
+            max="15"
+            step="0.5"
+            value="6"
+            aria-label="Bass boost amount in decibels"
+          />
+        </div>
+        <span class="hint">3–6 dB is an adjustment. 12 dB is an effect.</span>
+      </div>
+
+      <div class="field">
+        <label class="label" for="bb-corner">
+          Corner frequency <span class="label__value" data-out="corner">100 Hz</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="bb-corner"
+            data-control="corner"
+            type="range"
+            min="60"
+            max="250"
+            step="5"
+            value="100"
+          />
+          <input
+            class="num"
+            data-control="corner-num"
+            type="number"
+            min="60"
+            max="250"
+            step="5"
+            value="100"
+            aria-label="Corner frequency in hertz"
+          />
+        </div>
+        <span class="hint">
+          60–80 Hz for sub only, 100 Hz for general weight, 150–250 Hz for body — and mud.
+        </span>
+      </div>
+
+      <div class="field controls__full">
+        <span class="label">Level</span>
+        <label class="switch">
+          <input type="checkbox" data-control="fit" checked />
+          <span>Pull the file back to −1 dBFS after boosting</span>
+        </label>
+      </div>
+
+      <div class="controls__full" data-loud hidden>
+        <div class="note note--warn" role="status">
+          <div class="note__body">
+            <div class="note__title">That is a lot of shelf</div>
+            <div data-loud-detail></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>A shelf, not a bump</h2>
+    <p>
+      Most controls labelled "bass boost" are a peaking filter: a hump centred on one
+      frequency that tapers off on both sides. That is a useful shape for correcting a
+      specific resonance, but it is not what anyone means when they say a track needs more low
+      end. They mean everything down there should be bigger — kick, bass line, room, sub — not
+      a bulge at 80 Hz with a dip either side of it.
+    </p>
+    <p>
+      A low shelf does that instead. Below its corner frequency the gain reaches the full
+      amount you asked for and stays flat all the way down; above it, the gain returns to
+      zero. The corner is not a wall, it is the middle of a gradual transition, so a shelf set
+      to 100 Hz is still contributing several decibels at 150 Hz and a little at 250 Hz.
+      Moving the corner up brings more of the low midrange along, which reads as weight and
+      warmth. Moving it down confines the boost to deep material, which reads as sub without
+      thickening the voice.
+    </p>
+
+    <h2>Why small speakers get worse, not bassier</h2>
+    <p>
+      A phone speaker, a laptop, a pocket Bluetooth cube: none of them can move enough air to
+      produce 60 Hz at a useful level. Sending them a boosted low end does not make the bass
+      louder, because the driver cannot reproduce it at all. What it does is push that driver
+      into its mechanical limits, and the audible result is harmonic distortion spread across
+      the midrange — a buzz or rattle sitting directly on top of the vocal. The track sounds
+      worse and no deeper.
+    </p>
+    <p>
+      So audition the boost on whatever people will actually listen on. If that is phone
+      speakers, +3 dB at 150 Hz will do far more for perceived weight than +12 dB at 60 Hz,
+      because the higher shelf lands in a range the speaker can reproduce and the ear infers
+      the missing fundamental from its harmonics. On headphones, a car system or anything with
+      a real woofer, the deep boost does what you expect and this warning does not apply.
+    </p>
+
+    <h2>Headroom, and where the distortion really comes from</h2>
+    <p>
+      Adding gain to a band adds gain to the file. A track that peaked at −1 dBFS before a
+      +9 dB shelf will try to peak near +8 dBFS afterwards, and no audio format can store
+      that: the tops of the waves get flattened during export, which is a far uglier
+      distortion than anything a speaker produces. That is what the level switch is for. After
+      the shelf is applied the whole file is scaled back so the loudest sample lands at
+      −1 dBFS, which keeps the tonal change intact and discards only the level you were never
+      going to be able to store. Turn it off only if you plan to set the level yourself
+      afterwards, with the volume booster or the normalizer.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { bassBoost, applyEq } from '../lib/audio/effects';
+  import { normalizePeak } from '../lib/audio/dsp';
+  import { db } from '../lib/format';
+
+  const tool = createTool({
+    suffix: 'bass',
+    defaultFormat: 'mp3',
+
+    onReady(_ctx, runtime) {
+      const root = runtime.root;
+      const loud = root.querySelector<HTMLElement>('[data-loud]');
+      const loudDetail = root.querySelector<HTMLElement>('[data-loud-detail]');
+
+      const refreshWarning = (): void => {
+        const amount = runtime.value('amount', 6);
+        const corner = runtime.value('corner', 100);
+        const heavy = amount >= 8;
+
+        if (loud) loud.hidden = !heavy;
+        if (heavy && loudDetail) {
+          loudDetail.textContent =
+            `${db(amount)} below ${corner} Hz is more than a phone, laptop or small ` +
+            'Bluetooth speaker can reproduce. Those drivers answer a boost they cannot ' +
+            'follow with distortion spread across the midrange, so the track ends up ' +
+            'sounding rattly rather than deeper. It is fine on headphones, a car system or ' +
+            'anything with a real woofer — audition it on whatever people will actually use.';
+        }
+      };
+
+      /** Slider and number input stay in step; the slider is authoritative. */
+      const pair = (name: string, format: (value: number) => string): void => {
+        const slider = root.querySelector<HTMLInputElement>(`[data-control="${name}"]`);
+        const num = root.querySelector<HTMLInputElement>(`[data-control="${name}-num"]`);
+        const out = root.querySelector<HTMLElement>(`[data-out="${name}"]`);
+        if (!slider) return;
+
+        const paint = (): void => {
+          if (out) out.textContent = format(Number(slider.value));
+          refreshWarning();
+        };
+
+        // Rendering the shelf is a full offline render, so it waits for the
+        // release of the slider rather than firing on every pixel.
+        const commit = (): void => runtime.refreshPreview();
+
+        slider.addEventListener('input', () => {
+          if (num) num.value = slider.value;
+          paint();
+        });
+        slider.addEventListener('change', commit);
+
+        num?.addEventListener('input', () => {
+          slider.value = num.value;
+          paint();
+        });
+        num?.addEventListener('change', commit);
+
+        paint();
+      };
+
+      pair('amount', (value) => db(value));
+      pair('corner', (value) => `${Math.round(value)} Hz`);
+
+      root
+        .querySelector<HTMLInputElement>('[data-control="fit"]')
+        ?.addEventListener('change', () => runtime.refreshPreview());
+
+      refreshWarning();
+    },
+
+    preview(ctx) {
+      return render(ctx.buffer);
+    },
+
+    process(ctx) {
+      return render(ctx.buffer);
+    },
+  });
+
+  async function render(buffer: AudioBuffer): Promise<AudioBuffer> {
+    const amount = tool?.value('amount', 6) ?? 6;
+    const corner = tool?.value('corner', 100) ?? 100;
+
+    let out = buffer;
+    if (amount > 0) {
+      // bassBoost is the shared 100 Hz shelf; anywhere else needs the same
+      // shelf shape built through the generic EQ.
+      out =
+        corner === 100
+          ? await bassBoost(buffer, amount)
+          : await applyEq(buffer, [
+              { frequency: corner, gain: amount, q: 0.7, type: 'lowshelf' },
+            ]);
+    }
+
+    // An offline render is happy to produce samples above full scale; the file
+    // format is not.
+    return tool?.flag('fit') ? normalizePeak(out, -1) : out;
+  }
+</script>

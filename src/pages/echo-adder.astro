@@ -1,0 +1,397 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('echo-adder');
+
+const steps = [
+  'Drop an audio file onto the page. Your browser decodes it locally, so nothing leaves the machine and there is no queue to wait in.',
+  'Start from a preset. Slapback is a single tight repeat, Classic echo is the obvious one, and Dub keeps repeating until the repeats dissolve.',
+  'Set the delay time — the gap between one repeat and the next — then use feedback to decide how many repeats you get. The readout tells you how many will still be audible.',
+  'Balance the mix so the repeats sit behind the original rather than competing with it, press play to check, then pick a format and download.',
+];
+
+const faq = [
+  {
+    q: 'What is the difference between echo and reverb?',
+    a: 'An echo is a countable number of discrete repeats you can hear individually; reverb is thousands of reflections so dense that they merge into a single wash. The dividing line is roughly 50 milliseconds of separation — below that your hearing fuses the copies with the original, above it you perceive them as separate events. If you want space rather than repeats, use the reverb tool instead.',
+  },
+  {
+    q: 'How do I work out the right delay time for a song?',
+    a: 'Divide 60 by the tempo in beats per minute and you get the length of one beat in seconds: at 120 BPM that is 0.5 s, which lands each repeat on the next beat. Halve it for eighth notes, or multiply by 0.75 for the dotted-eighth setting that pushes the repeats slightly against the groove. The BPM detector on this site will give you the tempo to start from.',
+  },
+  {
+    q: 'What does feedback actually control?',
+    a: 'It is how much of each repeat is fed back into the delay line to become the next one. At 0.5 each repeat is half the level of the one before, so you get three or four before they disappear. At 0.85 the decay is slow enough that around eighteen repeats stay audible, which is where the dub sound comes from. The tool caps feedback at 0.85 because at 1.0 the loop never decays and the level climbs until it distorts.',
+  },
+  {
+    q: 'Why is the exported file longer than the original?',
+    a: 'The last repeats have to finish. The render is extended by the delay time multiplied by the number of repeats it takes to fall below about -60 dB, so a 600 ms delay at high feedback can add ten seconds or more. Ending the file at the original length would cut the last repeat off mid-note.',
+  },
+  {
+    q: 'Can I make the echo bounce between left and right?',
+    a: 'Not here — this is a single mono-position delay line applied to both channels, so the repeats sit where the original sound sits. Ping-pong delay needs two delay lines with crossed feedback paths. If you want movement, run the result through the stereo widener or the 8D tool afterwards.',
+  },
+  {
+    q: 'The repeats sound harsh and cluttered. What should I change?',
+    a: 'Usually the delay time, not the mix. Repeats landing on top of new words fight for the same space, so lengthen the delay until they fall into the gaps, or shorten it below 100 ms so they read as thickening instead of as echoes. Cutting some high end from the source with the equalizer first also stops the repeats from stacking up sibilance.',
+  },
+  {
+    q: 'Is a slapback echo the same as a doubling effect?',
+    a: 'Close, but not identical. Slapback is one repeat at roughly 60 to 120 milliseconds — short enough to sound like part of the original but long enough to hear as a distinct edge, the sound on most 1950s rockabilly vocals. True doubling uses a second performance, or a delay under 30 ms with slight pitch drift, which is thickening rather than an echo.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Download">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Delay</span>
+        <span class="hint">Delay time sets the spacing; feedback sets how many.</span>
+      </div>
+
+      <div class="field controls__full">
+        <span class="label" id="echo-preset-label">Preset</span>
+        <div class="seg" role="group" aria-labelledby="echo-preset-label">
+          <button type="button" class="seg__btn" data-preset="slapback" aria-pressed="false">
+            Slapback
+          </button>
+          <button type="button" class="seg__btn" data-preset="classic" aria-pressed="true">
+            Classic echo
+          </button>
+          <button type="button" class="seg__btn" data-preset="dub" aria-pressed="false">
+            Dub
+          </button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="echo-delay">
+          Delay time <span class="label__value" data-out="delay">350 ms</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="echo-delay"
+            data-control="delay"
+            type="range"
+            min="50"
+            max="1500"
+            step="5"
+            value="350"
+          />
+          <input
+            class="num"
+            data-control="delay-num"
+            type="number"
+            min="50"
+            max="1500"
+            step="5"
+            value="350"
+            aria-label="Delay time in milliseconds"
+          />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="echo-feedback">
+          Feedback <span class="label__value" data-out="feedback">40%</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="echo-feedback"
+            data-control="feedback"
+            type="range"
+            min="0"
+            max="85"
+            step="1"
+            value="40"
+          />
+          <input
+            class="num"
+            data-control="feedback-num"
+            type="number"
+            min="0"
+            max="85"
+            step="1"
+            value="40"
+            aria-label="Feedback percentage"
+          />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="echo-mix">
+          Mix <span class="label__value" data-out="mix">40%</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="echo-mix"
+            data-control="mix"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            value="40"
+          />
+          <input
+            class="num"
+            data-control="mix-num"
+            type="number"
+            min="0"
+            max="100"
+            step="1"
+            value="40"
+            aria-label="Wet mix percentage"
+          />
+        </div>
+      </div>
+
+      <p class="hint controls__full" data-repeat-note aria-live="polite">
+        About 3 audible repeats, trailing off roughly 1.1 seconds after each sound.
+      </p>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>A delay line, and what feedback does to it</h2>
+    <p>
+      An echo is the simplest effect in audio: hold a copy of the signal for a
+      fixed number of milliseconds, then play it back. That is a delay line, and
+      on its own it gives you exactly one repeat. Everything else comes from
+      what you do with the output.
+    </p>
+    <p>
+      Route some of the delayed signal back into the input and the repeat gets
+      delayed again, and again. That is feedback, and it is the only control
+      that decides how many repeats you hear. Each pass is multiplied by the
+      feedback amount, so the levels form a geometric series: at 0.4 the
+      repeats arrive at 40, 16 and 6 percent of the original before dropping
+      out of earshot. At 0.8 the series decays so slowly that a dozen and a half
+      repeats remain audible, which is why dub engineers ride this one control
+      like an instrument. The tool stops at 0.85 on purpose — feed back the full
+      signal and the loop never loses energy, so the level climbs on every pass
+      until the file clips.
+    </p>
+
+    <h2>Choosing a delay time</h2>
+    <p>
+      Three ranges behave very differently. Under about 40 milliseconds you do
+      not hear a repeat at all; the copy fuses with the original and thickens it,
+      sometimes with the hollow comb-filtered tone of a flanger. Between 60 and
+      150 milliseconds you get slapback: one clear reflection that reads as
+      energy rather than as a separate event, the sound stamped on every
+      rockabilly vocal ever cut at Sun Studio. Past roughly 200 milliseconds the
+      repeats become fully separate and rhythmic, and now the delay time has to
+      agree with the music.
+    </p>
+    <p>
+      For that, work from the tempo. One beat lasts 60 divided by the BPM, in
+      seconds — 500 milliseconds at 120 BPM. Set the delay to that and the
+      repeats land on the beat; halve it and they land on the offbeats; use
+      three quarters of it and you get the dotted-eighth pattern that makes a
+      delay feel like it is pulling against the groove instead of reinforcing
+      it. Speech has no tempo, so pick a delay long enough that the repeat falls
+      in a natural pause rather than under the next word.
+    </p>
+
+    <h2>Keeping the repeats out of the way</h2>
+    <p>
+      The mix control is not really a loudness control — it is a depth control.
+      Repeats at a high mix push the original backward, because your hearing
+      uses the ratio of direct to delayed sound to judge distance. If the effect
+      is meant to be a texture rather than a feature, 20 to 35 percent puts the
+      repeats clearly behind the source.
+    </p>
+    <p>
+      One thing to check before exporting: high feedback plus a high mix adds
+      real energy, so a file that peaked just under full scale can clip once the
+      repeats stack up. If the result sounds gritty on loud passages, drop the
+      source level a few decibels with the volume tool first, add the echo, then
+      normalize at the end.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { applyEcho } from '../lib/audio/effects';
+  import { clamp, pct } from '../lib/format';
+
+  interface Preset {
+    /** Milliseconds. */
+    delay: number;
+    /** Percent, 0–85. */
+    feedback: number;
+    /** Percent, 0–100. */
+    mix: number;
+  }
+
+  const PRESETS: Record<string, Preset> = {
+    slapback: { delay: 80, feedback: 12, mix: 35 },
+    classic: { delay: 350, feedback: 40, mix: 40 },
+    dub: { delay: 600, feedback: 75, mix: 50 },
+  };
+
+  /**
+   * Repeats still above roughly -26 dB, which is about where one stops being
+   * audible inside a mix. The engine extends the render to -60 dB, so this
+   * number is deliberately smaller than the tail it writes.
+   */
+  function audibleRepeats(feedback: number): number {
+    if (feedback <= 0.01) return 0;
+    return Math.max(0, Math.floor(Math.log(0.05) / Math.log(feedback)));
+  }
+
+  interface Pair {
+    get(): number;
+    set(value: number): void;
+  }
+
+  function bindPair(
+    root: HTMLElement,
+    name: string,
+    render: (value: number) => string,
+    onLive: () => void,
+    onCommit: () => void
+  ): Pair | null {
+    const slider = root.querySelector<HTMLInputElement>(`[data-control="${name}"]`);
+    const num = root.querySelector<HTMLInputElement>(`[data-control="${name}-num"]`);
+    const out = root.querySelector<HTMLElement>(`[data-out="${name}"]`);
+    if (!slider || !num) return null;
+
+    const min = Number(slider.min);
+    const max = Number(slider.max);
+
+    const paint = (): void => {
+      slider.style.setProperty('--pct', `${pct(Number(slider.value), min, max)}%`);
+      if (out) out.textContent = render(Number(slider.value));
+    };
+
+    slider.addEventListener('input', () => {
+      num.value = slider.value;
+      paint();
+      onLive();
+    });
+    slider.addEventListener('change', onCommit);
+
+    num.addEventListener('input', () => {
+      const raw = Number(num.value);
+      if (num.value === '' || !Number.isFinite(raw)) return;
+      slider.value = String(clamp(raw, min, max));
+      paint();
+      onLive();
+    });
+    num.addEventListener('change', () => {
+      const value = clamp(Number(num.value), min, max);
+      num.value = String(value);
+      slider.value = String(value);
+      paint();
+      onLive();
+      onCommit();
+    });
+
+    paint();
+
+    return {
+      get: () => Number(slider.value),
+      set: (value: number) => {
+        const v = clamp(value, min, max);
+        slider.value = String(v);
+        num.value = String(v);
+        paint();
+      },
+    };
+  }
+
+  let delay: Pair | null = null;
+  let feedback: Pair | null = null;
+  let mix: Pair | null = null;
+  let wired = false;
+
+  const settings = (): { delay: number; feedback: number; mix: number } => ({
+    delay: (delay?.get() ?? 350) / 1000,
+    feedback: (feedback?.get() ?? 40) / 100,
+    mix: (mix?.get() ?? 40) / 100,
+  });
+
+  createTool({
+    suffix: 'echo',
+    defaultFormat: 'mp3',
+
+    onReady(_ctx, runtime) {
+      if (wired) return;
+      wired = true;
+
+      const root = runtime.root;
+      const note = root.querySelector<HTMLElement>('[data-repeat-note]');
+      const buttons = Array.from(
+        root.querySelectorAll<HTMLButtonElement>('[data-preset]')
+      );
+
+      // A delay line is cheap to render, but re-rendering mid-drag would restart
+      // playback on every pixel — so the preview waits for the control to settle.
+      let timer = 0;
+      const commit = (): void => {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(() => runtime.refreshPreview(), 180);
+      };
+
+      const describe = (): void => {
+        if (!note) return;
+        const current = settings();
+        const count = audibleRepeats(current.feedback);
+        const tail = current.delay * count;
+        note.textContent =
+          count === 0
+            ? 'No repeats — feedback is off, so you get the original with a single delayed copy.'
+            : `About ${count} audible repeat${count === 1 ? '' : 's'}, trailing off roughly ` +
+              `${tail.toFixed(1)} seconds after each sound.`;
+      };
+
+      const clearPreset = (): void => {
+        for (const button of buttons) button.setAttribute('aria-pressed', 'false');
+        describe();
+      };
+
+      delay = bindPair(root, 'delay', (v) => `${Math.round(v)} ms`, clearPreset, commit);
+      feedback = bindPair(
+        root,
+        'feedback',
+        (v) => `${Math.round(v)}%`,
+        clearPreset,
+        commit
+      );
+      mix = bindPair(root, 'mix', (v) => `${Math.round(v)}%`, clearPreset, commit);
+
+      for (const button of buttons) {
+        button.addEventListener('click', () => {
+          const preset = PRESETS[button.dataset.preset ?? ''];
+          if (!preset) return;
+          delay?.set(preset.delay);
+          feedback?.set(preset.feedback);
+          mix?.set(preset.mix);
+          for (const other of buttons) {
+            other.setAttribute('aria-pressed', String(other === button));
+          }
+          describe();
+          commit();
+        });
+      }
+
+      describe();
+    },
+
+    preview(ctx) {
+      return applyEcho(ctx.buffer, settings());
+    },
+
+    process(ctx) {
+      return applyEcho(ctx.buffer, settings());
+    },
+  });
+</script>

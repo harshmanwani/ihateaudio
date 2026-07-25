@@ -1,0 +1,36 @@
+{
+  "name": "ihateaudio",
+  "type": "module",
+  "version": "0.1.0",
+  "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "postinstall": "node scripts/sync-ffmpeg-core.mjs",
+    "dev": "astro dev",
+    "prebuild": "node scripts/sync-ffmpeg-core.mjs",
+    "build": "astro check && astro build",
+    "build:fast": "astro build",
+    "preview": "astro preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "check": "astro check"
+  },
+  "dependencies": {
+    "@breezystack/lamejs": "^1.2.7",
+    "@ffmpeg/ffmpeg": "^0.12.15",
+    "@ffmpeg/util": "^0.12.2",
+    "astro": "^7.1.3"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.9",
+    "@ffmpeg/core": "^0.12.10",
+    "@phosphor-icons/core": "^2.1.1",
+    "@playwright/test": "^1.62.0",
+    "@types/node": "^26.1.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
+  }
+}

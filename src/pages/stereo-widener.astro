@@ -1,0 +1,385 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import Icon from '../components/Icon.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('stereo-widener');
+
+const steps = [
+  'Drop a stereo file onto the page. The tool needs two channels that differ from each other — a mono file has nothing to widen, and it will tell you so.',
+  'Move the width control. One is the original, above one pushes the sides outward, and zero collapses the whole mix to the centre.',
+  'Watch the line under the slider: it reports how much of the sound disappears when the result is folded down to mono, which is what happens on most phone and smart speakers.',
+  'Press play to hear the change, then back off until the image is wide but the centre still feels solid, and download.',
+];
+
+const faq = [
+  {
+    q: 'What is the width number actually multiplying?',
+    a: 'The side signal. The tool rebuilds the file as a mid channel — everything the two channels have in common — and a side channel, which is what they differ by, then multiplies the side by the width before rebuilding left and right. At 1 the side is untouched and the file is bit-identical in intent to the original. At 0 the side is gone. At 3 it is three times its original level relative to the centre.',
+  },
+  {
+    q: 'Why does my mix sound hollow when it plays in mono?',
+    a: 'Because a mono fold-down adds the two channels together, and anything that was in the side signal is equal and opposite in them, so it cancels exactly. Widening does not change how loud the mono version is — it changes how much of the total sound lives in the part that will vanish. That gap between the stereo and mono versions is what the readout under the slider measures.',
+  },
+  {
+    q: 'Where will people actually hear this in mono?',
+    a: 'More places than most people expect. Every phone loudspeaker, almost every portable Bluetooth speaker, single-driver smart speakers, laptop speakers close enough together to behave as one source, supermarket and cafe ceiling systems, and the subwoofer feed of any club PA. If a track is going anywhere near social video, assume a large share of listeners will hear the mono fold.',
+  },
+  {
+    q: 'The slider does nothing to my file. What is wrong?',
+    a: 'The file is probably dual mono — two channels carrying identical audio, which is common when a mono recording is exported as stereo. Identical channels mean the side signal is silent, and multiplying silence by three is still silence. The tool detects this and says so when the file loads.',
+  },
+  {
+    q: 'Is width 0 the same as the stereo-to-mono tool?',
+    a: 'It sounds the same but it is not the same file. Width 0 leaves you with two channels carrying identical audio, so the export is still stereo-sized. The stereo-to-mono tool produces a genuine single-channel file, which is roughly half the size and the right choice for voice recordings and podcasts.',
+  },
+  {
+    q: 'Why does widening make the file distort?',
+    a: 'The rebuilt left channel is the mid plus the scaled side, so tripling the side can push a peak past full scale even though neither original channel ever did. Samples that would exceed the ceiling are clamped, which is audible as crackle on the loudest passages. The warning under the slider appears when the current width would clip, and lowering the source level before widening avoids it.',
+  },
+  {
+    q: 'How wide can I go before it sounds wrong?',
+    a: 'On music, 1.2 to 1.5 is usually the useful range. Past that the centre — which is where the lead vocal, kick and bass normally sit — starts to feel scooped out and the mix takes on a phasey, out-of-focus quality on headphones. The tell is that the track sounds impressive for ten seconds and tiring after a minute.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Download">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Width</span>
+        <span class="hint">1 is the original. Below 1 narrows toward the centre.</span>
+      </div>
+
+      <div class="note note--warn controls__full" data-mono-note hidden>
+        <Icon name="warning" size={20} />
+        <div class="note__body">
+          <div class="note__title" data-mono-title>This file is mono</div>
+          <div data-mono-body>
+            There is no side signal to widen, so the controls are switched off. Convert
+            the file to stereo first, or use the 8D tool, which builds a stereo image
+            from a mono source rather than stretching one that already exists.
+          </div>
+        </div>
+      </div>
+
+      <div class="field controls__full">
+        <label class="label" for="width">
+          Stereo width <span class="label__value" data-out="width">1.00×</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="width"
+            data-control="width"
+            type="range"
+            min="0"
+            max="3"
+            step="0.05"
+            value="1"
+          />
+          <input
+            class="num"
+            data-control="width-num"
+            type="number"
+            min="0"
+            max="3"
+            step="0.05"
+            value="1"
+            aria-label="Stereo width multiplier"
+          />
+        </div>
+      </div>
+
+      <div class="field controls__full">
+        <span class="label" id="width-preset-label">Jump to</span>
+        <div class="seg" role="group" aria-labelledby="width-preset-label">
+          <button type="button" class="seg__btn" data-width="0" aria-pressed="false">
+            Mono
+          </button>
+          <button type="button" class="seg__btn" data-width="1" aria-pressed="true">
+            Original
+          </button>
+          <button type="button" class="seg__btn" data-width="1.6" aria-pressed="false">
+            Wide
+          </button>
+        </div>
+      </div>
+
+      <p class="hint controls__full" data-mono-loss aria-live="polite"></p>
+
+      <div class="note note--warn controls__full" data-clip-note hidden>
+        <Icon name="warning-circle" size={20} />
+        <div class="note__body" data-clip-body></div>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>Mid and side, the two signals hiding in every stereo file</h2>
+    <p>
+      A stereo file is stored as a left channel and a right channel, but that is
+      not the only way to describe it. Take the sum of the two and halve it and
+      you get the <strong>mid</strong>: everything both channels agree on, which
+      in a typical mix is the lead vocal, the kick, the snare and the bass.
+      Take the difference and halve it and you get the <strong>side</strong>:
+      everything the two channels disagree on, which is the reverb, the room,
+      the wide synths and the guitars panned out to the edges. The two together
+      hold exactly the same information as left and right, and either pair can
+      be rebuilt from the other with nothing lost.
+    </p>
+    <p>
+      That is the whole mechanism here. The file is converted to mid and side,
+      the side is multiplied by the width figure, and left and right are
+      reconstructed as mid plus side and mid minus side. Turn the multiplier up
+      and the differences between the channels are exaggerated, which the ear
+      reads as a wider image. Turn it to zero and the side disappears, leaving
+      the mid in both channels — a centred, mono-sounding file. Nothing is
+      delayed, nothing is phase-inverted, and nothing is added; the only thing
+      changing is the ratio between what the channels share and what they do
+      not.
+    </p>
+
+    <h2>Mono compatibility, and why it still matters</h2>
+    <p>
+      There is a catch built into the arithmetic. A mono fold-down is left plus
+      right, and the side signal appears in those two with opposite signs, so it
+      cancels perfectly. Whatever you pushed into the sides is not quieter in
+      mono — it is gone. Widening therefore never makes the mono version louder
+      or bigger; it only widens the gap between what a stereo listener hears and
+      what a mono listener does.
+    </p>
+    <p>
+      That would be an academic point if mono playback were rare, and it is not.
+      Phone loudspeakers, most portable Bluetooth speakers and single-driver
+      smart speakers are all mono. Shops and gyms run distributed ceiling
+      systems in mono, and club systems sum the low end before it reaches the
+      subwoofers, because two subs fed different bass fight each other in the
+      room.
+    </p>
+    <p>
+      The readout under the slider makes this concrete: it compares the level of
+      the mono fold with the stereo result at the current width. Under a decibel
+      is normal for a commercial mix. Four or five means half the perceived
+      energy of the track lives in material a phone speaker will never
+      reproduce.
+    </p>
+
+    <h2>How far to push it, and when to go the other way</h2>
+    <p>
+      For music, small amounts work. Between 1.1 and 1.4 the image opens up
+      without the centre losing its grip. Past 1.5 the vocal and bass start to
+      sound scooped and the whole track takes on a phasey quality on headphones
+      that is impressive for a few seconds and tiring after a minute. The
+      extreme end of the range is there for deliberate effects, not for
+      mastering.
+    </p>
+    <p>
+      Narrowing is the underrated direction. Pulling width down to 0.7 or 0.8
+      tightens a mix recorded with widely spaced microphones and often makes it
+      translate better to small speakers. For spoken word it is almost always
+      the right move: a voice belongs in the centre, and any spread on it is
+      room sound you would rather not have. For speech, consider going all the
+      way to a true mono file instead — same result, half the size.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { setStereoWidth } from '../lib/audio/effects';
+  import { clamp, db, pct } from '../lib/format';
+
+  interface Measurement {
+    /** RMS of the mid signal — the part that survives a mono fold. */
+    mid: number;
+    /** RMS of the side signal at width 1. */
+    side: number;
+    /** Highest absolute sample the current width would produce, pre-clamp. */
+    peak: number;
+  }
+
+  /**
+   * One pass over the file gives everything the readouts need. Mid and side do
+   * not depend on width, but the peak does, so this runs again on each change.
+   */
+  function measure(buffer: AudioBuffer, width: number): Measurement {
+    if (buffer.numberOfChannels < 2) return { mid: 0, side: 0, peak: 0 };
+    const left = buffer.getChannelData(0);
+    const right = buffer.getChannelData(1);
+    let midSq = 0;
+    let sideSq = 0;
+    let peak = 0;
+
+    for (let i = 0; i < left.length; i += 1) {
+      const mid = (left[i] + right[i]) / 2;
+      const side = (left[i] - right[i]) / 2;
+      midSq += mid * mid;
+      sideSq += side * side;
+      const magnitude = Math.abs(mid) + Math.abs(side) * width;
+      if (magnitude > peak) peak = magnitude;
+    }
+
+    const n = Math.max(1, left.length);
+    return { mid: Math.sqrt(midSq / n), side: Math.sqrt(sideSq / n), peak };
+  }
+
+  let width = 1;
+  let source: AudioBuffer | null = null;
+  let usable = true;
+  let wired = false;
+
+  createTool({
+    suffix: 'wide',
+    defaultFormat: 'mp3',
+
+    onReady(ctx, runtime) {
+      source = ctx.buffer;
+
+      const root = runtime.root;
+      const slider = root.querySelector<HTMLInputElement>('[data-control="width"]');
+      const num = root.querySelector<HTMLInputElement>('[data-control="width-num"]');
+      const out = root.querySelector<HTMLElement>('[data-out="width"]');
+      const loss = root.querySelector<HTMLElement>('[data-mono-loss]');
+      const monoNote = root.querySelector<HTMLElement>('[data-mono-note]');
+      const monoTitle = root.querySelector<HTMLElement>('[data-mono-title]');
+      const monoBody = root.querySelector<HTMLElement>('[data-mono-body]');
+      const clipNote = root.querySelector<HTMLElement>('[data-clip-note]');
+      const clipBody = root.querySelector<HTMLElement>('[data-clip-body]');
+      const buttons = Array.from(
+        root.querySelectorAll<HTMLButtonElement>('[data-width]')
+      );
+      if (!slider || !num) return;
+
+      const min = Number(slider.min);
+      const max = Number(slider.max);
+
+      let timer = 0;
+      const commit = (): void => {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(() => runtime.refreshPreview(), 120);
+      };
+
+      const report = (): void => {
+        if (!source || !usable) return;
+        const stats = measure(source, width);
+
+        if (loss) {
+          // A mono fold is the mid signal alone, whatever the width; widening
+          // only changes how much of the total lives in the part that cancels.
+          const stereo = Math.hypot(stats.mid, stats.side * width);
+          const drop = stereo > 0 ? 20 * Math.log10(stats.mid / stereo) : 0;
+          loss.textContent =
+            `Folded to mono, this loses ${Math.abs(drop).toFixed(1)} dB of what a ` +
+            'stereo listener hears.';
+        }
+
+        if (clipNote && clipBody) {
+          if (stats.peak > 1) {
+            clipBody.textContent =
+              `At this width the loudest peaks reach ${db(20 * Math.log10(stats.peak))} ` +
+              'above full scale and will be clipped. Lower the width, or reduce the ' +
+              'level with the volume tool before widening.';
+            clipNote.removeAttribute('hidden');
+          } else {
+            clipNote.setAttribute('hidden', '');
+          }
+        }
+      };
+
+      const paint = (): void => {
+        slider.style.setProperty('--pct', `${pct(width, min, max)}%`);
+        if (out) out.textContent = `${width.toFixed(2)}×`;
+        for (const button of buttons) {
+          button.setAttribute(
+            'aria-pressed',
+            String(Math.abs(Number(button.dataset.width) - width) < 0.001)
+          );
+        }
+      };
+
+      const setWidth = (value: number, fromSlider: boolean): void => {
+        width = clamp(value, min, max);
+        if (!fromSlider) slider.value = String(width);
+        num.value = String(width);
+        paint();
+        report();
+      };
+
+      // Decide whether there is anything here to widen at all.
+      const disable = (title: string, body: string): void => {
+        usable = false;
+        slider.disabled = true;
+        num.disabled = true;
+        for (const button of buttons) button.disabled = true;
+        if (monoTitle) monoTitle.textContent = title;
+        if (monoBody) monoBody.textContent = body;
+        monoNote?.removeAttribute('hidden');
+        if (loss) loss.textContent = '';
+        clipNote?.setAttribute('hidden', '');
+      };
+
+      usable = true;
+      slider.disabled = false;
+      num.disabled = false;
+      for (const button of buttons) button.disabled = false;
+      monoNote?.setAttribute('hidden', '');
+
+      if (ctx.buffer.numberOfChannels < 2) {
+        disable(
+          'This file is mono',
+          'There is no side signal to widen, so the controls are switched off. Convert ' +
+            'the file to stereo first, or use the 8D tool, which builds a stereo image ' +
+            'from a mono source rather than stretching one that already exists.'
+        );
+      } else if (measure(ctx.buffer, 1).side < 1e-5) {
+        disable(
+          'Both channels are identical',
+          'This is a dual-mono file: two channels carrying the same audio. The side ' +
+            'signal is silent, and multiplying silence has no effect, so widening ' +
+            'cannot do anything with it.'
+        );
+      }
+
+      if (wired) {
+        setWidth(width, false);
+        return;
+      }
+      wired = true;
+
+      slider.addEventListener('input', () => {
+        setWidth(Number(slider.value), true);
+        num.value = slider.value;
+      });
+      slider.addEventListener('change', commit);
+
+      num.addEventListener('input', () => {
+        if (num.value === '' || !Number.isFinite(Number(num.value))) return;
+        setWidth(Number(num.value), false);
+      });
+      num.addEventListener('change', () => {
+        setWidth(Number(num.value), false);
+        commit();
+      });
+
+      for (const button of buttons) {
+        button.addEventListener('click', () => {
+          setWidth(Number(button.dataset.width), false);
+          commit();
+        });
+      }
+
+      setWidth(width, false);
+    },
+
+    preview(ctx) {
+      return usable ? setStereoWidth(ctx.buffer, width) : ctx.buffer;
+    },
+
+    process(ctx) {
+      return usable ? setStereoWidth(ctx.buffer, width) : ctx.buffer;
+    },
+  });
+</script>

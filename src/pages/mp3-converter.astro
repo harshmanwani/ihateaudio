@@ -1,0 +1,176 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+import ConversionPanel from '../components/ConversionPanel.astro';
+
+const tool = getTool('mp3-converter');
+
+const steps = [
+  'Drop a WAV, M4A, OGG, FLAC, Opus or WebM file onto the page. It is decoded in the tab, not uploaded anywhere.',
+  'Read the bitrate table below and decide how much quality you are willing to trade for size.',
+  'Set the bitrate in the Quality box in the export bar. The estimated MP3 size updates as soon as you change it.',
+  'Click Download. The LAME encoder runs in your browser and writes the MP3 directly to your downloads folder.',
+];
+
+const bitrates = [
+  { rate: '64 kbps', size: '0.46 MB', use: 'Speech only. Music sounds hollow and swirly.' },
+  { rate: '96 kbps', size: '0.69 MB', use: 'Voice memos, lectures, audiobooks.' },
+  { rate: '128 kbps', size: '0.92 MB', use: 'The old CD-ripping default. Audible on cymbals.' },
+  { rate: '160 kbps', size: '1.1 MB', use: 'Comfortable for casual music listening.' },
+  { rate: '192 kbps', size: '1.4 MB', use: 'The sensible default for music. Hard to fault.' },
+  { rate: '256 kbps', size: '1.8 MB', use: 'Effectively transparent on most material.' },
+  { rate: '320 kbps', size: '2.3 MB', use: 'The MP3 ceiling. Use when storage is irrelevant.' },
+];
+
+const faq = [
+  {
+    q: 'What bitrate should I pick?',
+    a: '192 kbps for music is the answer that almost never gets anyone in trouble — the difference from 320 is inaudible on ordinary equipment, and the file is over 40 percent smaller. For pure speech, 96 kbps is plenty and 64 kbps is usable. Go to 320 only when you are archiving and the extra megabytes cost you nothing.',
+  },
+  {
+    q: 'Why does my MP3 sound slightly worse than the file I started with?',
+    a: 'Because MP3 is lossy by design. The encoder builds a psychoacoustic model of your audio, works out which parts are masked by louder sounds nearby, and does not store them. That is the whole point of the format, and it is why an MP3 is roughly a tenth the size of the WAV it came from.',
+  },
+  {
+    q: 'Can I convert an MP3 to MP3 at a higher bitrate to improve it?',
+    a: 'No. Going from 128 kbps to 320 kbps produces a file two and a half times bigger that sounds marginally worse, because the second encoding pass adds its own losses on top of the first. The only reason to re-encode an MP3 upward is if a piece of software refuses to accept anything below a certain bitrate.',
+  },
+  {
+    q: 'Does the sample rate change?',
+    a: 'Only if it has to. MP3 permits 8, 11.025, 12, 16, 22.05, 24, 32, 44.1 and 48 kHz. A 44.1 kHz source stays at 44.1 kHz. A 96 kHz source is resampled down to 48 kHz automatically, because the format simply cannot carry 96 kHz. If you need to keep a high rate, export as WAV or FLAC instead.',
+  },
+  {
+    q: 'Is MP3 still under patent?',
+    a: 'No. The last of the relevant patents expired in 2017, and Fraunhofer formally ended its licensing programme that April. MP3 is now free to encode, decode and distribute, which is a large part of why it remains everywhere despite newer formats being technically better.',
+  },
+  {
+    q: 'Why do MP3s sometimes have a gap at the start of a track?',
+    a: 'The encoder adds padding at the beginning and end of the stream because it works in fixed 1152-sample frames. LAME writes the exact padding amounts into an information tag so a good player can skip them, but many players ignore it. If gapless playback matters — a live album, a DJ mix — M4A or FLAC handles it more reliably.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Convert to MP3">
+    <ConversionPanel
+      hint="If your source is already an MP3, matching its bitrate keeps the size similar without paying a second quality penalty."
+    />
+
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Choosing a bitrate</span>
+        <span class="hint">Sizes are per minute of stereo audio.</span>
+      </div>
+
+      <div class="controls__full">
+        <div class="tablewrap">
+          <table class="datatable">
+            <thead>
+              <tr>
+                <th scope="col">Bitrate</th>
+                <th scope="col">Per minute</th>
+                <th scope="col">What it is for</th>
+              </tr>
+            </thead>
+            <tbody>
+              {
+                bitrates.map((row) => (
+                  <tr>
+                    <td class="tnum">{row.rate}</td>
+                    <td class="tnum">{row.size}</td>
+                    <td>{row.use}</td>
+                  </tr>
+                ))
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="controls__full">
+        <p class="hint">
+          MP3 is constant bitrate here, so the size is fixed by the bitrate and
+          the duration alone — a quiet acoustic track and a dense mix at 192 kbps
+          come out identical in size.
+        </p>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>Why MP3 refuses to die</h2>
+    <p>
+      MPEG-1 Audio Layer III was standardised in 1993, out of work done at
+      Fraunhofer IIS and the University of Erlangen through the late 1980s. By
+      any technical measure it has been beaten repeatedly since: AAC does the
+      same job in about two thirds the bits, Opus is better again below 96 kbps,
+      and both handle transients and high frequencies more gracefully. None of
+      that has dented MP3's position, because compatibility compounds. A format
+      that has been supported by every player, phone, car stereo, DJ controller,
+      smart speaker and set-top box for a quarter of a century is a format you
+      can send to anyone without asking what they own.
+    </p>
+    <p>
+      The patents that once made MP3 encoders a licensed product expired in 2017.
+      That removed the last practical argument against it for software authors,
+      and it is why an MP3 encoder small enough to load in a web page exists at
+      all.
+    </p>
+
+    <h2>What the encoder is throwing away</h2>
+    <p>
+      MP3 compression is built on auditory masking. When two sounds occur close
+      together in frequency and one is much louder, the quieter one becomes
+      inaudible — your ear genuinely does not register it. The encoder splits the
+      signal into 576-sample blocks, transforms each into a frequency
+      representation, estimates how much noise each band can hide, and allocates
+      bits accordingly. Parts of the signal you could not have heard are stored
+      coarsely or not at all.
+    </p>
+    <p>
+      The model breaks down in two well-known places. Sharp transients — a
+      castanet, a rimshot, a plucked harpsichord string — can smear noise
+      backwards in time across the block that contains them, an artifact called
+      pre-echo, audible as a faint whoosh just before the hit. And at low
+      bitrates the encoder often applies a low-pass filter, discarding everything
+      above roughly 16 kHz, which is what makes a 128 kbps file sound slightly
+      dull on cymbals and sibilance compared with the original.
+    </p>
+
+    <h2>When MP3 is the wrong choice</h2>
+    <p>
+      Skip MP3 if you need more than two channels, a sample rate above 48 kHz, or
+      reliable gapless playback across a whole album. Skip it for spoken word
+      that has to be as small as possible, where Opus at 32 kbps beats MP3 at
+      96 kbps outright. Skip it if the file is going into a Unity or Godot
+      project, where OGG Vorbis is the expected asset format and MP3 decoding is
+      awkward.
+    </p>
+    <p>
+      Skip it, above all, as an intermediate step. If you plan to trim, normalize
+      or add effects afterwards, keep the working copy lossless and encode to MP3
+      once, at the very end. Each lossy round trip compounds, and by the third or
+      fourth it stops being subtle.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { wireConversionPanel } from '../lib/conversion';
+
+  createTool({
+    suffix: 'mp3',
+    onReady(_ctx, runtime) {
+      wireConversionPanel(runtime);
+    },
+    formats: ['mp3'],
+    defaultFormat: 'mp3',
+
+    // The encoding itself is the conversion; the samples pass through untouched.
+    process(ctx) {
+      return ctx.buffer;
+    },
+  });
+</script>

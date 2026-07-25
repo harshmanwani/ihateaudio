@@ -1,0 +1,255 @@
+---
+/**
+ * The DOM skeleton every tool renders. Element hooks are data attributes that
+ * the shared runtime in src/lib/tool.ts binds to, which is why a new tool is a
+ * config plus a <slot>, not a new interface.
+ */
+import Icon from './Icon.astro';
+import { PRIVACY_LINE } from '../consts';
+import { relatedTools, type Tool } from '../data/tools';
+
+interface Props {
+  tool: Tool;
+  /** Show draggable selection handles over the waveform. */
+  selection?: boolean;
+  /** Hide the waveform for tools that only report numbers. */
+  stage?: boolean;
+  /** Show the format/quality export bar. */
+  exportBar?: boolean;
+  /** Label on the primary action. */
+  action?: string;
+  /** Copy in the empty dropzone. */
+  dropTitle?: string;
+  dropHint?: string;
+  multiple?: boolean;
+  video?: boolean;
+  /** Renders a container for multi-file output (splitters). */
+  results?: boolean;
+}
+
+const {
+  tool,
+  selection = false,
+  stage = true,
+  exportBar = true,
+  action = 'Download',
+  dropTitle,
+  dropHint,
+  multiple = false,
+  video = false,
+  results = false,
+} = Astro.props;
+
+const chain = relatedTools(tool.slug).slice(0, 3);
+
+const defaultDropTitle = multiple
+  ? 'Drop your audio files here'
+  : video
+    ? 'Drop a video or audio file here'
+    : 'Drop an audio file here';
+
+const formats = video
+  ? 'MP4, MOV, MKV, WEBM, AVI, MP3, WAV, M4A, OGG, FLAC and more'
+  : 'MP3, WAV, M4A, AAC, OGG, OPUS, FLAC, WMA, AIFF and more';
+---
+
+<div class="tool" data-tool data-slug={tool.slug}>
+  <!-- Empty state. Teaches the interface rather than just saying "no file". -->
+  <div
+    class="drop"
+    data-drop
+    data-armed="false"
+    role="button"
+    tabindex="0"
+    aria-label={defaultDropTitle}
+  >
+    <Icon name="upload-simple" size={36} class="drop__icon" />
+    <div class="drop__title">{dropTitle ?? defaultDropTitle}</div>
+    <p class="drop__hint">
+      {dropHint ?? 'Or click to browse. You can also paste a file from your clipboard.'}
+    </p>
+    <div class="drop__actions">
+      <button type="button" class="btn btn--solid btn--lg" data-browse>
+        <Icon name="upload-simple" size={18} />
+        Choose file{multiple ? 's' : ''}
+      </button>
+    </div>
+    <p class="drop__formats">{formats}</p>
+    <p class="privacy">
+      <Icon name="shield-check" size={15} />
+      {PRIVACY_LINE}
+    </p>
+    <input type="file" data-file-input tabindex="-1" aria-hidden="true" />
+  </div>
+
+  <!-- Status: progress, errors and notices all render here. -->
+  <div data-status aria-live="polite"></div>
+
+  <div class="tool" data-workspace hidden>
+    <div class="filebar">
+      <Icon name="file-audio" size={22} class="filebar__icon" />
+      <div class="filebar__text">
+        <div class="filebar__name" data-filename></div>
+        <div class="filebar__meta" data-filemeta></div>
+      </div>
+      <button type="button" class="btn btn--ghost btn--sm" data-reset>
+        <Icon name="x" size={16} />
+        <span class="visually-hidden">Remove file and start over</span>
+        <span aria-hidden="true">Clear</span>
+      </button>
+    </div>
+
+    {
+      stage && (
+        <div class="stage" data-stage>
+          <div class="stage__canvas-wrap" data-canvas-wrap>
+            <canvas data-canvas aria-label="Audio waveform" role="img" />
+
+            {selection && (
+              <>
+                <div class="stage__mask" data-mask="left" />
+                <div class="stage__mask" data-mask="right" />
+                <div
+                  class="stage__handle"
+                  data-handle="start"
+                  role="slider"
+                  tabindex="0"
+                  aria-label="Selection start"
+                  aria-valuemin="0"
+                  aria-valuenow="0"
+                  hidden
+                >
+                  <span class="stage__handle-tip" data-tip>0:00.00</span>
+                </div>
+                <div
+                  class="stage__handle"
+                  data-handle="end"
+                  role="slider"
+                  tabindex="0"
+                  aria-label="Selection end"
+                  aria-valuemin="0"
+                  aria-valuenow="0"
+                  hidden
+                >
+                  <span class="stage__handle-tip" data-tip>0:00.00</span>
+                </div>
+              </>
+            )}
+
+            <div class="stage__playhead" data-playhead />
+          </div>
+
+          <div class="transport">
+            <button
+              type="button"
+              class="transport__btn"
+              data-play
+              aria-label="Play"
+              aria-pressed="false"
+            >
+              <span data-icon-play style="display:flex">
+                <Icon name="play" size={18} weight="fill" />
+              </span>
+              <span data-icon-pause style="display:none">
+                <Icon name="pause" size={18} weight="fill" />
+              </span>
+            </button>
+
+            <button
+              type="button"
+              class="transport__btn"
+              data-skip-start
+              aria-label="Jump to start"
+            >
+              <Icon name="skip-back" size={16} weight="fill" />
+            </button>
+
+            <button
+              type="button"
+              class="transport__btn"
+              data-skip-end
+              aria-label="Jump to end"
+            >
+              <Icon name="skip-forward" size={16} weight="fill" />
+            </button>
+
+            <button
+              type="button"
+              class="transport__btn"
+              data-loop
+              aria-label="Loop playback"
+              aria-pressed="false"
+            >
+              <Icon name="repeat" size={16} />
+            </button>
+
+            <div class="transport__time tnum" data-time>0:00.00 <span>/ 0:00.00</span></div>
+            <div class="transport__spacer" />
+          </div>
+        </div>
+      )
+    }
+
+    <slot />
+
+    {results && <div class="results" data-results />}
+
+    {
+      exportBar && (
+        <div class="export">
+          <div class="field export__field" data-format-field>
+            <label class="label" for="format-select">
+              Format
+            </label>
+            <select class="select" id="format-select" data-format />
+          </div>
+
+          <div class="field export__field" data-quality-field>
+            <label class="label" for="quality-select">
+              Quality
+            </label>
+            <select class="select" id="quality-select" data-quality />
+          </div>
+
+          <div class="export__spacer" />
+          <div class="export__size tnum" data-size />
+
+          <button type="button" class="btn btn--solid btn--lg" data-download>
+            <Icon name="download-simple" size={18} />
+            {action}
+          </button>
+        </div>
+      )
+    }
+
+    {
+      chain.length > 0 && (
+        <div class="chain" data-chain hidden>
+          <span class="chain__label">Saved. Keep going?</span>
+          <div class="chain__links">
+            {chain.map((next) => (
+              <a class="btn btn--quiet btn--sm" href={`/${next.slug}`} data-chain-link>
+                {next.name}
+                <Icon name="arrow-right" size={14} />
+              </a>
+            ))}
+          </div>
+        </div>
+      )
+    }
+  </div>
+</div>
+
+<div class="drop-overlay" aria-hidden="true">Drop the file anywhere</div>
+
+<script>
+  // The "Choose files" button sits inside the dropzone, whose own click
+  // handler ignores buttons — so it needs to open the picker itself.
+  document.querySelectorAll<HTMLElement>('[data-browse]').forEach((button) => {
+    button.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const root = button.closest('[data-tool]');
+      root?.querySelector<HTMLInputElement>('[data-file-input]')?.click();
+    });
+  });
+</script>

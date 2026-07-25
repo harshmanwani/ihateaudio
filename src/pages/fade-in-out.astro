@@ -1,0 +1,274 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('fade-in-out');
+
+const steps = [
+  'Drop the track onto the page. The waveform you see is drawn from the real samples, so the shape of the fade will be visible once you set one.',
+  'Set how long the fade in and the fade out should last. The waveform redraws with the ramps applied, which is usually enough to tell whether a length is right.',
+  'Pick a curve. Linear is the safe choice for very short fades; the s-curve is the one to reach for on anything longer than a second or two.',
+  'Press play — the transport plays the faded version, not the original — then choose a format and download.',
+];
+
+const faq = [
+  {
+    q: 'Which curve should I choose?',
+    a: 'Linear for fades under about half a second, where the shape is too brief to matter. S-curve for long fades, because it starts and ends flat and so has no audible moment where the fade begins. Exponential for a musical fade-out that should sink away and leave a tail. Logarithmic for a fade-in that needs to become properly audible quickly rather than creeping up.',
+  },
+  {
+    q: 'Why does a linear fade-out sound like nothing happens and then it vanishes?',
+    a: 'Because hearing is roughly logarithmic and a linear fade is not. Halfway through a linear fade the signal is at half amplitude, which is only 6 dB down — noticeably quieter but nowhere near half as loud, since that takes about 10 dB. All the perceived disappearing is crammed into the final quarter. If a fade-out feels like it falls off a cliff at the end, that is the reason, and the s-curve or exponential shape fixes it.',
+  },
+  {
+    q: 'How long should a fade actually be?',
+    a: 'Ten to twenty milliseconds is a declick, not a fade — long enough to remove a pop, too short to hear as anything. Half a second to a second suits speech and podcast segments. Three to eight seconds is the range almost every faded song ending falls into. Video beds usually want one to two seconds so the fade finishes before the cut.',
+  },
+  {
+    q: 'Can I put a fade somewhere in the middle of the track?',
+    a: 'Not here. This tool fades in from the very first sample and out to the very last one. To fade at an internal point, cut the file at that point in the trimmer, fade the two pieces separately, and put them back together in the joiner — or use the crossfade joiner, which is that operation in one step.',
+  },
+  {
+    q: 'The fade-in eats the first word or the first beat.',
+    a: 'The fade is longer than the run-up in the material. A fade-in reaches full level only at its end, so anything inside that window is attenuated — a one-second fade on a track that starts singing at 0.3 seconds will always sound wrong. Shorten the fade, or trim the silence off the front first so the fade has somewhere to live.',
+  },
+  {
+    q: 'Can adding a fade cause clipping or distortion?',
+    a: 'No. A fade only ever multiplies samples by a number between 0 and 1, so every sample either stays where it is or moves closer to silence. Nothing can exceed the peak the file already had. That is the opposite of a volume boost, which can and does clip.',
+  },
+  {
+    q: 'Does fading out to silence make the file smaller?',
+    a: 'Slightly, in a lossy format — near-silence is cheap to encode, so an MP3 of a faded track is marginally smaller than the same track without the fade. In WAV it makes no difference at all, because every sample takes the same number of bytes whether it is loud or zero.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Download faded audio">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Fade</span>
+        <span class="hint">The waveform and the player both show the faded version.</span>
+      </div>
+
+      <div class="field">
+        <label class="label" for="fade-in">
+          Fade in
+          <span class="label__value" data-out="in">0.0 s</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="fade-in"
+            data-control="in"
+            type="range"
+            min="0"
+            max="30"
+            step="0.1"
+            value="0"
+          />
+          <input
+            class="num"
+            data-control="in-num"
+            type="number"
+            min="0"
+            max="30"
+            step="0.1"
+            value="0"
+            aria-label="Fade in length in seconds"
+          />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="fade-out">
+          Fade out
+          <span class="label__value" data-out="out">3.0 s</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="fade-out"
+            data-control="out"
+            type="range"
+            min="0"
+            max="30"
+            step="0.1"
+            value="3"
+          />
+          <input
+            class="num"
+            data-control="out-num"
+            type="number"
+            min="0"
+            max="30"
+            step="0.1"
+            value="3"
+            aria-label="Fade out length in seconds"
+          />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="fade-curve">Curve</label>
+        <select class="select" id="fade-curve" data-control="curve">
+          <option value="linear">Linear — straight line</option>
+          <option value="scurve" selected>S-curve — flat at both ends</option>
+          <option value="exponential">Exponential — leaves a tail</option>
+          <option value="logarithmic">Logarithmic — moves early</option>
+        </select>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>What a fade is, arithmetically</h2>
+    <p>
+      A fade multiplies each sample by a number that ramps between 0 and 1 across
+      the length you set. That is the entire operation. Nothing is filtered, no
+      envelope follower is involved, and the samples outside the fade region are
+      copied through untouched. The only interesting question is what path the
+      multiplier takes on its way from 0 to 1, and that is what the curve control
+      chooses.
+    </p>
+    <p>
+      With <em>t</em> running from 0 to 1 across the fade, the four options compute
+      a gain of <em>t</em>, <em>t²</em>, <em>√t</em>, and <em>3t² − 2t³</em>
+      respectively. Those look academic until you convert them to decibels at the
+      midpoint, which is where the difference lives. Halfway through, linear is 6 dB
+      down, exponential is 12 dB down, logarithmic is only 3 dB down, and the
+      s-curve is at 6 dB but arriving there with zero slope at both ends.
+    </p>
+
+    <h2>Why the shape changes what you hear</h2>
+    <p>
+      Loudness perception is closer to logarithmic than linear. Roughly 10 dB of
+      attenuation is needed before something sounds half as loud, so a linear fade —
+      which spends half its time between 0 and −6 dB — sounds like it is barely
+      doing anything for the first half and then disappears in a hurry. This is the
+      single most common complaint about fades, and it is not the tool's fault; it
+      is a mismatch between arithmetic and ears.
+    </p>
+    <p>
+      Exponential goes the other way: the level drops quickly and then trails off, so
+      a fading song gets out of the listener's way early but keeps a long,
+      audible tail. Logarithmic holds the level up and then falls off at the end,
+      which is what you want for a fade-in that needs to establish the material
+      quickly. The s-curve is flat at the start and flat at the finish, which means
+      there is no perceptible instant when the fade begins or ends — it is the most
+      "hands on a fader" of the four, and the safest default for anything longer than
+      a second.
+    </p>
+
+    <h2>Fades as repair, not decoration</h2>
+    <p>
+      Most fades in professional work are 15 milliseconds long and nobody ever hears
+      them. They exist because audio that starts or stops mid-waveform asks the
+      speaker cone to jump instantly from silence to some non-zero value, and that
+      jump is broadband — you hear it as a click or a thump. A fade of a few
+      milliseconds removes the discontinuity while being far too short to register
+      as a fade.
+    </p>
+    <p>
+      This is why a clip cut out of a longer recording so often clicks at both ends,
+      while a properly exported file does not. If you are here because of a click
+      rather than because you want a musical fade, set both fields to 0.02 seconds
+      and stop there. Longer will work too, but you will start to hear it, and a
+      fade you can hear on a two-second sound effect is a different problem from the
+      one you came to fix.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { applyFade, type FadeCurve } from '../lib/audio/dsp';
+
+  const CURVES: readonly string[] = ['linear', 'exponential', 'logarithmic', 'scurve'];
+
+  function currentCurve(): FadeCurve {
+    const raw = tool?.text('curve', 'scurve') ?? 'scurve';
+    return CURVES.includes(raw) ? (raw as FadeCurve) : 'linear';
+  }
+
+  const tool = createTool({
+    suffix: 'faded',
+    defaultFormat: 'mp3',
+
+    onReady(ctx, runtime) {
+      const root = runtime.root;
+
+      // A fade can never be longer than the file it is applied to.
+      const ceiling = Math.max(0.1, Math.min(30, ctx.buffer.duration));
+
+      // Re-rendering the preview copies the whole buffer, so coalesce drags.
+      let timer = 0;
+      const schedule = (): void => {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(() => runtime.refreshPreview(), 220);
+      };
+
+      const bindSlider = (name: string): void => {
+        const slider = root.querySelector<HTMLInputElement>(`[data-control="${name}"]`);
+        const num = root.querySelector<HTMLInputElement>(`[data-control="${name}-num"]`);
+        const out = root.querySelector<HTMLElement>(`[data-out="${name}"]`);
+        if (!slider) return;
+
+        slider.max = String(ceiling);
+        if (num) num.max = String(ceiling);
+        if (Number(slider.value) > ceiling) slider.value = String(ceiling);
+        if (num) num.value = slider.value;
+
+        const paint = (): void => {
+          const max = Number(slider.max) || 1;
+          slider.style.setProperty('--pct', `${(Number(slider.value) / max) * 100}%`);
+          if (out) out.textContent = `${Number(slider.value).toFixed(1)} s`;
+        };
+
+        slider.addEventListener('input', () => {
+          if (num) num.value = slider.value;
+          paint();
+          schedule();
+        });
+
+        num?.addEventListener('input', () => {
+          slider.value = num.value;
+          paint();
+          schedule();
+        });
+
+        num?.addEventListener('change', () => {
+          if (num) num.value = slider.value;
+        });
+
+        paint();
+      };
+
+      bindSlider('in');
+      bindSlider('out');
+
+      root
+        .querySelector<HTMLSelectElement>('[data-control="curve"]')
+        ?.addEventListener('change', () => runtime.refreshPreview());
+    },
+
+    preview(ctx) {
+      return applyFade(
+        ctx.buffer,
+        tool?.value('in', 0) ?? 0,
+        tool?.value('out', 0) ?? 0,
+        currentCurve()
+      );
+    },
+
+    process(ctx) {
+      return applyFade(
+        ctx.buffer,
+        tool?.value('in', 0) ?? 0,
+        tool?.value('out', 0) ?? 0,
+        currentCurve()
+      );
+    },
+  });
+</script>

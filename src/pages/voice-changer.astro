@@ -1,0 +1,370 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('voice-changer');
+
+const steps = [
+  'Drop a recording onto the page — a voice note, a take from your phone, anything your browser can decode. It stays on your device.',
+  'Choose a preset. The line underneath says what it does to the sound and whether it changes the length of the recording.',
+  'Add a manual pitch shift if the preset alone is not enough. It runs after the preset, so you can push Telephone lower or lift Radio slightly.',
+  'Press Preview to render the chain and listen to it in the player. Pitch shifting is heavy, so it runs when you ask rather than on every change.',
+  'Download the result. The filename records the preset you used, so a robot version saves as recording-robot.mp3.',
+];
+
+const faq = [
+  {
+    q: 'Will this make me unrecognisable?',
+    a: 'Not reliably. A pitch shift changes the register of a voice but leaves the things people actually identify you by: rhythm, accent, phrasing, breathing, word choice, and the room you recorded in. Simple shifts can also be undone by shifting back. Treat these as effects for content, not as a way to stay anonymous when it matters.',
+  },
+  {
+    q: 'Why do Chipmunk and Giant change the length of the recording?',
+    a: 'Because those two work by changing the playback rate, the way a tape machine does. Chipmunk plays the file at 1.5x, so it finishes a third sooner and every frequency rises by about seven semitones. Giant plays it at 0.7x, so it runs longer and drops about six. Deeper and Higher use time-stretching instead and leave the length exactly as it was.',
+  },
+  {
+    q: 'What is the difference between Deeper and Giant, then?',
+    a: 'Deeper moves only the pitch: the words come out at the same speed, four semitones down, so it still sounds like someone talking normally in a lower register. Giant slows everything, so the delivery drags as well as descending — the difference between a low voice and a very large slow one. Pick Deeper for a natural result and Giant when you want the character.',
+  },
+  {
+    q: 'How does the Telephone preset get that sound?',
+    a: 'It band-limits the recording to roughly 300 Hz to 3.4 kHz, which is the actual bandwidth a traditional phone line carried, and adds a small lift around 1.8 kHz where speech intelligibility lives. Everything below and above is simply gone. That missing low end is why a phone voice sounds thin, and why the effect is so recognisable from a fraction of a second.',
+  },
+  {
+    q: 'Why does the Robot preset sound metallic rather than just delayed?',
+    a: 'It feeds the signal through a delay of about eighteen milliseconds with heavy feedback. At that spacing the repeats are far too close to hear as echoes; instead they interfere with the original and produce a comb filter with peaks every fifty-odd hertz. Your ear reads a fixed pattern of resonances as a mechanical resonator rather than a throat.',
+  },
+  {
+    q: 'Can I use this on a live call or in a game?',
+    a: 'No. This page processes a file you already have and gives you a new file back. Changing your voice inside a call needs a virtual audio device installed on your machine, which a web page cannot provide. Record first, process here, then send the result.',
+  },
+  {
+    q: 'Does the source recording quality matter?',
+    a: 'A great deal, particularly for Radio. That preset compresses hard, and compression raises quiet material — which means room noise, air conditioning and hiss come up with the voice. Record close to the microphone in the quietest space you have. A clean recording survives heavy processing; a noisy one gets worse with every stage.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Download" dropHint="Or click to browse. A voice note or phone recording works fine.">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Voice</span>
+        <span class="hint">The preset runs first, then any manual pitch shift.</span>
+      </div>
+
+      <div class="field">
+        <label class="label" for="preset">Preset</label>
+        <select class="select" id="preset" data-control="preset">
+          <option value="deeper" selected>Deeper</option>
+          <option value="higher">Higher</option>
+          <option value="chipmunk">Chipmunk</option>
+          <option value="giant">Giant</option>
+          <option value="robot">Robot</option>
+          <option value="telephone">Telephone</option>
+          <option value="radio">Radio</option>
+          <option value="none">None — manual pitch only</option>
+        </select>
+        <span class="hint" data-out="preset-note">
+          Four semitones down, length unchanged.
+        </span>
+      </div>
+
+      <div class="field">
+        <label class="label" for="pitch">
+          Manual pitch
+          <span class="label__value tnum" data-out="pitch">0 semitones</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="pitch"
+            data-control="pitch"
+            type="range"
+            min="-12"
+            max="12"
+            step="1"
+            value="0"
+          />
+          <input
+            class="num"
+            data-control="pitch-num"
+            type="number"
+            min="-12"
+            max="12"
+            step="1"
+            value="0"
+            aria-label="Manual pitch shift in semitones"
+          />
+        </div>
+      </div>
+
+      <div class="field controls__full">
+        <span class="label">Audition</span>
+        <button type="button" class="btn btn--quiet" data-audition>Preview the voice</button>
+        <span class="hint" data-out="state">
+          The player holds the original until you render a preview.
+        </span>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>What a voice is made of</h2>
+    <p>
+      Speech has two independent parts, and every effect on this page works on
+      one or the other. The first is the source: the vocal folds open and close
+      at some rate, producing a buzz. That rate is the pitch, typically around 85
+      to 180 Hz for adult men and 165 to 255 Hz for adult women. The second is
+      the filter: the throat, mouth, tongue and nose form a set of resonant
+      cavities that emphasise certain bands and suppress others. Those emphasised
+      bands are the formants, and they are what turn a buzz into a recognisable
+      vowel.
+    </p>
+    <p>
+      Formant positions depend mostly on the size and shape of the cavities, not
+      on the note being sung. That is why you can recognise the same person
+      speaking high or low, and it is why simply moving the pitch never quite
+      produces a different person. It produces the same person transposed —
+      which is a perfectly good effect, but a different thing from a disguise.
+    </p>
+
+    <h2>Two families of effect</h2>
+    <p>
+      Deeper, Higher, Chipmunk and Giant all move pitch. Deeper and Higher use
+      time-stretching, so the timing of the speech is untouched and only the
+      register changes. Chipmunk and Giant change the playback rate instead, so
+      pitch and speed move together and the recording gets shorter or longer.
+      That coupling is what makes Chipmunk sound cartoonish rather than merely
+      high: the delivery is rushed as well as raised, exactly as it would be on a
+      tape running fast.
+    </p>
+    <p>
+      Telephone, Radio and Robot leave the pitch alone and change the filter
+      instead. Telephone throws away everything outside roughly 300 Hz to 3.4
+      kHz, the bandwidth a phone line actually carried, which strips the chest
+      resonance out of the voice and leaves the thin, close sound everyone
+      recognises. Radio narrows the band less aggressively, lifts the presence
+      region and then compresses hard, which is close to what a broadcast chain
+      does to keep a voice at a constant level. Robot adds a very short delay
+      with heavy feedback, producing a fixed comb of resonances that your ear
+      attributes to a machine rather than a mouth.
+    </p>
+
+    <h2>Stacking them without making mud</h2>
+    <p>
+      The manual pitch control runs after the preset, which lets you combine
+      families: Telephone plus four semitones down gives a voice on a bad line
+      from someone considerably larger, and Radio plus two up sits a narrator
+      slightly forward. Keep the manual shift small when you have already used a
+      pitch-based preset, because two stretching passes compound each other's
+      artefacts.
+    </p>
+    <p>
+      Beyond about seven semitones in either direction the result stops being a
+      person and becomes an effect. That is often what you want, but decide it
+      deliberately rather than arriving there by stacking. And do the ordinary
+      cleanup first: trim the silence at the start, get the level right, and
+      remove obvious background noise before you process. Every effect on this
+      page treats the noise in a recording exactly as carefully as it treats the
+      voice.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { changeSpeed } from '../lib/audio/dsp';
+  import { pitchShift } from '../lib/audio/stretch';
+  import {
+    applyCompressor,
+    applyEcho,
+    applyEq,
+    lowpass,
+    telephone,
+  } from '../lib/audio/effects';
+  import { clamp, pct } from '../lib/format';
+
+  const NOTES: Record<string, string> = {
+    deeper: 'Four semitones down, length unchanged.',
+    higher: 'Four semitones up, length unchanged.',
+    chipmunk: 'Played at 1.5x, so it is higher and about a third shorter.',
+    giant: 'Played at 0.7x, so it is lower and noticeably longer.',
+    robot: 'A very short delay fed back on itself, plus a lowpass. Metallic.',
+    telephone: 'Band-limited to 300 Hz–3.4 kHz, like an old phone line.',
+    radio: 'Narrowed, lifted around 2 kHz and compressed like a broadcast chain.',
+    none: 'No preset. Only the manual pitch shift below is applied.',
+  };
+
+  /** Presets that run a WSOLA stretch, which is what makes a render slow. */
+  const HEAVY = new Set(['deeper', 'higher']);
+
+  let source: AudioBuffer | null = null;
+  let auditionBuffer: AudioBuffer | null = null;
+  let wired = false;
+
+  function presetOf(): string {
+    return tool?.text('preset', 'deeper') ?? 'deeper';
+  }
+
+  function manualPitch(): number {
+    return clamp(tool?.value('pitch', 0) ?? 0, -12, 12);
+  }
+
+  async function render(buffer: AudioBuffer): Promise<AudioBuffer> {
+    let out = buffer;
+
+    switch (presetOf()) {
+      case 'deeper':
+        out = pitchShift(out, -4);
+        break;
+      case 'higher':
+        out = pitchShift(out, 4);
+        break;
+      case 'chipmunk':
+        out = changeSpeed(out, 1.5);
+        break;
+      case 'giant':
+        out = changeSpeed(out, 0.7);
+        break;
+      case 'robot':
+        // 18 ms of feedback delay lands the comb peaks about 55 Hz apart,
+        // which reads as a resonating shell rather than an echo.
+        out = await lowpass(out, 3200, 0.8);
+        out = await applyEcho(out, { delay: 0.018, feedback: 0.72, mix: 0.6 });
+        break;
+      case 'telephone':
+        out = await telephone(out);
+        break;
+      case 'radio':
+        out = await applyEq(out, [
+          { frequency: 200, gain: 0, q: 0.8, type: 'highpass' },
+          { frequency: 5200, gain: 0, q: 0.8, type: 'lowpass' },
+          { frequency: 2200, gain: 5, q: 1.2, type: 'peaking' },
+        ]);
+        out = await applyCompressor(out, {
+          threshold: -22,
+          ratio: 6,
+          attack: 0.004,
+          release: 0.12,
+          makeup: 4,
+        });
+        break;
+      default:
+        break;
+    }
+
+    const semitones = manualPitch();
+    if (Math.abs(semitones) >= 0.5) out = pitchShift(out, semitones);
+    return out;
+  }
+
+  const tool = createTool({
+    suffix: 'voice',
+    defaultFormat: 'mp3',
+
+    onReady(ctx, runtime) {
+      source = ctx.buffer;
+      auditionBuffer = null;
+
+      const root = runtime.root;
+      const preset = root.querySelector<HTMLSelectElement>('[data-control="preset"]');
+      const range = root.querySelector<HTMLInputElement>('[data-control="pitch"]');
+      const num = root.querySelector<HTMLInputElement>('[data-control="pitch-num"]');
+      const note = root.querySelector<HTMLElement>('[data-out="preset-note"]');
+      const pitchOut = root.querySelector<HTMLElement>('[data-out="pitch"]');
+      const state = root.querySelector<HTMLElement>('[data-out="state"]');
+      const button = root.querySelector<HTMLButtonElement>('[data-audition]');
+      if (!range) return;
+
+      const paint = (): void => {
+        const semitones = Number(range.value);
+        range.style.setProperty('--pct', `${pct(semitones, -12, 12)}%`);
+        if (pitchOut) {
+          const sign = semitones > 0 ? '+' : '';
+          pitchOut.textContent = `${sign}${semitones} semitone${Math.abs(semitones) === 1 ? '' : 's'}`;
+        }
+        if (note) note.textContent = NOTES[presetOf()] ?? '';
+      };
+
+      const invalidate = (): void => {
+        paint();
+        if (auditionBuffer) {
+          auditionBuffer = null;
+          runtime.refreshPreview();
+        }
+        if (state) state.textContent = 'Settings changed. Render the preview again to hear them.';
+      };
+
+      const audition = async (): Promise<void> => {
+        if (!source || !button) return;
+        button.dataset.loading = 'true';
+        if (state) {
+          state.textContent =
+            HEAVY.has(presetOf()) || Math.abs(manualPitch()) >= 0.5
+              ? 'Rendering. Pitch shifting takes a moment…'
+              : 'Rendering…';
+        }
+        // Yield so the spinner paints before any synchronous stretch starts.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        try {
+          auditionBuffer = await render(source);
+          runtime.refreshPreview();
+          if (state) state.textContent = 'Preview ready. Press play.';
+        } catch {
+          if (state) {
+            state.textContent = 'The preview could not be rendered. Downloading still works.';
+          }
+        } finally {
+          delete button.dataset.loading;
+        }
+      };
+
+      if (wired) {
+        paint();
+        return;
+      }
+      wired = true;
+
+      preset?.addEventListener('change', invalidate);
+
+      range.addEventListener('input', () => {
+        if (num) num.value = range.value;
+        invalidate();
+      });
+
+      num?.addEventListener('input', () => {
+        const typed = Number(num.value);
+        if (num.value.trim() === '' || !Number.isFinite(typed)) return;
+        range.value = String(Math.round(clamp(typed, -12, 12)));
+        invalidate();
+      });
+
+      num?.addEventListener('change', () => {
+        if (num) num.value = range.value;
+        paint();
+      });
+
+      button?.addEventListener('click', () => void audition());
+
+      paint();
+    },
+
+    preview(ctx) {
+      return auditionBuffer ?? ctx.buffer;
+    },
+
+    async process(ctx) {
+      const heavy = HEAVY.has(presetOf()) || Math.abs(manualPitch()) >= 0.5;
+      if (heavy) {
+        ctx.progress(0.05);
+        // Let the progress bar paint before the stretch takes the main thread.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+      }
+
+      const out = await render(ctx.buffer);
+      const preset = presetOf();
+      return { buffer: out, suffix: preset === 'none' ? 'voice' : preset };
+    },
+  });
+</script>

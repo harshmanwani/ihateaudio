@@ -1,0 +1,182 @@
+---
+import Base from './Base.astro';
+import Icon from '../components/Icon.astro';
+import { SITE } from '../consts';
+import { getTool, relatedTools, categoryOf, toolsIn } from '../data/tools';
+
+export interface FaqItem {
+  q: string;
+  a: string;
+}
+
+interface Props {
+  slug: string;
+  /** Numbered how-to steps. Also emitted as HowTo structured data. */
+  steps: string[];
+  /** Also emitted as FAQPage structured data, which earns rich results. */
+  faq: FaqItem[];
+}
+
+const { slug, steps, faq } = Astro.props;
+
+const tool = getTool(slug);
+const category = categoryOf(slug);
+const related = relatedTools(slug);
+const siblings = category
+  ? toolsIn(category.id).filter((t) => t.slug !== slug)
+  : [];
+
+const path = `/${slug}`;
+
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'SoftwareApplication',
+    name: tool.name,
+    url: new URL(path, SITE.url).href,
+    applicationCategory: 'MultimediaApplication',
+    operatingSystem: 'Any browser',
+    description: tool.description,
+    offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+    featureList: [
+      'Runs entirely in the browser',
+      'No file upload',
+      'No account required',
+      'No file size limit',
+    ],
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'HowTo',
+    name: `How to use the ${tool.name.toLowerCase()}`,
+    totalTime: 'PT1M',
+    tool: [{ '@type': 'HowToTool', name: 'A web browser' }],
+    step: steps.map((text, index) => ({
+      '@type': 'HowToStep',
+      position: index + 1,
+      text,
+    })),
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faq.map((item) => ({
+      '@type': 'Question',
+      name: item.q,
+      acceptedAnswer: { '@type': 'Answer', text: item.a },
+    })),
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      {
+        '@type': 'ListItem',
+        position: 1,
+        name: 'All tools',
+        item: SITE.url,
+      },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: tool.name,
+        item: new URL(path, SITE.url).href,
+      },
+    ],
+  },
+];
+---
+
+<Base title={tool.title} description={tool.description} path={path} schema={schema}>
+  <div class="wrap toolpage">
+    <div class="toolhead">
+      <nav class="toolhead__crumbs" aria-label="Breadcrumb">
+        <a href="/">All tools</a>
+        <Icon name="caret-right" size={12} />
+        <span>{category?.name}</span>
+      </nav>
+      <h1>{tool.name}</h1>
+      <p class="toolhead__sub">{tool.tagline}</p>
+      <div class="toolhead__tags">
+        <span class="chip chip--brand">Free, no account</span>
+        <span class="chip">Nothing uploaded</span>
+        {tool.instant && <span class="chip">No encoder download</span>}
+      </div>
+    </div>
+
+    <slot />
+
+    <div class="toolbody">
+      <div>
+        <section aria-labelledby="how">
+          <h2 id="how">How to use it</h2>
+          <ol class="steps">
+            {steps.map((step) => <li><span>{step}</span></li>)}
+          </ol>
+        </section>
+
+        <section class="prose" style="margin-top: var(--s12)">
+          <slot name="about" />
+        </section>
+
+        {
+          faq.length > 0 && (
+            <section aria-labelledby="faq-heading" style="margin-top: var(--s12)">
+              <h2 id="faq-heading" style="margin-bottom: var(--s4)">
+                Questions
+              </h2>
+              <div class="faq">
+                {faq.map((item) => (
+                  <details>
+                    <summary>{item.q}</summary>
+                    <div>{item.a}</div>
+                  </details>
+                ))}
+              </div>
+            </section>
+          )
+        }
+      </div>
+
+      <aside class="aside">
+        {
+          related.length > 0 && (
+            <div class="aside__group">
+              <h3>Works well with</h3>
+              <ul class="aside__list">
+                {related.map((item) => (
+                  <li>
+                    <a href={`/${item.slug}`}>{item.name}</a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )
+        }
+
+        {
+          siblings.length > 0 && (
+            <div class="aside__group">
+              <h3>More in {category?.name.toLowerCase()}</h3>
+              <ul class="aside__list">
+                {siblings.slice(0, 8).map((item) => (
+                  <li>
+                    <a href={`/${item.slug}`}>{item.name}</a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )
+        }
+
+        <div class="aside__group">
+          <h3>Reference</h3>
+          <ul class="aside__list">
+            <li><a href="/loudness-targets">Loudness targets by platform</a></li>
+            <li><a href="/audio-formats">Which format should I use?</a></li>
+          </ul>
+        </div>
+      </aside>
+    </div>
+  </div>
+</Base>

@@ -1,0 +1,162 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+import ConversionPanel from '../components/ConversionPanel.astro';
+
+const tool = getTool('m4a-converter');
+
+const steps = [
+  'Drop an MP3, WAV, FLAC, OGG or Opus file onto the page. It is decoded in your browser, not sent anywhere.',
+  'Choose a bitrate in the export bar. AAC at 128 kbps is roughly the quality of a 192 kbps MP3, so you can usually drop a step from whatever you would have picked for MP3.',
+  'Click Download. The first M4A of your session downloads the AAC encoder, about 31 MB, and the page shows that as a separate progress step.',
+  'Once the encoder is loaded it stays in memory, so any further M4A exports start immediately.',
+];
+
+const faq = [
+  {
+    q: 'What is the difference between M4A, MP4, M4B and M4R?',
+    a: 'Nothing structural — they are the same MPEG-4 container with different extensions signalling what is inside. M4A means audio only. MP4 usually means it also carries video. M4B is an audiobook, which players treat as bookmarkable. M4R is a ringtone, which is the only thing iOS will accept for that purpose. M4P is a FairPlay-encrypted purchase and cannot be converted by anything.',
+  },
+  {
+    q: 'Is AAC really better than MP3, or is that marketing?',
+    a: 'It is measurably better, and the reasons are structural. AAC uses a single clean MDCT filterbank where MP3 uses a hybrid design that leaks energy between bands, it has temporal noise shaping to suppress pre-echo on sharp transients, and it is not obliged to stay compatible with a 1991 standard. In listening tests AAC at 128 kbps holds its own against MP3 at 160 to 192 kbps.',
+  },
+  {
+    q: 'Will an M4A play on Android and Windows?',
+    a: 'Yes. AAC decoding is built into every version of Android and Windows anyone is still running, plus every current browser, games console and streaming box. The compatibility gap that existed in the 2000s has closed. The remaining holdouts are cheap dedicated MP3 players and car head units from before roughly 2010.',
+  },
+  {
+    q: 'Should I convert my MP3 library to M4A to save space?',
+    a: 'No. AAC is more efficient than MP3 at compressing an original recording, but your MP3s are not originals any more. Re-encoding them adds a second generation of loss on top of the first, and the result sounds worse than the MP3 at any bitrate you choose. Convert to M4A from lossless sources, or not at all.',
+  },
+  {
+    q: 'Does M4A handle gapless playback?',
+    a: 'Yes, and better than MP3 does. The MPEG-4 container carries edit lists and iTunes writes explicit encoder-delay values, so a compliant player knows precisely which samples are padding and skips them. Live albums and continuous DJ mixes survive the transition between tracks without the tiny click MP3 often produces.',
+  },
+  {
+    q: 'What bitrate matches Apple Music?',
+    a: 'Apple Music streams AAC at 256 kbps, and the iTunes Store has sold 256 kbps AAC since the DRM-free "iTunes Plus" change in 2007. Picking 256 here matches what Apple considers good enough for its own catalogue. 192 is close enough for almost anyone, and 128 is fine for casual listening on phone speakers or earbuds.',
+  },
+  {
+    q: 'Why does the first conversion take so long?',
+    a: 'No browser exposes an AAC encoder to web pages, only a decoder. Encoding therefore requires a WebAssembly build of ffmpeg weighing about 31 MB, served from this site rather than a third party. It downloads once per session and every M4A afterwards is fast. MP3 and WAV avoid the download entirely.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Convert to M4A">
+    <ConversionPanel
+      hint="AAC holds up better than MP3 at the same bitrate, so 128 kbps here is roughly equivalent to 160–192 kbps of MP3."
+    />
+
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">AAC output</span>
+        <span class="hint">Set the bitrate in the export bar below.</span>
+      </div>
+
+      <div class="controls__full">
+        <div class="note note--info">
+          <div class="note__body">
+            <div class="note__title">One download, then it is fast</div>
+            <div>
+              Browsers can decode AAC but none of them can encode it, so the
+              first M4A you make loads a converter of about 31 MB from this
+              site. Your audio still never leaves the tab. Afterwards the
+              converter stays in memory and further exports start immediately.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls__full">
+        <p class="hint">
+          As a rule of thumb, AAC at one step below your usual MP3 bitrate sounds
+          about the same: 128 kbps here is comparable to a 192 kbps MP3, and
+          256 kbps matches what Apple Music streams.
+        </p>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>AAC was built to replace MP3, and technically it did</h2>
+    <p>
+      Advanced Audio Coding was standardised in 1997 as MPEG-2 Part 7 and
+      extended two years later in MPEG-4 Part 3, by a group that included
+      Fraunhofer IIS, Dolby, Sony, AT&amp;T and Nokia — several of the same
+      people who had built MP3. The brief was to design a modern perceptual codec
+      with no obligation to remain backward compatible with anything, and the
+      freedom shows.
+    </p>
+    <p>
+      MP3 inherited a 32-band polyphase filterbank from earlier MPEG layers and
+      bolted an MDCT on top of it, a hybrid that leaks energy between adjacent
+      bands and wastes bits correcting for itself. AAC uses one clean MDCT with
+      1024-sample windows that switch to 128 samples when the signal turns
+      percussive. It adds temporal noise shaping, which pushes quantisation noise
+      into the loud part of a transient rather than smearing it backwards as
+      pre-echo. It supports sample rates from 8 kHz to 96 kHz and up to 48
+      channels, where MP3 stops at 48 kHz and two channels in practice. The
+      practical result is that AAC needs roughly two thirds the bitrate of MP3
+      for the same perceived quality.
+    </p>
+
+    <h2>M4A is a filename, not a format</h2>
+    <p>
+      The file this tool writes is an MPEG-4 Part 14 container, the ISO base
+      media file format, which descends directly from Apple's QuickTime .mov
+      structure. Everything inside is organised into nested boxes: one holds the
+      audio samples, others hold the track description, the timing table, the
+      edit list and the metadata.
+    </p>
+    <p>
+      Apple introduced the .m4a extension with iTunes 4 in 2003 purely so that
+      users and software could tell an audio-only MP4 from one with video, and
+      the convention stuck. The same container with .m4b tells a player the file
+      is an audiobook and should remember its position; with .m4r it tells iOS
+      the file is a ringtone; with .m4p it is a FairPlay-encrypted purchase.
+      Rename one to another and, DRM aside, players generally go along with it —
+      which is exactly how ringtone tools work.
+    </p>
+
+    <h2>When to pick something else</h2>
+    <p>
+      Choose MP3 instead if the file is going to a car stereo or a dedicated
+      player from before about 2010, or if you simply do not want to think about
+      whether the recipient's device will cope. Choose OGG Vorbis if the audio is
+      an asset in a Unity or Godot project, where it is the expected format.
+      Choose Opus if the content is speech and you want the smallest possible
+      file — below 96 kbps it beats AAC comfortably. Choose FLAC or ALAC if the
+      point is archival, since AAC discards information permanently no matter how
+      high you set the bitrate.
+    </p>
+    <p>
+      And do not convert an existing lossy library to M4A hoping to reclaim
+      space. The efficiency advantage applies to encoding an original recording.
+      Applied to an MP3, it compresses the artifacts along with the music and
+      leaves you worse off than when you started.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { wireConversionPanel } from '../lib/conversion';
+
+  createTool({
+    suffix: 'm4a',
+    onReady(_ctx, runtime) {
+      wireConversionPanel(runtime);
+    },
+    formats: ['m4a'],
+    defaultFormat: 'm4a',
+
+    // The AAC encode happens in the export step; the samples pass through as-is.
+    process(ctx) {
+      return ctx.buffer;
+    },
+  });
+</script>

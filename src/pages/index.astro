@@ -1,0 +1,122 @@
+---
+import Base from '../layouts/Base.astro';
+import Icon from '../components/Icon.astro';
+import { SITE, PRIVACY_LINE } from '../consts';
+import { CATEGORIES, TOOLS, toolsIn } from '../data/tools';
+
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: SITE.name,
+    url: SITE.url,
+    description: SITE.description,
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Free browser audio tools',
+    numberOfItems: TOOLS.length,
+    itemListElement: TOOLS.map((tool, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: tool.name,
+      url: new URL(`/${tool.slug}`, SITE.url).href,
+    })),
+  },
+];
+---
+
+<Base
+  title="ihateaudio — Free Audio Tools That Run in Your Browser"
+  description={SITE.description}
+  path="/"
+  schema={schema}
+>
+  <div class="wrap">
+    <section class="hero">
+      <h1>Audio editing is miserable. These make it less so.</h1>
+      <p class="hero__sub">
+        {TOOLS.length} free tools that run entirely inside your browser. No upload,
+        no account, no ads, no watermark, no file size limit. Drop a file and it
+        just works.
+      </p>
+      <div class="hero__meta">
+        <span class="privacy">
+          <Icon name="shield-check" size={16} />
+          {PRIVACY_LINE}
+        </span>
+      </div>
+    </section>
+
+    <div class="toolsearch" style="margin-bottom: var(--s10)">
+      <Icon name="magnifying-glass" size={18} />
+      <input
+        class="input"
+        type="search"
+        id="tool-search"
+        placeholder={`Search ${TOOLS.length} tools…`}
+        aria-label="Search tools"
+        autocomplete="off"
+      />
+    </div>
+
+    <p class="searchempty" data-search-empty hidden>
+      Nothing matched that. Try “trim”, “convert”, “louder” or “ringtone”.
+    </p>
+
+    {
+      CATEGORIES.map((category) => (
+        <section class="cat" data-category>
+          <div class="cat__head">
+            <h2>{category.name}</h2>
+            <span class="cat__count">{toolsIn(category.id).length} tools</span>
+          </div>
+          <p class="cat__desc">{category.blurb}</p>
+          <div class="grid">
+            {toolsIn(category.id).map((tool) => (
+              <a
+                class="tile"
+                href={`/${tool.slug}`}
+                data-tile
+                data-search={`${tool.name} ${tool.short} ${tool.slug}`.toLowerCase()}
+              >
+                <span class="tile__top">
+                  <Icon name={tool.icon} size={18} class="tile__icon" />
+                  <span class="tile__name">{tool.name}</span>
+                </span>
+                <span class="tile__desc">{tool.short}</span>
+              </a>
+            ))}
+          </div>
+        </section>
+      ))
+    }
+  </div>
+</Base>
+
+<script>
+  const search = document.querySelector<HTMLInputElement>('#tool-search');
+  const tiles = Array.from(document.querySelectorAll<HTMLElement>('[data-tile]'));
+  const sections = Array.from(document.querySelectorAll<HTMLElement>('[data-category]'));
+  const empty = document.querySelector<HTMLElement>('[data-search-empty]');
+
+  search?.addEventListener('input', () => {
+    const query = search.value.trim().toLowerCase();
+    let matches = 0;
+
+    for (const tile of tiles) {
+      const hit = query === '' || (tile.dataset.search ?? '').includes(query);
+      tile.hidden = !hit;
+      if (hit) matches += 1;
+    }
+
+    // Hide a category heading once every tool under it is filtered out.
+    for (const section of sections) {
+      const visible = section.querySelectorAll('[data-tile]:not([hidden])').length;
+      section.hidden = visible === 0;
+    }
+
+    if (empty) empty.hidden = matches > 0;
+  });
+</script>

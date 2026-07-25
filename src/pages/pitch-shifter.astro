@@ -1,0 +1,369 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('pitch-shifter');
+
+const steps = [
+  'Drop an audio file onto the page. It is decoded in the tab; nothing is sent anywhere.',
+  'Drag the semitone slider. Each step is one half step on a piano — 12 steps is a full octave, and the interval name under the slider tells you what you have asked for.',
+  'If you need to land between the notes, nudge the cents control. One hundred cents makes a semitone, so ±10 cents is about the smallest change most people can hear on a sustained note.',
+  'Click Preview the shift to render it and hear it in the player. Pitch shifting is heavy enough that it is not recomputed on every drag.',
+  'Choose a format and click Download. The length of the file is identical to what you started with.',
+];
+
+const faq = [
+  {
+    q: 'Does the track get longer or shorter when I shift the pitch?',
+    a: 'No. The length is untouched, which is the whole point of this tool. Internally the audio is time-stretched by the pitch ratio and then resampled back by the same ratio; the two length changes cancel out exactly and only the pitch is left moved.',
+  },
+  {
+    q: 'What is a cent, and when do I need one?',
+    a: 'A cent is one hundredth of a semitone. You need cents when something is slightly out of tune rather than in the wrong key: a guitar recorded a fraction flat, an old tape running a little slow, or two takes that will not sit together. Most listeners start hearing a sustained note as out of tune somewhere around 10 to 15 cents.',
+  },
+  {
+    q: 'How many semitones is a full octave?',
+    a: 'Twelve. An octave up doubles every frequency, so +12 turns 220 Hz into 440 Hz. The scale is logarithmic rather than linear, which is why +7 and −7 both sound like the same size of jump even though one adds far more hertz than the other takes away.',
+  },
+  {
+    q: 'How far can I shift before it starts to sound processed?',
+    a: 'Roughly four or five semitones in either direction is transparent on most material. Past about seven you start to hear the stretching: sustained notes get a faint warble and sharp transients like snare hits soften slightly. A full octave is usable as an effect but nobody will mistake it for the original recording.',
+  },
+  {
+    q: 'Can I use this to change a song into a different key?',
+    a: 'Yes, if you know the interval. Work out the distance between the two keys in semitones and shift by that. C to D is +2, C to G is +7 or −5 depending on which direction you want the singer to go, and C to A minor needs no shift at all because they share the same notes.',
+  },
+  {
+    q: 'Why does a shifted voice sound slightly artificial even at small amounts?',
+    a: 'Because pitch shifting moves the vocal formants along with the pitch. Formants are fixed resonances of a particular skull and throat, and in a real singer they barely move when the note changes. Shifting everything together is what produces the faint "not quite a person" quality, and it is why small shifts read as natural and large ones do not.',
+  },
+  {
+    q: 'Should I use this or the speed changer?',
+    a: 'Use this when the timing must stay exactly where it is — transposing a backing track, tuning a take, matching two recordings. Use the speed changer with pitch preservation off when you want the old-fashioned coupled effect, where the recording speeds up as it rises.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Download">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Pitch</span>
+        <span class="hint">The running time never changes — only the pitch moves.</span>
+      </div>
+
+      <div class="field controls__full">
+        <label class="label" for="semitones">
+          Semitones (half steps)
+          <span class="label__value tnum" data-out="semitones">0</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="semitones"
+            data-control="semitones"
+            type="range"
+            min="-12"
+            max="12"
+            step="1"
+            value="0"
+          />
+          <input
+            class="num"
+            data-control="semitones-num"
+            type="number"
+            min="-12"
+            max="12"
+            step="1"
+            value="0"
+            aria-label="Shift in semitones"
+          />
+        </div>
+      </div>
+
+      <div class="field controls__full">
+        <label class="label" for="cents">
+          Fine tune
+          <span class="label__value tnum" data-out="cents">0 cents</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="cents"
+            data-control="cents"
+            type="range"
+            min="-50"
+            max="50"
+            step="1"
+            value="0"
+          />
+          <input
+            class="num"
+            data-control="cents-num"
+            type="number"
+            min="-50"
+            max="50"
+            step="1"
+            value="0"
+            aria-label="Fine tune in cents"
+          />
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="label">
+          Interval
+          <span class="label__value" data-out="interval">No change</span>
+        </span>
+        <span class="hint">
+          Twelve semitones is one octave. One hundred cents is one semitone.
+        </span>
+      </div>
+
+      <div class="field">
+        <span class="label">Audition</span>
+        <button type="button" class="btn btn--quiet" data-audition>Preview the shift</button>
+        <span class="hint" data-out="state">
+          The player holds the original until you render a preview.
+        </span>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>Why pitch and length are normally locked together</h2>
+    <p>
+      A digital recording is a list of numbers plus a rate at which to read them.
+      Read the list faster and everything rises; read it slower and everything
+      falls. That is the only pitch control tape and vinyl ever had, and it is
+      why a sped-up recording always sounds like a smaller person in a smaller
+      room. The two properties are welded together by the format itself.
+    </p>
+    <p>
+      To separate them you have to rebuild the signal. This tool stretches the
+      audio in time first — cutting it into overlapping windows of about 46
+      milliseconds and laying them back down at wider spacing, searching for the
+      offset where each window best continues the waveform already written. That
+      gives a longer file at the original pitch. Then it resamples the stretched
+      version by the same ratio, which drags the length back to where it started
+      and takes the pitch up with it. The length changes cancel; the pitch change
+      does not. Shift down and the same trick runs in reverse.
+    </p>
+
+    <h2>Reading the numbers</h2>
+    <p>
+      Pitch is logarithmic, so intervals are ratios rather than differences. One
+      semitone is a ratio of the twelfth root of two, about 1.0595. Stack twelve
+      of them and you get exactly 2, which is why +12 doubles every frequency and
+      lands you an octave up. It also means the same slider position sounds like
+      the same musical distance whether you are working on a bass line or a
+      cymbal.
+    </p>
+    <p>
+      Cents divide each semitone into a hundred. They exist because tuning
+      problems are usually far smaller than a half step: a string that has
+      drifted, a sample that was recorded at 44,100 Hz and played back at 48,000,
+      a singer who sat consistently a touch under the note. Below roughly 5 cents
+      almost nobody hears a difference. Between 10 and 25 cents most people hear
+      "slightly off" without being able to say which way. Past 50 cents you are
+      halfway to the next note and the ear starts rounding to it.
+    </p>
+
+    <h2>Where it breaks down</h2>
+    <p>
+      Two things limit how far you can push a shift. The first is stretching
+      artefacts: at large ratios the algorithm has to reuse or discard a lot of
+      material, and sustained tones develop a faint warble while transients lose
+      their edge. The second, and the one people notice without knowing why, is
+      formants. A voice has fixed resonances set by the size of the throat and
+      mouth, and those resonances stay put when a real singer changes note. Shift
+      the whole spectrum and the resonances move too, so the listener hears a
+      body that changed size mid-sentence.
+    </p>
+    <p>
+      Keep shifts small when you want the result to pass as unprocessed. Go large
+      deliberately when you want an effect — a voice dropped an octave for a
+      character, or raised for a chipmunk part — and let it sound like the effect
+      it is.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { pitchShift } from '../lib/audio/stretch';
+  import { clamp, pct } from '../lib/format';
+
+  const INTERVALS = [
+    'unison',
+    'minor second',
+    'major second',
+    'minor third',
+    'major third',
+    'perfect fourth',
+    'tritone',
+    'perfect fifth',
+    'minor sixth',
+    'major sixth',
+    'minor seventh',
+    'major seventh',
+    'octave',
+  ];
+
+  let source: AudioBuffer | null = null;
+  let auditionBuffer: AudioBuffer | null = null;
+  let wired = false;
+
+  function totalSemitones(): number {
+    const steps = clamp(tool?.value('semitones', 0) ?? 0, -12, 12);
+    const cents = clamp(tool?.value('cents', 0) ?? 0, -50, 50);
+    return steps + cents / 100;
+  }
+
+  function intervalName(total: number): string {
+    const steps = Math.round(Math.abs(total) * 100) / 100;
+    const whole = Math.floor(steps);
+    const cents = Math.round((steps - whole) * 100);
+    const direction = total > 0 ? 'up' : 'down';
+
+    if (whole === 0 && cents === 0) return 'No change';
+
+    const detune = total > 0 ? 'sharp' : 'flat';
+    if (whole === 0) return `${cents} cents ${detune}`;
+
+    const base =
+      whole >= 12
+        ? 'One octave'
+        : INTERVALS[whole].charAt(0).toUpperCase() + INTERVALS[whole].slice(1);
+    const tail = cents === 0 ? '' : `, ${cents} cents ${detune}`;
+    return `${base} ${direction}${tail}`;
+  }
+
+  /** +7.2 -> "up-7-2st", so the filename says what was done. */
+  function shiftSuffix(total: number): string {
+    const size = String(Number(Math.abs(total).toFixed(2))).replace('.', '-');
+    return `${total > 0 ? 'up' : 'down'}-${size}st`;
+  }
+
+  const tool = createTool({
+    suffix: 'pitch',
+    defaultFormat: 'mp3',
+
+    onReady(ctx, runtime) {
+      source = ctx.buffer;
+      auditionBuffer = null;
+
+      const root = runtime.root;
+      const steps = root.querySelector<HTMLInputElement>('[data-control="semitones"]');
+      const stepsNum = root.querySelector<HTMLInputElement>('[data-control="semitones-num"]');
+      const cents = root.querySelector<HTMLInputElement>('[data-control="cents"]');
+      const centsNum = root.querySelector<HTMLInputElement>('[data-control="cents-num"]');
+      const stepsOut = root.querySelector<HTMLElement>('[data-out="semitones"]');
+      const centsOut = root.querySelector<HTMLElement>('[data-out="cents"]');
+      const intervalOut = root.querySelector<HTMLElement>('[data-out="interval"]');
+      const state = root.querySelector<HTMLElement>('[data-out="state"]');
+      const button = root.querySelector<HTMLButtonElement>('[data-audition]');
+      if (!steps || !cents) return;
+
+      const paint = (): void => {
+        const stepValue = Number(steps.value);
+        const centValue = Number(cents.value);
+        steps.style.setProperty('--pct', `${pct(stepValue, -12, 12)}%`);
+        cents.style.setProperty('--pct', `${pct(centValue, -50, 50)}%`);
+        if (stepsOut) {
+          stepsOut.textContent = stepValue > 0 ? `+${stepValue}` : String(stepValue);
+        }
+        if (centsOut) {
+          const sign = centValue > 0 ? '+' : '';
+          centsOut.textContent = `${sign}${centValue} cents`;
+        }
+        if (intervalOut) intervalOut.textContent = intervalName(totalSemitones());
+      };
+
+      const invalidate = (): void => {
+        paint();
+        if (auditionBuffer) {
+          auditionBuffer = null;
+          runtime.refreshPreview();
+        }
+        if (state) state.textContent = 'Settings changed. Render the preview again to hear them.';
+      };
+
+      const audition = async (): Promise<void> => {
+        if (!source || !button) return;
+        button.dataset.loading = 'true';
+        if (state) state.textContent = 'Rendering the shift…';
+        // Yield once so the button spinner paints before the synchronous
+        // stretch takes the main thread.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        try {
+          const total = totalSemitones();
+          auditionBuffer = Math.abs(total) < 0.005 ? null : pitchShift(source, total);
+          runtime.refreshPreview();
+          if (state) {
+            state.textContent = auditionBuffer
+              ? 'Preview ready. Press play.'
+              : 'Nothing to hear — the shift is zero.';
+          }
+        } catch {
+          if (state) {
+            state.textContent = 'The preview could not be rendered. Downloading still works.';
+          }
+        } finally {
+          delete button.dataset.loading;
+        }
+      };
+
+      if (wired) {
+        paint();
+        return;
+      }
+      wired = true;
+
+      const bind = (
+        range: HTMLInputElement,
+        box: HTMLInputElement | null,
+        lo: number,
+        hi: number
+      ): void => {
+        range.addEventListener('input', () => {
+          if (box) box.value = range.value;
+          invalidate();
+        });
+        box?.addEventListener('input', () => {
+          const typed = Number(box.value);
+          if (box.value.trim() === '' || !Number.isFinite(typed)) return;
+          range.value = String(clamp(typed, lo, hi));
+          invalidate();
+        });
+        box?.addEventListener('change', () => {
+          box.value = range.value;
+          paint();
+        });
+      };
+
+      bind(steps, stepsNum, -12, 12);
+      bind(cents, centsNum, -50, 50);
+
+      button?.addEventListener('click', () => void audition());
+
+      paint();
+    },
+
+    // Returns whatever the audition button last rendered, so dragging a slider
+    // never triggers a stretch on its own.
+    preview(ctx) {
+      return auditionBuffer ?? ctx.buffer;
+    },
+
+    async process(ctx) {
+      const total = totalSemitones();
+      if (Math.abs(total) < 0.005) return ctx.buffer;
+
+      ctx.progress(0.05);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return { buffer: pitchShift(ctx.buffer, total), suffix: shiftSuffix(total) };
+    },
+  });
+</script>

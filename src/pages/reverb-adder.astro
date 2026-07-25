@@ -1,0 +1,387 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('reverb-adder');
+
+const steps = [
+  'Drop an audio file onto the page. It is decoded by your browser and stays on your machine — nothing is sent anywhere.',
+  'Pick a space. Small room and Studio keep the source close and present; Hall, Cathedral and Canyon push it further back and hold the tail longer.',
+  'Press play to hear the reverb over the whole file, then adjust decay, mix and pre-delay until the dry sound still cuts through the wash.',
+  'Choose a format and click Download. The exported file runs a little longer than the original, because the tail is written out in full instead of being chopped off.',
+];
+
+const faq = [
+  {
+    q: 'What does pre-delay actually change?',
+    a: 'It is the gap between the direct sound reaching you and the first reflection arriving behind it. Your hearing fuses anything inside roughly the first 30 milliseconds into one event, so a pre-delay in that range lets a word finish before the room answers it. Set it to zero and the reflections start on top of the consonants, which is what makes a voice turn to mush in a large space.',
+  },
+  {
+    q: 'Why is the downloaded file longer than the one I dropped in?',
+    a: 'Because the tail has to go somewhere. A 2.5-second hall setting adds about 2.5 seconds past the last sample of the original, and Canyon adds eight. Cutting the file at the original length would end the reverb with an abrupt gate, which sounds far worse than a few extra seconds of silence.',
+  },
+  {
+    q: 'Is this a real convolution reverb?',
+    a: 'Yes, in the sense that it convolves your audio with an impulse response rather than faking depth with a delay network. The impulse response is generated here — decaying noise, darkened toward the tail — rather than sampled from an actual building. That trades the character of a specific famous hall for a decay control you can move continuously from 0.2 to 8 seconds.',
+  },
+  {
+    q: 'How much mix is too much?',
+    a: 'For speech, 15 to 25 percent is usually plenty; for a solo instrument you can go to 40. A reliable check is to listen once and ask what you noticed first. If you noticed the reverb before you noticed the performance, it is too high. Turning it down by a third almost always sounds better a day later.',
+  },
+  {
+    q: 'Can I use this to remove reverb from a room recording?',
+    a: 'No. This tool only adds reverb. Removing it is a genuinely hard inverse problem — the reflections are mixed into the same samples as the direct sound — and the tools that attempt it are machine-learning models that need far more compute than a browser tab. Re-recording closer to the microphone beats any amount of processing.',
+  },
+  {
+    q: 'My source is mono. Will the reverb still be stereo?',
+    a: 'The impulse response has two decorrelated channels, so the tail spreads across the stereo field even from a mono source. But the export keeps the channel count of your input, so a mono file in gives a mono file out and that spread collapses. Convert to stereo first if you want the width.',
+  },
+  {
+    q: 'Should I add reverb before or after compression?',
+    a: 'After, in almost every case. A compressor placed after reverb reacts to the tail as if it were signal and pumps the room up in the gaps between phrases, which is the sound of a badly processed voice-over. Level and compress the dry recording first, then put it in a space.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Download">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Space</span>
+        <span class="hint">Presets set all three values at once. Move any slider to go custom.</span>
+      </div>
+
+      <div class="field controls__full">
+        <label class="label" for="reverb-space">Room</label>
+        <select class="select" id="reverb-space" data-control="space">
+          <option value="room">Small room — 0.6 s, close and dry</option>
+          <option value="studio">Studio — 1.2 s, a little air</option>
+          <option value="hall" selected>Hall — 2.5 s, concert stage</option>
+          <option value="cathedral">Cathedral — 5 s, stone and space</option>
+          <option value="canyon">Canyon — 8 s, enormous</option>
+          <option value="custom">Custom</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="label" for="reverb-decay">
+          Decay <span class="label__value" data-out="decay">2.5 s</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="reverb-decay"
+            data-control="decay"
+            type="range"
+            min="0.2"
+            max="8"
+            step="0.1"
+            value="2.5"
+          />
+          <input
+            class="num"
+            data-control="decay-num"
+            type="number"
+            min="0.2"
+            max="8"
+            step="0.1"
+            value="2.5"
+            aria-label="Decay in seconds"
+          />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="reverb-mix">
+          Mix <span class="label__value" data-out="mix">35%</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="reverb-mix"
+            data-control="mix"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            value="35"
+          />
+          <input
+            class="num"
+            data-control="mix-num"
+            type="number"
+            min="0"
+            max="100"
+            step="1"
+            value="35"
+            aria-label="Wet mix percentage"
+          />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="reverb-predelay">
+          Pre-delay <span class="label__value" data-out="predelay">35 ms</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="reverb-predelay"
+            data-control="predelay"
+            type="range"
+            min="0"
+            max="150"
+            step="1"
+            value="35"
+          />
+          <input
+            class="num"
+            data-control="predelay-num"
+            type="number"
+            min="0"
+            max="150"
+            step="1"
+            value="35"
+            aria-label="Pre-delay in milliseconds"
+          />
+        </div>
+      </div>
+
+      <p class="hint controls__full" data-tail-note>
+        The export will run about 2.5 seconds past the end of the original so the
+        tail is not cut off.
+      </p>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>What a convolution reverb is doing</h2>
+    <p>
+      A room does not add an effect to a sound. It adds thousands of copies of
+      it. Every surface throws the sound back at you a few milliseconds later,
+      those reflections hit other surfaces, and within a fraction of a second
+      you are hearing a dense wash of delayed, filtered copies arriving from
+      every direction at once. An impulse response captures all of that in one
+      file: fire a single short burst into a space, record what comes back, and
+      you have the room's complete behaviour written down.
+    </p>
+    <p>
+      Convolution is the operation that applies that behaviour to new audio,
+      sample by sample. The impulse response here is generated rather than
+      recorded in a real building — noise on a decay curve, progressively
+      darkened toward the tail so the late reflections lose their top end the
+      way air and soft furnishings absorb high frequencies in a real space. It
+      will not give you the exact signature of a particular famous hall, but it
+      does something a fixed sample cannot: the decay length is a continuous
+      control, so you can sit between a stairwell and a cathedral.
+    </p>
+
+    <h2>Decay, mix and pre-delay</h2>
+    <p>
+      <strong>Decay</strong> is how long the tail takes to fall away, close to
+      the RT60 figure acousticians quote for a building. A treated studio is
+      well under a second. A concert hall is around two. A stone cathedral runs
+      five or more, which is a large part of why choral music written for those
+      buildings moves so slowly — anything faster turns into a chord that never
+      resolves.
+    </p>
+    <p>
+      <strong>Mix</strong> is the balance between the untouched signal and the
+      reverberated one. It is the control most people push too far. Past about
+      40 percent the direct sound stops being the loudest thing in the file and
+      the result reads as "recorded in the next room" rather than "recorded in a
+      nice room".
+    </p>
+    <p>
+      <strong>Pre-delay</strong> is the one that decides whether a big space
+      sounds impressive or unintelligible. It is the gap between the direct
+      sound arriving at your ears and the first reflection following it. Because
+      of the precedence effect, your hearing merges everything inside roughly
+      the first 30 milliseconds into a single perceived event and locates it
+      where the earliest arrival came from. Give the reverb 20 to 40 milliseconds
+      of head start and a spoken word gets to finish before the building answers
+      — the tail blooms behind the voice instead of on top of it, and the
+      consonants survive. Set pre-delay to zero and the reflections begin in the
+      same instant as the word, smearing exactly the transients that carry
+      meaning. That is why a singer in a vast hall can still be perfectly
+      intelligible: you hear the singer first and the room a beat later.
+    </p>
+
+    <h2>When reverb is the wrong fix</h2>
+    <p>
+      Reverb adds space; it cannot subtract one. If a recording already sounds
+      boxy or distant because it was made in a bare room, adding more will only
+      deepen the problem. That is an EQ job, or a microphone-placement job, and
+      no amount of processing beats moving closer to the source.
+    </p>
+    <p>
+      Order matters too. Compression after reverb treats the tail as signal and
+      pulls it up in every gap between phrases, which is the characteristic
+      sound of an over-processed voice-over. Level and compress the dry file
+      first, then place it in a space, then export once.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { applyReverb } from '../lib/audio/effects';
+  import { clamp, pct } from '../lib/format';
+
+  interface Space {
+    decay: number;
+    /** Percent, 0–100. */
+    mix: number;
+    /** Milliseconds. */
+    preDelay: number;
+  }
+
+  // Bigger spaces want a longer pre-delay and a wetter balance, otherwise the
+  // decay control alone just makes everything sound distant.
+  const SPACES: Record<string, Space> = {
+    room: { decay: 0.6, mix: 20, preDelay: 8 },
+    studio: { decay: 1.2, mix: 26, preDelay: 18 },
+    hall: { decay: 2.5, mix: 35, preDelay: 35 },
+    cathedral: { decay: 5, mix: 45, preDelay: 60 },
+    canyon: { decay: 8, mix: 55, preDelay: 120 },
+  };
+
+  interface Pair {
+    get(): number;
+    set(value: number): void;
+  }
+
+  /** Binds a slider to its paired number input and its readout. */
+  function bindPair(
+    root: HTMLElement,
+    name: string,
+    render: (value: number) => string,
+    onLive: () => void,
+    onCommit: () => void
+  ): Pair | null {
+    const slider = root.querySelector<HTMLInputElement>(`[data-control="${name}"]`);
+    const num = root.querySelector<HTMLInputElement>(`[data-control="${name}-num"]`);
+    const out = root.querySelector<HTMLElement>(`[data-out="${name}"]`);
+    if (!slider || !num) return null;
+
+    const min = Number(slider.min);
+    const max = Number(slider.max);
+
+    const paint = (): void => {
+      slider.style.setProperty('--pct', `${pct(Number(slider.value), min, max)}%`);
+      if (out) out.textContent = render(Number(slider.value));
+    };
+
+    slider.addEventListener('input', () => {
+      num.value = slider.value;
+      paint();
+      onLive();
+    });
+    slider.addEventListener('change', onCommit);
+
+    num.addEventListener('input', () => {
+      const raw = Number(num.value);
+      if (num.value === '' || !Number.isFinite(raw)) return;
+      slider.value = String(clamp(raw, min, max));
+      paint();
+      onLive();
+    });
+    num.addEventListener('change', () => {
+      const value = clamp(Number(num.value), min, max);
+      num.value = String(value);
+      slider.value = String(value);
+      paint();
+      onLive();
+      onCommit();
+    });
+
+    paint();
+
+    return {
+      get: () => Number(slider.value),
+      set: (value: number) => {
+        const v = clamp(value, min, max);
+        slider.value = String(v);
+        num.value = String(v);
+        paint();
+      },
+    };
+  }
+
+  let decay: Pair | null = null;
+  let mix: Pair | null = null;
+  let predelay: Pair | null = null;
+  let wired = false;
+
+  const settings = (): { decay: number; mix: number; preDelay: number } => ({
+    decay: decay?.get() ?? 2.5,
+    mix: (mix?.get() ?? 35) / 100,
+    preDelay: (predelay?.get() ?? 35) / 1000,
+  });
+
+  createTool({
+    suffix: 'reverb',
+    defaultFormat: 'mp3',
+
+    onReady(_ctx, runtime) {
+      if (wired) return;
+      wired = true;
+
+      const root = runtime.root;
+      const select = root.querySelector<HTMLSelectElement>('[data-control="space"]');
+      const tailNote = root.querySelector<HTMLElement>('[data-tail-note]');
+
+      // Convolution over a whole track with a long tail is not instant, so the
+      // preview re-renders when a control is released, not while it is moving.
+      let timer = 0;
+      const commit = (): void => {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(() => runtime.refreshPreview(), 200);
+      };
+
+      const describeTail = (): void => {
+        if (!tailNote) return;
+        const extra = settings().decay + settings().preDelay;
+        tailNote.textContent =
+          `The export will run about ${extra.toFixed(1)} seconds past the end of ` +
+          'the original so the tail is not cut off.';
+      };
+
+      const goCustom = (): void => {
+        if (select) select.value = 'custom';
+        describeTail();
+      };
+
+      decay = bindPair(root, 'decay', (v) => `${v.toFixed(1)} s`, goCustom, commit);
+      mix = bindPair(root, 'mix', (v) => `${Math.round(v)}%`, goCustom, commit);
+      predelay = bindPair(
+        root,
+        'predelay',
+        (v) => `${Math.round(v)} ms`,
+        goCustom,
+        commit
+      );
+
+      select?.addEventListener('change', () => {
+        const space = SPACES[select.value];
+        if (!space) return;
+        decay?.set(space.decay);
+        mix?.set(space.mix);
+        predelay?.set(space.preDelay);
+        describeTail();
+        commit();
+      });
+
+      describeTail();
+    },
+
+    preview(ctx) {
+      return applyReverb(ctx.buffer, settings());
+    },
+
+    process(ctx) {
+      return applyReverb(ctx.buffer, settings());
+    },
+  });
+</script>

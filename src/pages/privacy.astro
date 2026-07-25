@@ -1,0 +1,95 @@
+---
+import Base from '../layouts/Base.astro';
+---
+
+<Base
+  title="Privacy — ihateaudio"
+  description="No files are uploaded, no accounts exist, and no personal data is collected. Here is exactly what happens to your audio and how to verify it yourself."
+  path="/privacy"
+>
+  <div class="wrap page prose">
+    <h1>Privacy</h1>
+    <p class="toolhead__sub" style="margin-bottom: var(--s8)">
+      The short version: your files never leave your device, and there is
+      nothing here to sign up for.
+    </p>
+
+    <h2>What happens to your audio</h2>
+    <p>
+      When you drop a file onto any tool on this site, your browser reads it
+      from your own disk into the memory of that tab. All decoding, editing and
+      encoding happens there, using audio features built into the browser
+      itself. The finished file is written back out by the same tab and saved
+      straight to your downloads folder.
+    </p>
+    <p>
+      At no point is your audio transmitted anywhere. There is no upload step,
+      no processing server, and no storage bucket — not because we delete files
+      quickly, but because they are never sent in the first place. Closing the
+      tab discards everything.
+    </p>
+
+    <h2>How to verify that yourself</h2>
+    <p>
+      Do not take our word for it. Two checks, either of which is conclusive:
+    </p>
+    <ul>
+      <li>
+        Open your browser's developer tools, switch to the Network tab, and use
+        any tool normally. You will see the page and its code load, and then
+        nothing further — no request carrying your file.
+      </li>
+      <li>
+        Load a tool page, then disconnect from the internet entirely and use it.
+        Everything still works, because there is nothing on the other end to
+        talk to.
+      </li>
+    </ul>
+
+    <h2>What we do collect</h2>
+    <p>
+      Aggregate, anonymous page analytics: which pages were viewed, roughly
+      where in the world from, and which site sent you. No cookies are set for
+      this, no cross-site identifier is created, and no individual visitor is
+      tracked from one page to another. It exists so we know which tools to
+      build next.
+    </p>
+    <p>
+      There are no accounts, so there is no email address, password, or profile
+      to leak. There is no advertising, so no advertising network receives
+      anything about you.
+    </p>
+
+    <h2>The one network request worth explaining</h2>
+    <p>
+      Most tools need nothing beyond the page itself. A few output formats —
+      M4A, OGG, FLAC, WMA, AIFF and iPhone ringtones — require a converter that
+      is too large to include in every page, so it downloads on demand the first
+      time you use one, from this site's own servers.
+    </p>
+    <p>
+      That download goes one way: code comes to you, and your audio still does
+      not go anywhere. It is also the only third-party-free way to do it — the
+      converter is hosted here rather than pulled from someone else's CDN,
+      precisely so no other company sees that you requested it.
+    </p>
+
+    <h2>Local storage</h2>
+    <p>
+      If you use the "keep going" links after exporting a file, the result is
+      held in memory and handed to the next tool so you do not have to select it
+      again. A short-lived token in your browser's session storage links the
+      two. It is cleared when you close the tab and contains no audio itself.
+    </p>
+    <p>
+      Installing the site as an app caches the pages so it works offline. That
+      cache holds only the site's own code, never your files.
+    </p>
+
+    <h2>Changes</h2>
+    <p>
+      If this ever changes in a way that affects what happens to your files, it
+      will be stated plainly on the affected tool page, not buried here.
+    </p>
+  </div>
+</Base>

@@ -1,0 +1,190 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('wav-converter');
+
+const steps = [
+  'Drop an MP3, M4A, OGG, FLAC or Opus file onto the page. It is decoded in the tab; nothing is uploaded.',
+  'Pick a bit depth. 16-bit matches CD and is what most software expects; 24-bit matches studio practice; 32-bit writes IEEE floating point.',
+  'Watch the projected size — WAV is uncompressed, so it grows quickly and the number below tells you exactly how quickly.',
+  'Click Download. WAV needs no encoder, so the file is written the moment you click and there is nothing to wait for.',
+];
+
+const faq = [
+  {
+    q: 'Does converting an MP3 to WAV improve the sound?',
+    a: 'No, and it cannot. WAV stores exactly the samples it is given, and the samples coming out of an MP3 decoder still have every artifact the MP3 encoder introduced. You end up with a file roughly ten times larger that sounds precisely the same. Convert to WAV because a program demands it, not to repair anything.',
+  },
+  {
+    q: 'Should I choose 16, 24 or 32-bit?',
+    a: 'Choose 16-bit unless something specific asks otherwise: it is universally supported and matches CD audio. Choose 24-bit when handing files to a studio or a mastering engineer, which is the professional norm. Choose 32-bit float when the file is going straight back into a DAW and you want the engine\'s internal values preserved exactly, including anything that has gone over full scale.',
+  },
+  {
+    q: 'Does exporting a 16-bit source at 24-bit make it better?',
+    a: 'No. The extra bits are padding. Bit depth sets how finely amplitudes can be described, and the fine detail that a 24-bit file could hold was discarded when the source was made. A higher depth only helps for audio that still has processing ahead of it, where the extra headroom stops rounding errors accumulating.',
+  },
+  {
+    q: 'How large will the file be?',
+    a: 'Uncompressed stereo at 44.1 kHz costs about 10.1 MB per minute at 16-bit, 15.1 MB at 24-bit and 20.2 MB at 32-bit float. That is roughly 600 MB for an hour-long interview at CD quality. If you only need it lossless rather than uncompressed, FLAC holds the identical audio in about half the space.',
+  },
+  {
+    q: 'Why does my WAV fail above about 4 GB?',
+    a: 'WAV inherited its chunk sizes from the RIFF container, and those sizes are unsigned 32-bit integers, so the format tops out just under 4 GB — around six and three quarter hours of 16-bit stereo at 44.1 kHz. Extensions such as RF64 and Wave64 lift the ceiling but are not widely supported. For anything that long, split the recording or use FLAC.',
+  },
+  {
+    q: 'Will my tags and cover art survive?',
+    a: 'No. WAV has no standard tagging scheme worth relying on — a few programs write ID3 or LIST chunks and most ignore them. The output here is audio plus a 44-byte header and nothing else. If you care about metadata, FLAC or M4A are far better containers for it.',
+  },
+  {
+    q: 'Is the sample rate preserved?',
+    a: 'Yes. WAV can carry any sample rate, so whatever the source declares is what the output declares — 44.1 kHz stays 44.1 kHz and 96 kHz stays 96 kHz. That is one of the reasons WAV is a safe intermediate format, and why MP3, which is limited to 48 kHz and below, is not.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Convert to WAV">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">WAV settings</span>
+        <span class="hint">Uncompressed PCM. No encoder, no waiting.</span>
+      </div>
+
+      <div class="field">
+        <span class="label" id="depth-label">Bit depth</span>
+        <div class="seg" role="group" aria-labelledby="depth-label">
+          <button type="button" class="seg__btn" data-depth="16" aria-pressed="true">
+            16-bit
+          </button>
+          <button type="button" class="seg__btn" data-depth="24" aria-pressed="false">
+            24-bit
+          </button>
+          <button type="button" class="seg__btn" data-depth="32" aria-pressed="false">
+            32-bit float
+          </button>
+        </div>
+        <!-- The shared runtime reads the depth from this control; the buttons
+             above drive it, since a button group has no value of its own. -->
+        <input type="hidden" data-control="bitdepth" value="16" />
+      </div>
+
+      <div class="field">
+        <span class="label">Dynamic range</span>
+        <p class="hint" data-depth-note>
+          16-bit integer. About 96 dB of range, and what CD audio uses. The safe
+          default for anything you are handing to other software.
+        </p>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>WAV is a wrapper, not a codec</h2>
+    <p>
+      A WAV file is a 44-byte header followed by the raw samples, in order,
+      untouched. Microsoft and IBM defined it in 1991 as part of the Multimedia
+      PC specification, building on RIFF — Microsoft's little-endian rework of
+      Electronic Arts' Interchange File Format. The header states how many
+      channels there are, how many samples per second, and how many bits each
+      sample uses. After that it is just numbers.
+    </p>
+    <p>
+      This is why WAV opens in everything and why writing one takes no time at
+      all: there is no compression to undo and no codec to negotiate. It is also
+      why the format is a poor citizen in every other respect. There is no
+      agreed-upon place for a title or an artist, no cover art, no gapless hints,
+      and a hard ceiling near 4 GB because RIFF chunk lengths are unsigned 32-bit
+      integers.
+    </p>
+
+    <h2>What bit depth actually controls</h2>
+    <p>
+      Bit depth is the resolution of each amplitude measurement, and it maps
+      almost exactly to dynamic range: about 6.02 dB per bit. Sixteen bits gives
+      roughly 96 dB between the loudest representable signal and the noise floor,
+      which comfortably exceeds what any listening environment outside an anechoic
+      chamber can resolve. Twenty-four bits gives about 144 dB, which no
+      microphone or converter can deliver either — its value is headroom during
+      production, not fidelity at playback.
+    </p>
+    <p>
+      Thirty-two-bit float is a different animal. Instead of integers it stores
+      IEEE floating-point values, which means a sample can exceed the nominal
+      full-scale limit and come back down without being clipped. That is exactly
+      how digital audio engines work internally, including the one in your
+      browser, so a 32-bit float WAV is a bit-exact snapshot of what the engine
+      was holding. It is the right choice for handing audio to a DAW and the
+      wrong choice for handing it to a hardware sampler, half of which will
+      simply refuse the file.
+    </p>
+
+    <h2>Where WAV earns its size, and where it does not</h2>
+    <p>
+      Use WAV when a piece of software or hardware insists on uncompressed PCM:
+      most hardware samplers and drum machines, older IVR and phone systems, CD
+      authoring, game engines loading short sound effects that must not cost CPU
+      to decode, and broadcast workflows built on BWF, which is a WAV with an
+      extra chunk carrying timecode and origination data. Use it as a working
+      format between edits, where its lack of compression is a feature — nothing
+      degrades no matter how many times you save.
+    </p>
+    <p>
+      Do not use it for distribution. Ten megabytes per minute is unreasonable
+      for anything that has to travel over a network, and FLAC delivers the same
+      samples, verifiable as bit-identical, at roughly half the size with real
+      metadata support. The only argument for WAV over FLAC in 2020s workflows is
+      compatibility with old or stubborn equipment, and that argument is still
+      good often enough for the format to be everywhere.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+
+  const DEPTH_NOTES: Record<string, string> = {
+    '16':
+      '16-bit integer. About 96 dB of range, and what CD audio uses. The safe default for anything you are handing to other software.',
+    '24':
+      '24-bit integer. About 144 dB of range. The studio hand-off standard, and worth choosing when the file has more processing ahead of it.',
+    '32':
+      '32-bit IEEE float. Stores exactly what the browser\'s audio engine holds, including anything above full scale, but some hardware and older software will not open it.',
+  };
+
+  const tool = createTool({
+    suffix: 'wav',
+    formats: ['wav'],
+    defaultFormat: 'wav',
+
+    // The runtime reads data-control="bitdepth" and writes the WAV itself, so
+    // the decoded samples pass straight through.
+    process(ctx) {
+      return ctx.buffer;
+    },
+  });
+
+  if (tool) {
+    const root = tool.root;
+    const note = root.querySelector<HTMLElement>('[data-depth-note]');
+    const store = root.querySelector<HTMLInputElement>('[data-control="bitdepth"]');
+    const format = root.querySelector<HTMLSelectElement>('[data-format]');
+    const buttons = root.querySelectorAll<HTMLButtonElement>('[data-depth]');
+
+    buttons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const depth = button.dataset.depth ?? '16';
+        if (store) store.value = depth;
+
+        buttons.forEach((other) => {
+          other.setAttribute('aria-pressed', String(other === button));
+        });
+        if (note) note.textContent = DEPTH_NOTES[depth] ?? DEPTH_NOTES['16'];
+
+        // Nudges the export bar to re-estimate the size at the new depth.
+        format?.dispatchEvent(new Event('change'));
+      });
+    });
+  }
+</script>

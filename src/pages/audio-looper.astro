@@ -1,0 +1,266 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('audio-looper');
+
+const steps = [
+  'Drop the clip you want repeated. Trim it first if the start or end is ragged — a loop exposes every flaw at its edges, over and over.',
+  'Set how many times it should repeat. The running total next to the heading updates as you drag, so you can aim for a length rather than guess at a count.',
+  'Add a gap if the repeats should not run straight into each other. Gaps go between repeats, so the file still ends on audio rather than on silence.',
+  'Choose a format and download. The repeats are copies of the same samples, so the file gets longer without getting any worse.',
+];
+
+const faq = [
+  {
+    q: 'Will the loop be seamless?',
+    a: 'Only if your clip already is. This tool joins the end of one repeat straight onto the start of the next with nothing in between, so the join is as clean as the clip. If the clip ends mid-note or has a few frames of silence at the front, you will hear that once per repeat. Trim it to the exact loop point first, then come back.',
+  },
+  {
+    q: 'How many repeats can I ask for before it fails?',
+    a: 'The limit is memory, and it is easy to work out. Decoded audio costs roughly 21 MB per minute of 44.1 kHz stereo, and the whole result must exist in the tab at once. Thirty repeats of a four-minute track is two hours, which is around 2.5 GB — more than most browser tabs will give you. Thirty repeats of a ten-second loop is five minutes and about 105 MB, which is nothing. Short clips are where this tool lives.',
+  },
+  {
+    q: 'Is there a gap after the final repeat?',
+    a: 'No. The gap is defined as the space between repeats, so a file with five repeats and a two-second gap contains four gaps, not five. The audio ends the moment the last repeat does. If you actually want silence on the end — for a hold-music file that should pause before the player restarts it — add it with the trimmer, or set the gap and accept that the loop point is now inside the file.',
+  },
+  {
+    q: 'Why build a long file instead of just pressing repeat in a player?',
+    a: 'Because plenty of places have no repeat button. Video editors, presentation software, kiosk displays, phone systems, exhibition installations and most embedded players simply play a file once. A twenty-minute file made from a thirty-second bed solves that without any of them having to cooperate.',
+  },
+  {
+    q: 'Does each repeat lose a bit of quality?',
+    a: 'No. Every repeat is a copy of the same decoded samples, so repeat forty is identical to repeat one. Encoding happens once at the end, to the whole result, exactly as it would for any other export. Quality does not compound with repetition here — only file size does.',
+  },
+  {
+    q: 'Can I make a file that loops forever?',
+    a: 'A file has a length, so no. What you can do is make one that loops seamlessly and let the player repeat it: on a web page that is the loop attribute on an audio element, in a game engine it is a flag on the sound asset. Building a long file is the workaround for the cases where no such flag exists.',
+  },
+  {
+    q: 'How big will the exported file be?',
+    a: 'Close to linear with the repeat count. Ten repeats of a 1 MB MP3 lands near 10 MB, give or take the encoder finding the repetition slightly cheaper to describe. Gaps are nearly free in a lossy format and cost full price in WAV, where every second of silence takes exactly as many bytes as a second of music.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Download looped audio">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Repeats</span>
+        <span class="hint" data-total>Set a count to see the resulting length.</span>
+      </div>
+
+      <div class="field">
+        <label class="label" for="loop-times">
+          Number of repeats
+          <span class="label__value" data-out="times">2</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="loop-times"
+            data-control="times"
+            type="range"
+            min="2"
+            max="50"
+            step="1"
+            value="2"
+          />
+          <input
+            class="num"
+            data-control="times-num"
+            type="number"
+            min="2"
+            max="50"
+            step="1"
+            value="2"
+            aria-label="Number of repeats"
+          />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="loop-gap">
+          Gap between repeats
+          <span class="label__value" data-out="gap">0.0 s</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="loop-gap"
+            data-control="gap"
+            type="range"
+            min="0"
+            max="5"
+            step="0.1"
+            value="0"
+          />
+          <input
+            class="num"
+            data-control="gap-num"
+            type="number"
+            min="0"
+            max="5"
+            step="0.1"
+            value="0"
+            aria-label="Gap between repeats in seconds"
+          />
+        </div>
+      </div>
+
+      <div class="note note--warn controls__full" data-heavy hidden>
+        <div class="note__body" data-heavy-text></div>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>What makes a loop seamless</h2>
+    <p>
+      A loop is seamless when the end of the clip and the start of the clip are
+      interchangeable — same level, same phase, same musical position. Repetition
+      does not create that property; it only reveals whether you already had it.
+      Everything this tool can do is join copies together perfectly, and it does,
+      so any bump you hear at the loop point was in the clip before it arrived
+      here.
+    </p>
+    <p>
+      For music, the boundary you want is almost always a bar line, and bar lengths
+      are arithmetic rather than judgement. One bar of 4/4 lasts 60 ÷ BPM × 4
+      seconds: exactly 2 seconds at 120 BPM, 1.875 at 128, about 1.379 at 174.
+      Trim the clip to a whole number of bars at that length and the loop will sit
+      right. If you do not know the tempo, the BPM detector will tell you, and the
+      trimmer's timecode fields accept hundredths of a second, which is finer than
+      the error you would hear.
+    </p>
+    <p>
+      For everything else — room tone, rain, machinery, a synth pad — the rule is
+      to cut where the waveform crosses zero and the content is unremarkable. A
+      loop point in the middle of a bird call announces itself once a cycle; the
+      same point two seconds later, in flat background, does not.
+    </p>
+
+    <h2>Where the gaps go</h2>
+    <p>
+      Gap length is measured between repeats, and there is deliberately no gap
+      after the last one. That means five repeats with a two-second gap produce four
+      gaps, and the file ends the instant the fifth repeat does. This is the
+      behaviour you want almost always: a file that ends on silence looks longer
+      than it is in every editor, and the trailing pause turns into an awkward hole
+      when the file is dropped onto a timeline.
+    </p>
+    <p>
+      Gaps are digital silence, not a fade, so they are only useful when the clip
+      already ends cleanly. A practice loop with two seconds between passes is the
+      classic use — long enough to reset your hands, short enough to keep the tempo
+      in your head. For a continuous bed, leave the gap at zero.
+    </p>
+
+    <h2>Knowing when to stop</h2>
+    <p>
+      The whole result is assembled in memory before anything is encoded, so length
+      has a hard ceiling that depends on your device rather than on the tool. At
+      roughly 21 MB per minute of 44.1 kHz stereo, half an hour of output is about
+      630 MB of working memory, and browsers begin refusing allocations somewhere
+      above that on most machines and much sooner on phones.
+    </p>
+    <p>
+      Two things buy you room. A mono source halves the cost immediately, which is
+      free if the clip is a voice or a mono sound effect. And a shorter source loop
+      repeated more times costs exactly the same as a longer one repeated fewer
+      times — it is total output length that matters, not the count. If you need
+      hours of ambience, generate twenty minutes here and let whatever plays it
+      repeat that.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { loop, slice } from '../lib/audio/dsp';
+  import { duration as fmtDuration, filesize } from '../lib/format';
+
+  const tool = createTool({
+    suffix: 'looped',
+    defaultFormat: 'mp3',
+
+    onReady(ctx, runtime) {
+      const root = runtime.root;
+      const totalOut = root.querySelector<HTMLElement>('[data-total]');
+      const heavy = root.querySelector<HTMLElement>('[data-heavy]');
+      const heavyText = root.querySelector<HTMLElement>('[data-heavy-text]');
+      const source = ctx.buffer;
+
+      const update = (): void => {
+        const times = Math.max(2, Math.round(runtime.value('times', 2)));
+        const gap = runtime.value('gap', 0);
+        // The gap sits between repeats, so there are times - 1 of them.
+        const total = times * source.duration + gap * (times - 1);
+
+        if (totalOut) {
+          totalOut.textContent = `${times} repeats · ${fmtDuration(total)} in total`;
+        }
+
+        if (heavy && heavyText) {
+          const bytes = total * source.sampleRate * source.numberOfChannels * 4;
+          const tooBig = total > 1800 || bytes > 700_000_000;
+          heavyText.textContent = tooBig
+            ? `${fmtDuration(total)} of audio needs about ${filesize(bytes)} of memory while it is built. ` +
+              'That is enough to fail on a phone and to be slow on a laptop — try fewer repeats.'
+            : '';
+          heavy.hidden = !tooBig;
+        }
+      };
+
+      const bindSlider = (name: string, format: (value: number) => string): void => {
+        const slider = root.querySelector<HTMLInputElement>(`[data-control="${name}"]`);
+        const num = root.querySelector<HTMLInputElement>(`[data-control="${name}-num"]`);
+        const out = root.querySelector<HTMLElement>(`[data-out="${name}"]`);
+        if (!slider) return;
+
+        const paint = (): void => {
+          const min = Number(slider.min);
+          const max = Number(slider.max);
+          const span = max - min || 1;
+          slider.style.setProperty('--pct', `${((Number(slider.value) - min) / span) * 100}%`);
+          if (out) out.textContent = format(Number(slider.value));
+        };
+
+        slider.addEventListener('input', () => {
+          if (num) num.value = slider.value;
+          paint();
+          update();
+        });
+
+        num?.addEventListener('input', () => {
+          slider.value = num.value;
+          paint();
+          update();
+        });
+
+        num?.addEventListener('change', () => {
+          if (num) num.value = slider.value;
+        });
+
+        paint();
+      };
+
+      bindSlider('times', (value) => String(Math.round(value)));
+      bindSlider('gap', (value) => `${value.toFixed(1)} s`);
+
+      update();
+    },
+
+    process(ctx) {
+      const times = Math.max(2, Math.round(tool?.value('times', 2) ?? 2));
+      const gap = tool?.value('gap', 0) ?? 0;
+      const looped = loop(ctx.buffer, times, gap);
+      if (gap <= 0) return looped;
+      // loop() pads every repeat, including the last. Drop the trailing silence
+      // so the file ends on audio.
+      return slice(looped, 0, Math.max(0.01, looped.duration - gap));
+    },
+  });
+</script>

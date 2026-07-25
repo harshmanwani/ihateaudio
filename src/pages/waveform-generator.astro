@@ -1,0 +1,360 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('waveform-generator');
+
+const steps = [
+  'Drop an audio file onto the page. The waveform is drawn from the decoded samples, not from a preview image, so the shape is the real shape of the recording.',
+  'Pick a size. The presets cover the shapes people actually need — a wide banner, a square post, a full video frame — and you can type any dimensions you like instead.',
+  'Choose bars, filled or line, then set the two colours. Turn on the transparent background if the image is going to sit on top of something else.',
+  'The preview updates as you change things and is the exact image you get. When it looks right, click Download PNG.',
+];
+
+const faq = [
+  {
+    q: 'What size should I export?',
+    a: 'Match the place it is going. 1600 × 400 suits a page header or a podcast banner, 1080 × 1080 is a square social post, and 1920 × 1080 is a full video frame for an editor. Export at the final display size or larger — enlarging a small PNG afterwards produces visibly soft edges, while scaling a large one down looks fine.',
+  },
+  {
+    q: 'Is the transparent background really transparent?',
+    a: 'Yes. PNG carries an alpha channel and the background is left unpainted, so the waveform composites over whatever is behind it in a video editor or a design tool. Two things to watch: converting the result to JPEG flattens transparency to black, and a light-coloured waveform disappears against a light background, so pick your colour for the destination rather than for the preview here.',
+  },
+  {
+    q: 'Does the image show the left and right channels separately?',
+    a: 'No. Every column takes the minimum and maximum across all channels, so a stereo file produces one combined shape. That is what almost every waveform graphic you have seen does. If you need the channels drawn apart, split the file with the stereo to mono tool and generate one image per channel.',
+  },
+  {
+    q: 'Why is the whole track squashed into one image?',
+    a: 'The image always spans the entire file, edge to edge, however long it is. An hour-long recording therefore gives you an hour-wide picture in which individual words are a fraction of a pixel. If you want detail, trim the section you care about first and generate the image from that.',
+  },
+  {
+    q: 'What is the difference between the three styles?',
+    a: 'Bars draw one rounded column per slice with a gap between them — the familiar look from audio apps, and the most legible at small sizes. Filled draws a single solid shape through every peak, which reads better at large sizes and in print. Line traces only the upper envelope with a stroke, which is the lightest and works well over a photograph or a video.',
+  },
+  {
+    q: 'How large can the image be?',
+    a: 'This page allows up to 4000 pixels on each side, which is comfortably inside what browsers can allocate for a canvas. Beyond roughly 16384 pixels a canvas fails silently in most browsers and produces a blank image, so the limit here keeps you well clear of that edge.',
+  },
+  {
+    q: 'Can I animate it or make a video from it?',
+    a: 'Not here — this tool produces a single still PNG. It is the right starting point for one, though: export at your video resolution with a transparent background, drop it into your editor, and animate a mask or a playhead over it there.',
+  },
+];
+
+const presets = [
+  { value: '1600x400', label: '1600 × 400 — banner' },
+  { value: '1080x1080', label: '1080 × 1080 — square post' },
+  { value: '1920x1080', label: '1920 × 1080 — video frame' },
+  { value: '1200x630', label: '1200 × 630 — link preview' },
+  { value: '800x200', label: '800 × 200 — small strip' },
+  { value: 'custom', label: 'Custom size' },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} stage={false} exportBar={false}>
+    <div class="panel" style="padding:var(--s4)">
+      <div
+        data-preview
+        style="display:flex; justify-content:center; align-items:center; min-height:120px; overflow-x:auto"
+      >
+      </div>
+    </div>
+
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Image</span>
+        <span class="hint">The preview is the file you download, pixel for pixel.</span>
+      </div>
+
+      <div class="field">
+        <label class="label" for="wf-preset">Size preset</label>
+        <select class="select" id="wf-preset" data-control="preset">
+          {presets.map((preset) => <option value={preset.value}>{preset.label}</option>)}
+        </select>
+      </div>
+
+      <div class="field">
+        <label class="label" for="wf-width">Width (px)</label>
+        <input
+          class="input tnum"
+          id="wf-width"
+          data-control="width"
+          type="number"
+          min="200"
+          max="4000"
+          step="10"
+          value="1600"
+        />
+      </div>
+
+      <div class="field">
+        <label class="label" for="wf-height">Height (px)</label>
+        <input
+          class="input tnum"
+          id="wf-height"
+          data-control="height"
+          type="number"
+          min="80"
+          max="4000"
+          step="10"
+          value="400"
+        />
+      </div>
+
+      <div class="field">
+        <span class="label" id="wf-style-label">Style</span>
+        <div class="seg" role="group" aria-labelledby="wf-style-label">
+          <button type="button" class="seg__btn" data-style="bars" aria-pressed="true">
+            Bars
+          </button>
+          <button type="button" class="seg__btn" data-style="filled" aria-pressed="false">
+            Filled
+          </button>
+          <button type="button" class="seg__btn" data-style="line" aria-pressed="false">
+            Line
+          </button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="wf-wave">Waveform colour</label>
+        <input class="input" id="wf-wave" data-control="wave" type="color" value="#5bbf94" />
+      </div>
+
+      <div class="field">
+        <label class="label" for="wf-bg">Background colour</label>
+        <input
+          class="input"
+          id="wf-bg"
+          data-control="background"
+          type="color"
+          value="#0e1512"
+        />
+      </div>
+
+      <div class="field">
+        <span class="label">Background</span>
+        <label class="switch">
+          <input type="checkbox" data-control="transparent" />
+          <span>Transparent</span>
+        </label>
+        <span class="hint">
+          Previewed against this page, so a pale waveform will look faint here
+          and still composite correctly over dark video.
+        </span>
+      </div>
+    </div>
+
+    <div class="export">
+      <div class="export__spacer"></div>
+      <div class="export__size tnum" data-png-meta></div>
+      <button type="button" class="btn btn--solid btn--lg" data-png-download>
+        Download PNG
+      </button>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>What a waveform image is showing you</h2>
+    <p>
+      A waveform picture is not the audio drawn small. There are far more
+      samples in a recording than there are pixels across an image — a
+      three-minute stereo track holds roughly sixteen million of them — so
+      every column has to summarise thousands of samples at once.
+    </p>
+    <p>
+      The summary used here is the pair of extremes: for each column, the lowest
+      and highest sample value in that slice. Drawing between them means a
+      single sharp transient still produces a visible spike instead of being
+      averaged into the surrounding quiet, which is why these images look the
+      way they do. It also means the picture shows amplitude and nothing else.
+      You can read where the loud parts are, where the silences fall and roughly
+      how compressed the material is. You cannot read pitch, key, instruments or
+      words, however much a waveform in a film implies otherwise.
+    </p>
+    <p>
+      One consequence surprises people: a heavily limited modern master looks
+      like a solid brick, and a dynamic recording looks lively and varied. That
+      is a real difference in the audio, not a rendering artefact, and it is the
+      quickest visual check on how squashed a file is.
+    </p>
+
+    <h2>Choosing a size that survives the platform</h2>
+    <p>
+      Export at the size the image will be displayed, or larger. Scaling a PNG
+      up afterwards softens every edge, and a waveform is nothing but edges.
+      Scaling down is harmless.
+    </p>
+    <p>
+      The aspect ratio matters more than the pixel count. A waveform in a
+      1080 × 1080 square is short and wide-shouldered, which reads as bold; the
+      same audio at 1600 × 400 becomes a thin ribbon, which reads as
+      decorative. Neither is better, but they are different pictures, so choose
+      the shape before you fuss over the colours. If the image is going into a
+      video, match the video's frame size exactly and let the editor place it —
+      that avoids a resample step that would blur the bars.
+    </p>
+
+    <h2>Bars, filled and line</h2>
+    <p>
+      Bars leave a gap between columns, which sacrifices detail for legibility.
+      At small sizes this is the only style that stays readable, because a solid
+      shape at 200 pixels tall collapses into a smear. It is also the style
+      people recognise as "audio", since every editor and podcast player uses
+      it.
+    </p>
+    <p>
+      Filled draws one continuous shape through every peak, upper and lower. It
+      keeps more detail and looks better the larger it gets, which makes it the
+      right choice for print, for large banners and for anything where the
+      texture of the waveform is the point.
+    </p>
+    <p>
+      Line traces the upper envelope only, with a stroke that scales with the
+      image height. It is by far the lightest visually, so it works over a
+      photograph or a video frame where a filled shape would dominate. With a
+      transparent background it is the closest thing here to an overlay
+      graphic.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { renderWaveformImage } from '../lib/audio/waveform';
+  import { saveBlob } from '../lib/files';
+  import { outputName, clamp } from '../lib/format';
+
+  type Style = 'bars' | 'filled' | 'line';
+
+  let style: Style = 'bars';
+  let buffer: AudioBuffer | null = null;
+  let sourceName = 'audio';
+  let preview: HTMLCanvasElement | null = null;
+  let frame = 0;
+
+  createTool({
+    suffix: 'waveform',
+    stage: false,
+
+    onReady(ctx, runtime) {
+      const root = runtime.root;
+      buffer = ctx.buffer;
+      sourceName = ctx.files[0]?.name ?? 'audio';
+
+      const host = root.querySelector<HTMLElement>('[data-preview]');
+      const meta = root.querySelector<HTMLElement>('[data-png-meta]');
+      const presetSelect = root.querySelector<HTMLSelectElement>('[data-control="preset"]');
+      const widthInput = root.querySelector<HTMLInputElement>('[data-control="width"]');
+      const heightInput = root.querySelector<HTMLInputElement>('[data-control="height"]');
+      const bgInput = root.querySelector<HTMLInputElement>('[data-control="background"]');
+      const transparent = root.querySelector<HTMLInputElement>('[data-control="transparent"]');
+
+      const dimensions = (): { width: number; height: number } => ({
+        width: Math.round(clamp(Number(widthInput?.value), 200, 4000)),
+        height: Math.round(clamp(Number(heightInput?.value), 80, 4000)),
+      });
+
+      const draw = (): void => {
+        if (!buffer || !host) return;
+        const { width, height } = dimensions();
+
+        const canvas = renderWaveformImage(buffer, {
+          width,
+          height,
+          style,
+          color: runtime.text('wave', '#5bbf94'),
+          background: runtime.text('background', '#0e1512'),
+          transparent: runtime.flag('transparent'),
+        });
+
+        canvas.setAttribute('role', 'img');
+        canvas.setAttribute('aria-label', 'Waveform image preview');
+        canvas.style.maxWidth = '100%';
+        canvas.style.height = 'auto';
+        canvas.style.borderRadius = 'var(--r-md)';
+
+        host.replaceChildren(canvas);
+        preview = canvas;
+        if (meta) meta.textContent = `${width} × ${height} px`;
+      };
+
+      // Colour inputs fire continuously while a picker is dragged; one draw
+      // per frame is plenty and keeps long files responsive.
+      const schedule = (): void => {
+        if (frame) return;
+        frame = requestAnimationFrame(() => {
+          frame = 0;
+          draw();
+        });
+      };
+
+      root.querySelectorAll<HTMLElement>('[data-control]').forEach((control) => {
+        control.addEventListener('input', schedule);
+        control.addEventListener('change', schedule);
+      });
+
+      root.querySelectorAll<HTMLButtonElement>('[data-style]').forEach((button) => {
+        button.addEventListener('click', () => {
+          const next = button.dataset.style;
+          style = next === 'filled' || next === 'line' ? next : 'bars';
+          root.querySelectorAll<HTMLButtonElement>('[data-style]').forEach((other) => {
+            other.setAttribute('aria-pressed', String(other === button));
+          });
+          schedule();
+        });
+      });
+
+      presetSelect?.addEventListener('change', () => {
+        const [w, h] = presetSelect.value.split('x');
+        if (!w || !h) return;
+        if (widthInput) widthInput.value = w;
+        if (heightInput) heightInput.value = h;
+        schedule();
+      });
+
+      // Typing a size by hand means the preset no longer describes it.
+      for (const input of [widthInput, heightInput]) {
+        input?.addEventListener('input', () => {
+          if (presetSelect) presetSelect.value = 'custom';
+        });
+      }
+
+      // A background colour is meaningless once transparency is on.
+      const syncBackground = (): void => {
+        if (bgInput && transparent) bgInput.disabled = transparent.checked;
+      };
+      transparent?.addEventListener('change', syncBackground);
+      syncBackground();
+
+      draw();
+    },
+
+    // The PNG is delivered by the button below, not by the shared export bar.
+    process(ctx) {
+      return ctx.buffer;
+    },
+  });
+
+  const downloadButton = document.querySelector<HTMLButtonElement>('[data-png-download]');
+
+  downloadButton?.addEventListener('click', () => {
+    const canvas = preview;
+    const button = downloadButton;
+    if (!canvas) return;
+
+    button.dataset.loading = 'true';
+    canvas.toBlob((blob) => {
+      delete button.dataset.loading;
+      if (!blob) return;
+      saveBlob(blob, outputName(sourceName, 'waveform', 'png'));
+      // Same one-shot confirmation the shared export bar uses.
+      button.classList.remove('btn--ready');
+      void button.offsetWidth;
+      button.classList.add('btn--ready');
+    }, 'image/png');
+  });
+</script>

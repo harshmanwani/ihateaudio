@@ -1,0 +1,159 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+import ConversionPanel from '../components/ConversionPanel.astro';
+
+const tool = getTool('ogg-converter');
+
+const steps = [
+  'Drop an MP3, WAV, FLAC, M4A or Opus file onto the page. Decoding happens in the tab, so nothing is uploaded.',
+  'Pick a target bitrate in the export bar. Vorbis is efficient in the middle of the range — 128 to 192 kbps covers most music comfortably.',
+  'Click Download. The first OGG of your session loads the Vorbis encoder, roughly 31 MB, shown as its own progress step.',
+  'Drop the resulting .ogg straight into Unity, Godot or a web project — both engines treat it as a native compressed audio asset.',
+];
+
+const faq = [
+  {
+    q: 'Is OGG a format or a container?',
+    a: 'Ogg is a container, and Vorbis is the codec inside it. The two are so often paired that "OGG" has come to mean "Ogg Vorbis" in everyday use, but an .ogg file can also hold Opus, FLAC, Speex or Theora video. This tool writes Vorbis, which is what any program asking for an OGG almost always expects.',
+  },
+  {
+    q: 'Why does OGG exist when MP3 already did?',
+    a: 'Because MP3 was patented. In September 1998 Fraunhofer and Thomson announced they would enforce royalties on MP3 encoders and decoders, which made the format unusable for free software and expensive for everyone else. Xiph.Org built Vorbis as an unencumbered replacement and released version 1.0 in July 2002 under a BSD-style licence.',
+  },
+  {
+    q: 'Which software actually prefers OGG?',
+    a: 'Unity compresses imported audio to Vorbis by default, and Godot uses Ogg Vorbis as its standard compressed audio resource. Minecraft ships its sounds as .ogg. Wikipedia and Wikimedia Commons require patent-free formats, so audio there is Ogg or WebM. Spotify\'s streaming has long been Ogg Vorbis, at roughly 96, 160 and 320 kbps depending on your quality setting.',
+  },
+  {
+    q: 'Will an OGG file play on an iPhone?',
+    a: 'Not reliably. Apple was the last major holdout on Ogg support, and it only arrived in Safari relatively recently, so anything older will refuse the file outright. If you are sending audio to someone on an Apple device and you do not know what they are running, send M4A or MP3 instead.',
+  },
+  {
+    q: 'Is Vorbis better than MP3 at the same bitrate?',
+    a: 'Yes, generally by a noticeable margin below about 160 kbps, and it never applies the aggressive low-pass filtering that makes low-bitrate MP3 sound dull. It is roughly comparable to AAC in the middle of the range. Opus beats both, which is why Vorbis is now largely maintenance-mode outside the game engines that standardised on it.',
+  },
+  {
+    q: 'Why is Vorbis normally variable bitrate?',
+    a: 'The encoder is designed around a quality scale from -1 to 10 rather than a fixed rate: it spends bits where the music is complex and saves them where it is not. Asking for a specific bitrate, as this page does, switches it into a managed mode that hits your number on average. That is what most tools and engines expect, and it makes file sizes predictable.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Convert to OGG">
+    <ConversionPanel
+      hint="Vorbis sits close to AAC in quality. 128 kbps is the usual choice for game and web audio."
+    />
+
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Vorbis output</span>
+        <span class="hint">Bitrate is set in the export bar below.</span>
+      </div>
+
+      <div class="controls__full">
+        <div class="note note--info">
+          <div class="note__body">
+            <div class="note__title">The Vorbis encoder loads once</div>
+            <div>
+              Vorbis has no encoder built into any browser, so the first OGG of
+              your session pulls a converter of about 31 MB from this site. The
+              audio itself never leaves the tab, and every OGG after the first
+              one encodes without any further wait.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls__full">
+        <p class="hint">
+          Game engines are the most common destination for these files. Unity and
+          Godot both accept .ogg directly and will not re-compress it, so what
+          you export here is what ships.
+        </p>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>A codec written to be free</h2>
+    <p>
+      Vorbis exists because of a licensing announcement. In September 1998
+      Fraunhofer and Thomson made clear that MP3 encoders and decoders were
+      subject to royalties, which put the dominant audio format out of reach for
+      free software and made it a running cost for everyone else. Christopher
+      Montgomery, who had already been experimenting with audio coding for
+      several years, redirected the work into a deliberately unencumbered codec
+      and founded what became the Xiph.Org Foundation around it. Vorbis 1.0
+      shipped in July 2002 with a BSD-style licence and no patent claims attached.
+    </p>
+    <p>
+      Ogg is the separate piece: a general-purpose streaming container from the
+      same project, designed so that a decoder can find frame boundaries in a
+      stream it joined halfway through. It carries Vorbis most often, but also
+      Opus, lossless FLAC, Speex and the Theora video codec. Calling a file "an
+      OGG" is therefore slightly imprecise, in the same way that calling an MP4
+      "a video" is.
+    </p>
+
+    <h2>How Vorbis differs under the hood</h2>
+    <p>
+      Vorbis splits each block of spectrum into two parts and codes them
+      separately: a coarse "floor" describing the overall spectral envelope, and
+      a "residue" carrying the fine structure that sits on top of it. Both are
+      coded against vector-quantisation codebooks — and unusually, those
+      codebooks are not fixed by the standard. They are written into the header
+      of every file. That decision meant encoders could keep improving for years
+      without breaking a single existing decoder, and it is why a Vorbis file
+      made today plays in a decoder built in 2003.
+    </p>
+    <p>
+      It also means Vorbis is naturally variable bitrate. Its native control is a
+      quality number from -1 to 10, where 3 lands near 112 kbps, 5 near 160 and 8
+      near 256, varying with the material. Requesting a fixed bitrate puts the
+      encoder into a managed mode that averages out to your target, which is what
+      this page does because predictable file sizes matter more than the last
+      percent of efficiency for most uses.
+    </p>
+
+    <h2>Where OGG belongs, and where it does not</h2>
+    <p>
+      Game engines are the strongest case. Unity's default compression for
+      imported audio is Vorbis, Godot treats Ogg Vorbis as its standard
+      compressed audio resource, and both decode it cheaply enough to run dozens
+      of simultaneous sounds. Open platforms are the second: Wikimedia projects
+      require patent-free formats, so Ogg is the audio you find there, and much
+      of the Linux desktop assumes it works.
+    </p>
+    <p>
+      Outside those worlds, think twice. Apple resisted Ogg support for two
+      decades and older iPhones and iPads simply cannot open the file. Car
+      stereos and hardware players almost universally cannot. Phones have no
+      hardware Vorbis decoder, so long playback costs more battery than AAC does.
+      And for new work where you control both ends, Opus is the better codec by
+      almost every measure — Vorbis's real advantage today is the enormous amount
+      of software already built to expect it.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { wireConversionPanel } from '../lib/conversion';
+
+  createTool({
+    suffix: 'ogg',
+    onReady(_ctx, runtime) {
+      wireConversionPanel(runtime);
+    },
+    formats: ['ogg'],
+    defaultFormat: 'ogg',
+
+    // Vorbis encoding happens in the export step; the samples pass through.
+    process(ctx) {
+      return ctx.buffer;
+    },
+  });
+</script>

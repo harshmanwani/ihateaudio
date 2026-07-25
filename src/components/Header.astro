@@ -1,0 +1,35 @@
+---
+import Icon from './Icon.astro';
+
+const path = Astro.url.pathname;
+const isHome = path === '/';
+---
+
+<header class="hdr">
+  <div class="wrap hdr__inner">
+    <a class="wordmark" href="/" aria-label="ihateaudio — home">
+      <Icon name="waveform" size={22} class="wordmark__mark" />
+      <span>i<em>hate</em>audio</span>
+    </a>
+
+    <nav class="hdr__nav" aria-label="Main">
+      <a
+        class="hdr__link"
+        href="/"
+        aria-current={isHome ? 'page' : undefined}>All tools</a
+      >
+      <a
+        class="hdr__link hdr__link--wide"
+        href="/loudness-targets"
+        aria-current={path === '/loudness-targets' ? 'page' : undefined}
+        >Loudness targets</a
+      >
+      <a
+        class="hdr__link hdr__link--wide"
+        href="/audio-formats"
+        aria-current={path === '/audio-formats' ? 'page' : undefined}
+        >Format guide</a
+      >
+    </nav>
+  </div>
+</header>

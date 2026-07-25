@@ -1,0 +1,340 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('tempo-changer');
+
+const steps = [
+  'Drop the track you want to work on onto the page. It is decoded locally, so a rehearsal recording or an unreleased mix never leaves your machine.',
+  'Set the tempo as a percentage of the original. 100% is untouched, 75% is three quarters of the original speed, 120% is a fifth faster.',
+  'If you know the tempo of the recording, type it into the BPM box. The tool then tells you the beats per minute you will actually be playing at.',
+  'Click Preview the tempo to render it and listen. Time-stretching is too expensive to redo on every drag, so it runs when you ask for it.',
+  'Download the result, or loop a section first with the trimmer if you only need one difficult bar.',
+];
+
+const faq = [
+  {
+    q: 'Will the key change if I slow the track down?',
+    a: 'No. That is the entire reason to use this rather than a speed control. The audio is rebuilt from overlapping windows placed at new intervals, so every note keeps the frequency it was recorded at. A song in E flat is still in E flat at 70%, which is what makes it usable as a practice tool.',
+  },
+  {
+    q: 'What percentage should I practise at?',
+    a: 'The usual advice is the fastest tempo at which you can play the passage cleanly, which for most people starts somewhere between 60% and 75%. Move up in steps of about 5% once a pass is clean twice in a row. Jumping straight from 60% to full speed tends to reintroduce the same mistakes, because the muscle timing was learned at the slow tempo rather than adapted from it.',
+  },
+  {
+    q: 'How slow can I go before it sounds strange?',
+    a: 'Down to about 70% most material holds together well. Between 50% and 70% you begin to hear a faint smearing on cymbals and consonants, because the algorithm is repeating more windows than it is playing. Below 50% the effect becomes obvious on anything with sharp attacks, although a solo instrument or a clean vocal survives further than a dense full mix.',
+  },
+  {
+    q: 'Does 200% mean twice as fast?',
+    a: 'Yes. Percentage here is a straightforward multiplier on the playback rate: 200% halves the running time, 50% doubles it. A three minute song at 80% runs three minutes and forty-five seconds, because the length scales by one divided by the percentage rather than by the percentage itself.',
+  },
+  {
+    q: 'Can I use this to match two tracks for a mix?',
+    a: 'Yes, and this is where the BPM box earns its place. Detect or look up both tempos, divide the target by the source, and enter that as the percentage — 128 into 124 is 96.9%. Beat-matching still needs the downbeats aligned afterwards, which is a job for the trimmer, but the tempo will hold across the whole track rather than drifting.',
+  },
+  {
+    q: 'Why does the result sometimes sound slightly flangy?',
+    a: 'Time-stretching works by overlapping copies of the signal, and when two overlapping copies are almost but not exactly in phase they interfere in a way that sweeps across the spectrum. The alignment search removes most of this by hunting for the offset where the waveforms match best, but it cannot remove all of it on material with lots of simultaneous pitches. Smaller tempo changes leave less to interfere.',
+  },
+  {
+    q: 'Is this the same as the speed changer with pitch preservation on?',
+    a: 'It is the same engine, expressed differently. The speed changer thinks in multipliers and offers both coupled and uncoupled modes; this page is percentage-first, always pitch-preserving, and adds the BPM readout that musicians actually want. Use whichever set of numbers matches how you are thinking about the problem.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Download">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Tempo</span>
+        <span class="hint">The pitch is held throughout. Only the timing moves.</span>
+      </div>
+
+      <div class="field controls__full">
+        <label class="label" for="tempo">
+          Tempo
+          <span class="label__value tnum" data-out="tempo">100%</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="tempo"
+            data-control="tempo"
+            type="range"
+            min="50"
+            max="200"
+            step="1"
+            value="100"
+          />
+          <input
+            class="num"
+            data-control="tempo-num"
+            type="number"
+            min="50"
+            max="200"
+            step="1"
+            value="100"
+            aria-label="Tempo as a percentage of the original"
+          />
+        </div>
+      </div>
+
+      <div class="field controls__full">
+        <span class="label" id="tempo-presets">Presets</span>
+        <div class="seg" role="group" aria-labelledby="tempo-presets">
+          <button type="button" class="seg__btn" data-preset="50" aria-label="50 percent" aria-pressed="false">50</button>
+          <button type="button" class="seg__btn" data-preset="75" aria-label="75 percent" aria-pressed="false">75</button>
+          <button type="button" class="seg__btn" data-preset="90" aria-label="90 percent" aria-pressed="false">90</button>
+          <button type="button" class="seg__btn" data-preset="100" aria-label="100 percent, the original" aria-pressed="true">100</button>
+          <button type="button" class="seg__btn" data-preset="125" aria-label="125 percent" aria-pressed="false">125</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="bpm">Original BPM (optional)</label>
+        <input
+          class="input tnum"
+          id="bpm"
+          data-control="bpm"
+          type="number"
+          min="20"
+          max="300"
+          step="0.1"
+          inputmode="decimal"
+          placeholder="e.g. 120"
+        />
+        <span class="hint" data-out="bpm">
+          Enter the source tempo to see what you will be playing at.
+        </span>
+      </div>
+
+      <div class="field">
+        <span class="label">
+          New length
+          <span class="label__value tnum" data-out="length">—</span>
+        </span>
+        <span class="hint" data-out="length-hint">Load a file to see the new running time.</span>
+      </div>
+
+      <div class="field controls__full">
+        <span class="label">Audition</span>
+        <button type="button" class="btn btn--quiet" data-audition>Preview the tempo</button>
+        <span class="hint" data-out="state">
+          The player holds the original until you render a preview.
+        </span>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>Why practising along with a recording needs this</h2>
+    <p>
+      Learning a part by ear from a record is a good way to learn, right up until
+      the passage is faster than your hands. The obvious fix — slow the recording
+      down — used to mean slowing the tape, which drops the pitch with it. A solo
+      slowed to three quarters speed on tape arrives roughly five semitones flat.
+      Now your fingering no longer matches what you are hearing, your ear is
+      being trained on the wrong intervals, and you cannot play along on a tuned
+      instrument at all.
+    </p>
+    <p>
+      Pitch-preserving stretching removes that problem completely. The recording
+      stays in its original key at any tempo, so you can put the metronome away,
+      play along at 65%, and step up as the passage settles. Everything you learn
+      at the slow tempo transfers directly, because the notes were never in a
+      different place.
+    </p>
+    <p>
+      The same property matters outside practice rooms. A cue that has to fit a
+      picture edit can be nudged a few percent without anyone hearing that the
+      key moved. Two takes recorded on different days at slightly different
+      tempos can be pulled into agreement. A sample can be made to sit on a grid
+      without being transposed off the chord it belongs to.
+    </p>
+
+    <h2>How the stretch is done</h2>
+    <p>
+      The technique is overlap-add with a similarity search, usually called
+      WSOLA. The audio is cut into windows of about 46 milliseconds, each faded
+      in and out with a raised-cosine shape. To slow the recording down, those
+      windows are written to the output further apart than they were read; to
+      speed it up, closer together. Because each window still contains real
+      waveform at its real frequency, nothing is transposed.
+    </p>
+    <p>
+      The difficulty is the joins. Two windows dropped next to each other at
+      arbitrary phase will cancel or reinforce in ways that sound like a comb
+      filter sweeping past. So before writing each window the algorithm looks at
+      a small range of nearby read positions and picks the one whose waveform
+      best continues what has already been written. That search is why a stretch
+      takes a second or two rather than being instant, and it is the difference
+      between a usable practice tool and something that sounds like a broken CD.
+    </p>
+
+    <h2>Where the limits are</h2>
+    <p>
+      Stretching is interpolation, and interpolation invents nothing. At moderate
+      ratios — say 75% to 130% — there is very little to invent and the output is
+      close to transparent. Push further and the algorithm has to repeat or drop
+      an increasing share of the material. On sustained sounds that is harmless.
+      On transients it is not: a snare hit stretched across two windows arrives
+      twice, faintly, and reads as softness rather than as a doubled hit.
+    </p>
+    <p>
+      If you need a very large change and the pitch does not matter, use the
+      speed changer instead — a plain resample is artefact-free at any ratio. If
+      you need the pitch moved and the timing held, that is the pitch shifter.
+      This page is for the case in the middle, where the timing is the thing that
+      has to change and the key must not.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { changeTempo } from '../lib/audio/stretch';
+  import { clamp, duration, pct } from '../lib/format';
+
+  let source: AudioBuffer | null = null;
+  let auditionBuffer: AudioBuffer | null = null;
+  let wired = false;
+
+  function percentOf(): number {
+    return clamp(tool?.value('tempo', 100) ?? 100, 50, 200);
+  }
+
+  const tool = createTool({
+    suffix: 'tempo',
+    defaultFormat: 'mp3',
+
+    onReady(ctx, runtime) {
+      source = ctx.buffer;
+      auditionBuffer = null;
+
+      const root = runtime.root;
+      const range = root.querySelector<HTMLInputElement>('[data-control="tempo"]');
+      const num = root.querySelector<HTMLInputElement>('[data-control="tempo-num"]');
+      const bpm = root.querySelector<HTMLInputElement>('[data-control="bpm"]');
+      const tempoOut = root.querySelector<HTMLElement>('[data-out="tempo"]');
+      const bpmOut = root.querySelector<HTMLElement>('[data-out="bpm"]');
+      const length = root.querySelector<HTMLElement>('[data-out="length"]');
+      const lengthHint = root.querySelector<HTMLElement>('[data-out="length-hint"]');
+      const state = root.querySelector<HTMLElement>('[data-out="state"]');
+      const button = root.querySelector<HTMLButtonElement>('[data-audition]');
+      const presets = root.querySelectorAll<HTMLButtonElement>('[data-preset]');
+      if (!range) return;
+
+      const paint = (): void => {
+        const percent = percentOf();
+        const multiplier = percent / 100;
+        range.style.setProperty('--pct', `${pct(percent, 50, 200)}%`);
+        if (tempoOut) tempoOut.textContent = `${percent}%`;
+        if (length) length.textContent = duration((source?.duration ?? 0) / multiplier);
+        if (lengthHint) {
+          lengthHint.textContent =
+            percent === 100
+              ? `Unchanged — ${duration(source?.duration ?? 0)}.`
+              : `Was ${duration(source?.duration ?? 0)}.`;
+        }
+        if (bpmOut) {
+          const original = Number(bpm?.value);
+          bpmOut.textContent =
+            bpm && bpm.value.trim() !== '' && Number.isFinite(original) && original > 0
+              ? `${original} BPM becomes ${(original * multiplier).toFixed(1)} BPM.`
+              : 'Enter the source tempo to see what you will be playing at.';
+        }
+        presets.forEach((preset) => {
+          preset.setAttribute('aria-pressed', String(Number(preset.dataset.preset) === percent));
+        });
+      };
+
+      const invalidate = (): void => {
+        paint();
+        if (auditionBuffer) {
+          auditionBuffer = null;
+          runtime.refreshPreview();
+        }
+        if (state) state.textContent = 'Settings changed. Render the preview again to hear them.';
+      };
+
+      const audition = async (): Promise<void> => {
+        if (!source || !button) return;
+        button.dataset.loading = 'true';
+        if (state) state.textContent = 'Stretching…';
+        // Yield so the spinner paints before the stretch blocks the thread.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        try {
+          const multiplier = percentOf() / 100;
+          auditionBuffer =
+            Math.abs(multiplier - 1) < 0.001 ? null : changeTempo(source, multiplier);
+          runtime.refreshPreview();
+          if (state) {
+            state.textContent = auditionBuffer
+              ? 'Preview ready. Press play.'
+              : 'Nothing to hear — the tempo is unchanged.';
+          }
+        } catch {
+          if (state) {
+            state.textContent = 'The preview could not be rendered. Downloading still works.';
+          }
+        } finally {
+          delete button.dataset.loading;
+        }
+      };
+
+      if (wired) {
+        paint();
+        return;
+      }
+      wired = true;
+
+      range.addEventListener('input', () => {
+        if (num) num.value = range.value;
+        invalidate();
+      });
+
+      num?.addEventListener('input', () => {
+        const typed = Number(num.value);
+        if (num.value.trim() === '' || !Number.isFinite(typed)) return;
+        range.value = String(Math.round(clamp(typed, 50, 200)));
+        invalidate();
+      });
+
+      num?.addEventListener('change', () => {
+        if (num) num.value = range.value;
+        paint();
+      });
+
+      // The BPM box only feeds the readout, so it never invalidates the audition.
+      bpm?.addEventListener('input', paint);
+
+      presets.forEach((preset) => {
+        preset.addEventListener('click', () => {
+          range.value = preset.dataset.preset ?? '100';
+          if (num) num.value = range.value;
+          invalidate();
+        });
+      });
+
+      button?.addEventListener('click', () => void audition());
+
+      paint();
+    },
+
+    preview(ctx) {
+      return auditionBuffer ?? ctx.buffer;
+    },
+
+    async process(ctx) {
+      const percent = percentOf();
+      if (percent === 100) return ctx.buffer;
+
+      ctx.progress(0.05);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return { buffer: changeTempo(ctx.buffer, percent / 100), suffix: `${percent}pct` };
+    },
+  });
+</script>

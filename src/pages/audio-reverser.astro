@@ -1,0 +1,185 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('audio-reverser');
+
+const steps = [
+  'Drop the file onto the page. It is decoded in the tab and reversed there — nothing is uploaded and no encoder is downloaded.',
+  'To reverse the whole thing, leave the selection alone: it covers the entire file by default.',
+  'To reverse only a section, drag across the waveform to select it. The handles also respond to the arrow keys, one twentieth of a second at a time.',
+  'Press play to hear it backwards, then pick a format and download.',
+];
+
+const faq = [
+  {
+    q: 'Does reversing lose any quality?',
+    a: 'None. Reversing writes the same sample values out in the opposite order — no filtering, no resampling, no interpolation. The peak level, the RMS level and the frequency content of the result are identical to the source. The only quality question is the format you export to, and that would apply to any edit.',
+  },
+  {
+    q: 'If I reverse it twice, do I get the original back?',
+    a: 'Exactly, provided you stay lossless. Reverse to WAV or FLAC, reverse that file again, and the samples match the original bit for bit. Going through MP3 both times gives you audio that sounds the same but has picked up two generations of encoding, so the file will not be identical even though the reversal itself was perfect.',
+  },
+  {
+    q: 'Why does reversed audio have that distinctive swelling, swooshing sound?',
+    a: 'Because almost every real sound is asymmetric in time. A piano note or a drum hit begins with a sharp attack and decays slowly; played backwards, that becomes a slow swell into an abrupt stop. Reverb makes it stronger still — the tail that followed a sound now arrives before it, so you hear the room before you hear what caused it. That is the whole trick behind reversed cymbal risers.',
+  },
+  {
+    q: 'Will reversing a song reveal a hidden message?',
+    a: 'It will reveal exactly what is on the recording, played backwards. Where a producer deliberately recorded something in reverse, you will hear it clearly and unambiguously. What people usually find instead is that forwards speech, reversed, throws up syllables the brain assembles into words it was already expecting — the same effect that makes faces appear in clouds.',
+  },
+  {
+    q: 'Are the left and right channels swapped?',
+    a: 'No. Each channel is reversed independently along the time axis, so anything mixed to the left stays on the left. If you actually want the channels swapped, that is a different operation and it lives in the stereo tools.',
+  },
+  {
+    q: 'Can I reverse the audio in a video file?',
+    a: 'Extract the soundtrack with the video to audio tool first, then reverse the audio it gives you. This tool only produces audio files — it cannot write the reversed audio back into a video, and it will not reverse the picture.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell
+    tool={tool}
+    selection
+    action="Download reversed audio"
+    dropHint="Or click to browse. Reversing takes about as long as the file takes to decode."
+  >
+    <div class="controls controls--single">
+      <div class="controls__head">
+        <span class="controls__title">Range</span>
+        <span class="hint">Drag across the waveform to reverse only part of the file.</span>
+      </div>
+
+      <div class="note note--info controls__full" data-scope>
+        <div class="note__body" data-scope-text>Reversing the whole file.</div>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>What reversing actually does</h2>
+    <p>
+      An audio file is a list of numbers — one per channel, tens of thousands per
+      second — each describing where a speaker cone should be at that instant.
+      Reversing reads that list from the end to the beginning and writes it back
+      out. The sample that was last becomes first, and nothing else changes. No
+      value is altered, averaged, filtered or interpolated, which is why the
+      operation is exactly lossless and why it finishes almost instantly even on a
+      long file.
+    </p>
+    <p>
+      Because the sample values are untouched, every measurement you could take of
+      the file comes back the same: same peak, same RMS, same loudness, same
+      spectrum. A frequency analyser genuinely cannot tell the two apart, since a
+      Fourier transform of a signal and its reverse have identical magnitudes. All
+      the information that makes reversed audio recognisable lives in the ordering,
+      not in the content.
+    </p>
+
+    <h2>Why it sounds so unmistakable</h2>
+    <p>
+      Real sounds are lopsided in time. A struck string, a plucked guitar, a snare,
+      a consonant — nearly everything starts abruptly and dies away gradually. Run
+      that backwards and the envelope inverts: a slow rise out of nothing into a
+      sudden cut-off. Your ear uses attack shape as one of its main cues for
+      identifying an instrument, so inverting it makes even a familiar sound
+      strange while leaving its pitch and timbre completely intact.
+    </p>
+    <p>
+      Reverb amplifies the effect enormously. In a normal recording, the room's
+      response trails behind whatever caused it. Reversed, that trail arrives
+      first, so you hear a swelling wash of a room and only afterwards the thing
+      that made the sound — an ordering that never happens in the physical world.
+      Producers have used this deliberately for sixty years: reverse a cymbal crash
+      and you get the standard riser that leads into a chorus, reverse a piano
+      chord and you get the sound of something arriving.
+    </p>
+
+    <h2>Reversing only a section</h2>
+    <p>
+      When the selection covers part of the file rather than all of it, the audio
+      outside the selection is copied through unchanged and only the selected
+      stretch is flipped. That creates two seams, and seams are where clicks come
+      from: at each boundary the signal that was continuous now jumps from one
+      value to a different one in a single sample. A five-millisecond equal-power
+      blend is applied at each join to remove that jump. It is far too short to
+      hear as a crossfade and long enough to stop the click, and it makes the
+      result about a hundredth of a second shorter than the source.
+    </p>
+    <p>
+      One practical note: a reversed section inside forward audio reads as an
+      obvious effect, not as an edit you can hide. If you want it to feel intentional,
+      put the boundaries somewhere the music already changes — the start of a bar,
+      a beat, the gap between two words — rather than in the middle of a sustained
+      note.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { reverse, slice, concat } from '../lib/audio/dsp';
+  import { timecode, duration as fmtDuration } from '../lib/format';
+
+  /** True when the selection is the whole file, allowing for rounding. */
+  function coversAll(buffer: AudioBuffer, start: number, end: number): boolean {
+    return start <= 0.005 && end >= buffer.duration - 0.005;
+  }
+
+  function reverseRange(
+    buffer: AudioBuffer,
+    selection: { start: number; end: number }
+  ): AudioBuffer {
+    if (coversAll(buffer, selection.start, selection.end)) return reverse(buffer);
+
+    const parts: AudioBuffer[] = [];
+    if (selection.start > 0) parts.push(slice(buffer, 0, selection.start));
+    parts.push(reverse(slice(buffer, selection.start, selection.end)));
+    if (selection.end < buffer.duration) {
+      parts.push(slice(buffer, selection.end, buffer.duration));
+    }
+    // Flipping a section leaves the signal discontinuous at both edges; a 5ms
+    // equal-power blend removes the click without being audible as a fade.
+    return concat(parts, 0.005);
+  }
+
+  // Nothing here reads a control value, so the runtime handle is not kept.
+  createTool({
+    suffix: 'reversed',
+    selection: true,
+    defaultFormat: 'mp3',
+
+    onReady(ctx, runtime) {
+      const text = runtime.root.querySelector<HTMLElement>('[data-scope-text]');
+
+      const describe = (): void => {
+        if (!text) return;
+        const { start, end } = runtime.getSelection();
+        text.textContent = coversAll(ctx.buffer, start, end)
+          ? `Reversing the whole file — ${fmtDuration(ctx.buffer.duration)}.`
+          : `Reversing ${timecode(start)} to ${timecode(end)}. The rest plays forward.`;
+      };
+
+      // Rebuilding the preview copies the buffer, so wait for the drag to settle.
+      let timer = 0;
+      runtime.root.addEventListener('selectionchange', () => {
+        describe();
+        window.clearTimeout(timer);
+        timer = window.setTimeout(() => runtime.refreshPreview(), 250);
+      });
+
+      describe();
+    },
+
+    preview(ctx) {
+      return reverseRange(ctx.buffer, ctx.selection);
+    },
+
+    process(ctx) {
+      return reverseRange(ctx.buffer, ctx.selection);
+    },
+  });
+</script>

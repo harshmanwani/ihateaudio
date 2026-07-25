@@ -1,0 +1,275 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('nightcore-maker');
+
+const steps = [
+  'Drop the song onto the page. It is decoded in the tab, so there is no upload, no queue and no watermark on the way out.',
+  'Leave the rate at 1.25x for the classic sound, or pick Subtle or Hyper. The readout tells you how far the pitch has moved and how long the track will run.',
+  'Press play. The preview is the real thing — speeding audio up is cheap enough to render as you go, so what you hear is what downloads.',
+  'Adjust until the vocal sits where you want it. Around 1.2x it reads as energetic; by 1.4x it reads as a different singer.',
+  'Download as MP3 and drop it straight into your video editor.',
+];
+
+const faq = [
+  {
+    q: 'Is nightcore just a song played faster?',
+    a: 'Essentially, yes — but faster in the specific sense of a tape or record running quick, so the pitch rises along with the tempo. That coupling is what produces the bright, weightless vocal the style is built on. A tempo increase with the pitch held would give you a rushed version of the original, not nightcore.',
+  },
+  {
+    q: 'What rate counts as proper nightcore?',
+    a: 'Most of the classic uploads sit between 1.2x and 1.3x, which is where this tool starts. Below about 1.15x it sounds like a playback error rather than a deliberate style. Above 1.4x the vocal thins out and the low end disappears, which some people want and most do not.',
+  },
+  {
+    q: 'Why did the singer get higher when I only changed the speed?',
+    a: 'Because pitch is just how often the waveform repeats per second. Read the same samples out 25% faster and every cycle finishes 25% sooner, so every frequency in the recording climbs by that same ratio. A 1.25x rate works out to about 3.9 semitones — nearly a major third — for every part at once.',
+  },
+  {
+    q: 'How is this different from the "sped up" versions on streaming?',
+    a: 'Usually not much, technically. Most official sped-up edits are the same coupled speed-and-pitch change at a gentler rate, often 1.1x to 1.2x, mixed and mastered afterwards. Nightcore is the older, more extreme version of the same idea, and it carries the visual conventions of its scene with it — anime artwork, a static image, a full track rather than a fifteen second cut.',
+  },
+  {
+    q: 'What kind of songs work best?',
+    a: 'Anything already built on a steady four-on-the-floor pulse: eurodance, trance, happy hardcore, most pop from the last two decades. The style grew out of that music and the arrangements survive being pushed. Slow ballads and anything built on a live drummer tend to fall apart, because the groove was played by a human at a specific tempo and does not scale.',
+  },
+  {
+    q: 'Does speeding a track up lose quality?',
+    a: 'The speed change itself does not remove anything — it is straight resampling, and no detail is discarded. The only loss is the usual one from decoding an MP3 and encoding a new one, which is inaudible in a single pass at 192 kbps or higher. Export as WAV if you plan to keep editing afterwards.',
+  },
+  {
+    q: 'How do I make the opposite version?',
+    a: 'Slowing a track down and dropping its pitch is the slowed and reverb style, which has its own page here. Some people call the pure slowed-down version daycore. It is the same operation with a rate below 1, and the slowed and reverb tool adds the room sound that usually goes with it.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Download">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Nightcore rate</span>
+        <span class="hint">Speed and pitch move together — that is the effect.</span>
+      </div>
+
+      <div class="field controls__full">
+        <label class="label" for="rate">
+          Rate
+          <span class="label__value tnum" data-out="rate">1.25x</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="rate"
+            data-control="rate"
+            type="range"
+            min="1.15"
+            max="1.45"
+            step="0.01"
+            value="1.25"
+          />
+          <input
+            class="num"
+            data-control="rate-num"
+            type="number"
+            min="1.15"
+            max="1.45"
+            step="0.01"
+            value="1.25"
+            aria-label="Nightcore rate multiplier"
+          />
+        </div>
+      </div>
+
+      <div class="field controls__full">
+        <span class="label" id="nc-presets">Presets</span>
+        <div class="seg" role="group" aria-labelledby="nc-presets">
+          <button type="button" class="seg__btn" data-preset="1.15" aria-pressed="false">Subtle</button>
+          <button type="button" class="seg__btn" data-preset="1.25" aria-pressed="true">Classic</button>
+          <button type="button" class="seg__btn" data-preset="1.4" aria-pressed="false">Hyper</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="label">
+          Pitch rise
+          <span class="label__value tnum" data-out="pitch">+3.9 semitones</span>
+        </span>
+        <span class="hint">Twelve semitones would be a full octave.</span>
+      </div>
+
+      <div class="field">
+        <span class="label">
+          New length
+          <span class="label__value tnum" data-out="length">—</span>
+        </span>
+        <span class="hint" data-out="length-hint">Load a track to see the new running time.</span>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>Where nightcore came from</h2>
+    <p>
+      The name belongs to a Norwegian duo. In 2002 two students, Thomas S.
+      Nilsen and Steffen Ojala Søderholm, put together a project called Nightcore
+      and released a set of eurodance tracks they had sped up and pitched up.
+      It was a school assignment as much as a release. The files circulated, the
+      idea outlived the project, and by the late 2000s "nightcore" had stopped
+      meaning that duo and started meaning the treatment itself: take a song,
+      run it roughly a quarter faster, let the voices climb, upload it over a
+      still image.
+    </p>
+    <p>
+      For a long stretch of YouTube history that was one of the most reliably
+      popular things you could post. The conventions hardened — anime artwork, a
+      static frame, the full track rather than an excerpt — and the sound spread
+      well past the eurodance it started with. The recent wave of official
+      "sped up" versions on streaming services is the same operation with the
+      dial turned down and a mastering engineer involved.
+    </p>
+
+    <h2>Why speeding up raises the pitch</h2>
+    <p>
+      A recording is a list of sample values plus a rate at which to read them
+      back. Read the list faster and every waveform cycle completes sooner, so
+      every frequency in the file rises by exactly the same ratio. This is not a
+      side effect to be corrected; it is what a record played at the wrong speed
+      has always done, and it is the entire sound of nightcore.
+    </p>
+    <p>
+      The amount is easy to work out. Pitch is logarithmic, so the rise in
+      semitones is twelve times the base-two logarithm of the rate. At 1.15x that
+      is about 2.4 semitones. At 1.25x it is 3.9, a shade under a major third. At
+      1.4x it is 5.8, most of a perfect fourth. Doubling the speed would be a
+      full octave, which is why anything past about 1.5x stops sounding like a
+      faster version of the song and starts sounding like a different recording
+      altogether.
+    </p>
+    <p>
+      The other thing that moves is the formants — the fixed resonances of the
+      singer's throat and mouth that tell your ear how big the person is. In a
+      real voice those stay put when the note changes. Here they climb with
+      everything else, and your ear reads the result as a smaller, younger
+      singer. That impression is a large part of why the style reads the way it
+      does, and it is exactly what a pitch-preserving stretch would remove.
+    </p>
+
+    <h2>Choosing a rate</h2>
+    <p>
+      Start at 1.25x. It is the centre of the tradition and it works on most
+      material without any thought. Move down towards 1.15x when the vocal is
+      already high or the song is busy, because both make the effect land harder
+      than the number suggests. Move up towards 1.4x for a track that was slow to
+      begin with, or when you want the result to be unmistakably processed.
+    </p>
+    <p>
+      Two things go wrong at high rates. The bass thins out, because the kick and
+      the low synths move up into the range where they have less weight, and the
+      percussion starts to sound brittle as cymbals shift into the top of the
+      spectrum. If a track sounds thin at 1.4x, come back to 1.3x and add a
+      little low end with the bass booster rather than fighting it here. If you
+      need a rate outside the range on this page, the speed changer covers 0.25x
+      to 4x with the same coupled behaviour.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { changeSpeed } from '../lib/audio/dsp';
+  import { clamp, duration, pct } from '../lib/format';
+
+  let sourceDuration = 0;
+  let wired = false;
+
+  function rateOf(): number {
+    return clamp(tool?.value('rate', 1.25) ?? 1.25, 1.15, 1.45);
+  }
+
+  const tool = createTool({
+    suffix: 'nightcore',
+    defaultFormat: 'mp3',
+
+    onReady(ctx, runtime) {
+      sourceDuration = ctx.buffer.duration;
+      const root = runtime.root;
+
+      const range = root.querySelector<HTMLInputElement>('[data-control="rate"]');
+      const num = root.querySelector<HTMLInputElement>('[data-control="rate-num"]');
+      const rateOut = root.querySelector<HTMLElement>('[data-out="rate"]');
+      const pitchOut = root.querySelector<HTMLElement>('[data-out="pitch"]');
+      const lengthOut = root.querySelector<HTMLElement>('[data-out="length"]');
+      const lengthHint = root.querySelector<HTMLElement>('[data-out="length-hint"]');
+      const presets = root.querySelectorAll<HTMLButtonElement>('[data-preset]');
+      if (!range) return;
+
+      const paint = (): void => {
+        const rate = rateOf();
+        range.style.setProperty('--pct', `${pct(rate, 1.15, 1.45)}%`);
+        if (rateOut) rateOut.textContent = `${rate.toFixed(2)}x`;
+        if (pitchOut) {
+          pitchOut.textContent = `+${(12 * Math.log2(rate)).toFixed(1)} semitones`;
+        }
+        if (lengthOut) lengthOut.textContent = duration(sourceDuration / rate);
+        if (lengthHint) lengthHint.textContent = `Was ${duration(sourceDuration)}.`;
+        presets.forEach((preset) => {
+          preset.setAttribute(
+            'aria-pressed',
+            String(Math.abs(Number(preset.dataset.preset) - rate) < 0.001)
+          );
+        });
+      };
+
+      const commit = (): void => {
+        paint();
+        runtime.refreshPreview();
+      };
+
+      if (wired) {
+        paint();
+        return;
+      }
+      wired = true;
+
+      // Readouts follow the drag; the resample waits for the pointer to lift,
+      // so a long track does not stutter under the finger.
+      range.addEventListener('input', () => {
+        if (num) num.value = range.value;
+        paint();
+      });
+      range.addEventListener('change', commit);
+
+      num?.addEventListener('input', () => {
+        const typed = Number(num.value);
+        if (num.value.trim() === '' || !Number.isFinite(typed)) return;
+        range.value = String(clamp(typed, 1.15, 1.45));
+        paint();
+      });
+      num?.addEventListener('change', () => {
+        if (num) num.value = range.value;
+        commit();
+      });
+
+      presets.forEach((preset) => {
+        preset.addEventListener('click', () => {
+          range.value = preset.dataset.preset ?? '1.25';
+          if (num) num.value = range.value;
+          commit();
+        });
+      });
+
+      paint();
+    },
+
+    // Resampling is one cheap pass, so the transport plays the real output.
+    preview(ctx) {
+      return changeSpeed(ctx.buffer, rateOf());
+    },
+
+    process(ctx) {
+      return changeSpeed(ctx.buffer, rateOf());
+    },
+  });
+</script>

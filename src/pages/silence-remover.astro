@@ -1,0 +1,325 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('silence-remover');
+
+const steps = [
+  'Drop the recording onto the page. It is scanned where it sits, so an hour-long interview costs you the decode and nothing else.',
+  'Set the threshold — the level below which audio counts as silence. The summary underneath immediately tells you how many gaps were found at that setting.',
+  'Raise the minimum gap length until the tool stops cutting the natural beats between words, and raise the padding until speech stops sounding clipped at the joins.',
+  'When the summary says the right thing, pick a format and download. The audio that survives is untouched — only the gaps are gone.',
+];
+
+const faq = [
+  {
+    q: 'What does the threshold number actually mean?',
+    a: 'It is dBFS: decibels relative to full scale, where 0 is the loudest a digital file can be and everything real sits below it. Your recording has a noise floor — the level of the room and the microphone when nobody is talking — and the threshold has to sit above it. A quiet indoor room floors out around -50 dBFS, a phone in a cafe closer to -35.',
+  },
+  {
+    q: 'It is cutting the beginning off words. How do I stop that?',
+    a: 'Raise the padding. Consonants like t, k and p start with almost no energy before the burst arrives, so a cut placed at the exact moment the level crosses the threshold lands inside the word. Padding of 0.08 seconds is enough for most voices; 0.15 is safer for fast speakers and sibilant microphones.',
+  },
+  {
+    q: 'How is this different from a noise gate?',
+    a: 'A gate turns the level down during quiet passages but leaves the time in place, so a two-second pause stays two seconds long and merely becomes more silent. This deletes the pause entirely, so the file gets shorter. If you want the dead air quieter rather than gone, a gate is what you want and this is not it.',
+  },
+  {
+    q: 'Nothing was removed, even though there are obvious pauses.',
+    a: 'Two settings have to agree before a stretch is cut: it must be quieter than the threshold and it must last at least the minimum gap. If your pauses are one second and the minimum is two, nothing qualifies. If your room tone is -40 and the threshold is -50, nothing qualifies either. The summary tells you which of the two is failing, because it reports what was found before padding is applied.',
+  },
+  {
+    q: 'Will it work on music?',
+    a: 'Rarely, and usually not in a way you want. Music has a reverb tail, a bass note ringing out, or a sustained pad that keeps the level above any sensible threshold, so nothing is detected. Where it does trigger — between movements, or in a sparse acoustic recording — it will happily remove the rest the composer wrote in. Use the trimmer for music.',
+  },
+  {
+    q: 'Does removing silence change the pitch or speed of what is left?',
+    a: 'No. Nothing is time-stretched or resampled. The surviving audio is copied out sample for sample and the pieces are butted together with a five-millisecond crossfade, which is short enough to be inaudible and long enough to stop the joins from clicking.',
+  },
+  {
+    q: 'Can it get rid of background hiss?',
+    a: 'No — hiss is not silence, it is a continuous signal, and this tool only deletes time. What it does do is remove the passages where the hiss is all you can hear, which makes a noisy recording feel cleaner without touching the noise itself. For actual hiss reduction you want a noise reduction pass, or a high-pass filter if the problem is low rumble.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Download trimmed audio">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Detection</span>
+        <span class="hint">A stretch is cut only if it is quiet enough and long enough.</span>
+      </div>
+
+      <div class="field">
+        <label class="label" for="sr-threshold">
+          Counts as silence below
+          <span class="label__value" data-out="threshold">-45 dB</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="sr-threshold"
+            data-control="threshold"
+            type="range"
+            min="-70"
+            max="-20"
+            step="1"
+            value="-45"
+          />
+          <input
+            class="num"
+            data-control="threshold-num"
+            type="number"
+            min="-70"
+            max="-20"
+            step="1"
+            value="-45"
+            aria-label="Silence threshold in decibels relative to full scale"
+          />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="sr-min">
+          Minimum gap length
+          <span class="label__value" data-out="min">0.40 s</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="sr-min"
+            data-control="min"
+            type="range"
+            min="0.1"
+            max="3"
+            step="0.05"
+            value="0.4"
+          />
+          <input
+            class="num"
+            data-control="min-num"
+            type="number"
+            min="0.1"
+            max="3"
+            step="0.05"
+            value="0.4"
+            aria-label="Minimum gap length in seconds"
+          />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="sr-pad">
+          Padding kept each side
+          <span class="label__value" data-out="pad">0.08 s</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="sr-pad"
+            data-control="pad"
+            type="range"
+            min="0"
+            max="0.5"
+            step="0.01"
+            value="0.08"
+          />
+          <input
+            class="num"
+            data-control="pad-num"
+            type="number"
+            min="0"
+            max="0.5"
+            step="0.01"
+            value="0.08"
+            aria-label="Padding kept on each side of a gap, in seconds"
+          />
+        </div>
+      </div>
+
+      <div class="note note--info controls__full" data-report hidden>
+        <div class="note__body" data-report-text></div>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>What the tool calls silence</h2>
+    <p>
+      Silence in a recording is almost never silence. Even a treated room has a
+      noise floor — the microphone's self-noise, the air handling, traffic through a
+      wall — so the passage you think of as "nothing" still carries a signal. That is
+      why the control is a threshold rather than a switch. The file is measured in
+      20-millisecond windows, each window's RMS level is compared against your
+      number, and anything below it is a candidate for removal.
+    </p>
+    <p>
+      Twenty milliseconds is a deliberate choice. Shorter windows would trip on the
+      moments a normal waveform passes through zero, which happens hundreds of times
+      a second in ordinary speech. Longer windows would smear over a real breath and
+      miss it. At 20 ms the measurement tracks the envelope of the sound rather than
+      its individual cycles, which is what a listener hears anyway.
+    </p>
+    <p>
+      The second condition — minimum gap length — is what separates a pause from a
+      rhythm. Ordinary speech contains dozens of sub-200-millisecond silences per
+      minute, between words and inside stop consonants, and removing them makes a
+      person sound like they are being played back wrong. Setting the minimum around
+      0.4 seconds ignores the rhythm of speech and catches only the pauses a listener
+      would also notice.
+    </p>
+
+    <h2>Why padding matters more than it looks</h2>
+    <p>
+      When a stretch is removed, the cut is pulled inward by the padding amount at
+      both ends, so some of the quiet stays. This is not politeness; it is a fix for
+      a specific artefact. Plosives and fricatives — p, t, k, s — begin with a very
+      low-energy approach before the burst, and a cut placed exactly where the level
+      crosses the threshold slices into that approach. The result sounds like the
+      speaker is being interrupted by their own recording.
+    </p>
+    <p>
+      Padding also protects the natural cadence of speech. Removing every millisecond
+      of dead air produces a person who never breathes, which listeners find
+      exhausting long before they can say why. Leaving 80 to 150 milliseconds either
+      side keeps the impression of a pause while removing its length.
+    </p>
+
+    <h2>When not to use this</h2>
+    <p>
+      Anything where the silence is the content. Music uses rests structurally, and a
+      tool that cannot tell a rest from dead air will flatten a piece. Recordings
+      intended as evidence or as a record of a meeting should not have time removed
+      at all — the edit is invisible in the result, which is exactly the problem.
+    </p>
+    <p>
+      And if the goal is a shorter file rather than a tighter one, this is an
+      inefficient way to get there. Removing 90 seconds of silence from a 40-minute
+      episode saves about 3 percent of the file. Dropping the bitrate or converting
+      to a more efficient format saves far more, and does not change the edit.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { findSilence, removeSilence } from '../lib/audio/dsp';
+  import { duration as fmtDuration } from '../lib/format';
+
+  const tool = createTool({
+    suffix: 'tightened',
+    defaultFormat: 'mp3',
+
+    onReady(ctx, runtime) {
+      const root = runtime.root;
+      const report = root.querySelector<HTMLElement>('[data-report]');
+      const reportText = root.querySelector<HTMLElement>('[data-report-text]');
+
+      /**
+       * Mirrors the arithmetic removeSilence performs, so the estimate can be
+       * shown on every slider move without allocating a whole new buffer.
+       */
+      const measure = (): void => {
+        if (!report || !reportText) return;
+
+        const threshold = runtime.value('threshold', -45);
+        const minSec = runtime.value('min', 0.4);
+        const padSec = runtime.value('pad', 0.08);
+        const total = ctx.buffer.duration;
+        const regions = findSilence(ctx.buffer, threshold, minSec);
+
+        if (regions.length === 0) {
+          reportText.textContent =
+            `No stretch is both quieter than ${threshold} dB and longer than ${minSec.toFixed(2)} s. ` +
+            'Move the threshold up toward -20 dB, or shorten the minimum gap.';
+          report.hidden = false;
+          return;
+        }
+
+        let removed = 0;
+        let cut = 0;
+        let cursor = 0;
+        for (const region of regions) {
+          const start = Math.max(cursor, region.start + padSec);
+          const end = Math.min(total, region.end - padSec);
+          if (end <= start) continue;
+          removed += end - start;
+          cursor = end;
+          cut += 1;
+        }
+
+        if (cut === 0) {
+          reportText.textContent =
+            `${regions.length} gap${regions.length === 1 ? '' : 's'} found, but the padding is wide ` +
+            'enough to keep all of them. Lower the padding to start removing time.';
+          report.hidden = false;
+          return;
+        }
+
+        const share = Math.round((removed / total) * 100);
+        reportText.textContent =
+          `${regions.length} gap${regions.length === 1 ? '' : 's'} found. ` +
+          `About ${fmtDuration(removed)} comes out — ${share}% of the file — ` +
+          `leaving ${fmtDuration(total - removed)} of ${fmtDuration(total)}.`;
+        report.hidden = false;
+      };
+
+      // The scan reads every sample, so it must not run on every drag frame.
+      let timer = 0;
+      const schedule = (): void => {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(measure, 160);
+      };
+
+      const bindSlider = (name: string, format: (value: number) => string): void => {
+        const slider = root.querySelector<HTMLInputElement>(`[data-control="${name}"]`);
+        const num = root.querySelector<HTMLInputElement>(`[data-control="${name}-num"]`);
+        const out = root.querySelector<HTMLElement>(`[data-out="${name}"]`);
+        if (!slider) return;
+
+        const paint = (): void => {
+          const min = Number(slider.min);
+          const max = Number(slider.max);
+          const span = max - min || 1;
+          slider.style.setProperty('--pct', `${((Number(slider.value) - min) / span) * 100}%`);
+          if (out) out.textContent = format(Number(slider.value));
+        };
+
+        slider.addEventListener('input', () => {
+          if (num) num.value = slider.value;
+          paint();
+          schedule();
+        });
+
+        num?.addEventListener('input', () => {
+          slider.value = num.value;
+          paint();
+          schedule();
+        });
+
+        num?.addEventListener('change', () => {
+          if (num) num.value = slider.value;
+        });
+
+        paint();
+      };
+
+      bindSlider('threshold', (value) => `${value} dB`);
+      bindSlider('min', (value) => `${value.toFixed(2)} s`);
+      bindSlider('pad', (value) => `${value.toFixed(2)} s`);
+
+      measure();
+    },
+
+    process(ctx) {
+      return removeSilence(
+        ctx.buffer,
+        tool?.value('threshold', -45) ?? -45,
+        tool?.value('min', 0.4) ?? 0.4,
+        tool?.value('pad', 0.08) ?? 0.08
+      );
+    },
+  });
+</script>

@@ -1,0 +1,341 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('audio-joiner');
+
+const steps = [
+  'Drop every file you want to merge onto the page in one go. They are decoded on your machine — nothing is sent anywhere, and there is no queue to wait in.',
+  'Put them in the order you want. Drag a row by its handle, or use the up and down buttons on each row if you would rather not drag. Row one plays first.',
+  'Set a gap if you want a pause between tracks. Zero joins them with no space at all, which is what you want for segments of one continuous recording.',
+  'Pick an output format and download. The merged file is written from the decoded samples, so the parts line up exactly where the list says they will.',
+];
+
+const faq = [
+  {
+    q: 'Can I reorder the files after they load?',
+    a: 'Yes — that is the point of the list. Drag a row by the handle on the left, or move it with the up and down buttons, which work with a keyboard. The order you see top to bottom is the order in the exported file, and nothing is committed until you press download.',
+  },
+  {
+    q: 'What happens if my files have different sample rates or channel counts?',
+    a: 'They are reconciled before joining. Everything is brought up to the highest sample rate present and the widest channel count present, so a 44.1 kHz mono voice memo merged onto a 48 kHz stereo track is resampled up and copied to both channels. The better file is never downgraded to match the worse one, and a mono file never silently loses a channel.',
+  },
+  {
+    q: 'Why is there a click where two tracks meet?',
+    a: 'A join with no gap is a hard edit. If one file ends mid-waveform and the next starts somewhere else, the signal jumps in a single sample and you hear a tick. Files exported properly end on silence and this never comes up. If yours do not, add a small gap, run them through the fade tool first, or use the crossfade joiner instead.',
+  },
+  {
+    q: 'Can I add more files after the first batch has loaded?',
+    a: 'Not to the existing list — dropping files again starts over with the new set. Select everything you want in one go from the file picker, or drag them all in together. Reordering afterwards is free, so the order you pick them in does not matter.',
+  },
+  {
+    q: 'How many files can I merge, and how long can the result be?',
+    a: 'There is no count limit in the tool. The real ceiling is memory: decoded audio costs about 21 MB per minute of 44.1 kHz stereo, and every file plus the merged result has to be held at once. An hour of total material is comfortable on a laptop; a phone will start to struggle well before that.',
+  },
+  {
+    q: 'Does merging MP3 files re-encode them?',
+    a: 'It has to. There is no way to concatenate MP3 frames from different encoders and different settings into one valid stream, so the files are decoded to raw audio, joined, and encoded once. That is a single generation of loss, which at 192 kbps and above nobody can hear. Export WAV or FLAC if you plan to keep editing.',
+  },
+  {
+    q: 'Is the gap real silence, or a fade?',
+    a: 'Real silence — digital zero, inserted between tracks. It does not soften anything. If a track ends abruptly, a gap makes the abruptness more obvious rather than less, because now there is nothing to distract from it. Fade the ends first if that is the problem you are solving.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell
+    tool={tool}
+    multiple
+    action="Download merged file"
+    dropTitle="Drop the files you want to merge"
+    dropHint="Choose them all at once — you can reorder them after they load. Nothing is uploaded."
+  >
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Order</span>
+        <span class="hint" data-total>Drag a row, or use the arrows.</span>
+      </div>
+
+      <div class="field controls__full">
+        <div class="filelist" data-list role="list" aria-label="Files to merge, in play order"></div>
+        <p class="hint">
+          The player above previews the first file only. The merged result is built when you
+          download.
+        </p>
+      </div>
+
+      <div class="field">
+        <label class="label" for="join-gap">
+          Gap between tracks
+          <span class="label__value" data-out="gap">0.0 s</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="join-gap"
+            data-control="gap"
+            type="range"
+            min="0"
+            max="5"
+            step="0.1"
+            value="0"
+          />
+          <input
+            class="num"
+            data-control="gap-num"
+            type="number"
+            min="0"
+            max="5"
+            step="0.1"
+            value="0"
+            aria-label="Gap between tracks in seconds"
+          />
+        </div>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>What joining actually does</h2>
+    <p>
+      When two audio files are joined here, nothing clever happens. The samples of
+      the second file are written into memory directly after the last sample of the
+      first, and the result is saved as one file. There is no analysis, no attempt
+      to match keys or tempos, no re-timing. That is why it finishes in about the
+      time it takes to press the button, and it is also why the output is exactly
+      as good as the material you fed in.
+    </p>
+    <p>
+      The one complication is files that disagree about their format. A 48 kHz
+      stereo export and a 44.1 kHz mono voice memo cannot simply be placed end to
+      end, because their samples do not represent the same slices of time and one
+      of them has half as many channels. Everything is brought to the highest
+      sample rate and the widest channel count present before the join, so the
+      voice memo is resampled upward and copied across both channels. The
+      alternative — matching downward — would quietly degrade your best source to
+      accommodate your worst, and that is the wrong default.
+    </p>
+
+    <h2>Order, gaps and the seam itself</h2>
+    <p>
+      A join with no gap is a hard edit. If the first file ends mid-waveform at,
+      say, 40 percent of full scale and the next one starts at minus 30 percent,
+      the speaker is asked to make that jump in the space of one sample. Your ear
+      registers it as a tick. Files that were exported properly end on silence and
+      this never comes up; files that were themselves cut out of something bigger
+      very often do.
+    </p>
+    <p>
+      Gap conventions are worth knowing because they are load-bearing. Roughly two
+      seconds between album tracks reads as deliberate. One to two seconds between
+      audiobook or podcast chapters gives a listener time to register that
+      something changed. Between two halves of a single continuous take, any gap at
+      all sounds like a mistake — join those at zero and, if there is a click, fix
+      the click rather than papering over it with silence.
+    </p>
+
+    <h2>One encode, not one per file</h2>
+    <p>
+      Every source is decoded to raw samples first, joined in that raw form, and
+      encoded once at the end. Merging five MP3s therefore does not stack five
+      generations of MP3 damage onto the result. Each input arrives carrying
+      whatever loss it already had, the join adds none, and the export adds exactly
+      one more pass. At 192 kbps or higher that pass is inaudible to almost
+      everyone.
+    </p>
+    <p>
+      If this merge is one step of several — say you plan to normalize the result,
+      or trim the front — take WAV or FLAC out of here instead. Both are lossless,
+      so the intermediate steps cost nothing, and you encode to MP3 once at the very
+      end. FLAC is roughly half the size of WAV for identical audio, which matters
+      when the merged file is an hour long.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { concat, padSilence } from '../lib/audio/dsp';
+  import { duration as fmtDuration } from '../lib/format';
+
+  /** Indices into ctx.buffers. The buffer array is fixed; this is the order. */
+  let order: number[] = [];
+  let names: string[] = [];
+  let lengths: number[] = [];
+
+  const tool = createTool({
+    suffix: 'merged',
+    multiple: true,
+    defaultFormat: 'mp3',
+
+    onReady(ctx, runtime) {
+      const root = runtime.root;
+      const list = root.querySelector<HTMLElement>('[data-list]');
+      const totalOut = root.querySelector<HTMLElement>('[data-total]');
+      if (!list) return;
+
+      order = ctx.buffers.map((_, index) => index);
+      names = ctx.files.map((file, index) => file?.name ?? `Track ${index + 1}`);
+      lengths = ctx.buffers.map((buffer) => buffer.duration);
+
+      const showTotal = (): void => {
+        if (!totalOut) return;
+        const gap = runtime.value('gap', 0);
+        const sum = lengths.reduce((total, value) => total + value, 0);
+        const spacing = gap * Math.max(0, order.length - 1);
+        totalOut.textContent =
+          order.length === 1
+            ? 'One file — add more to merge them.'
+            : `${order.length} files · ${fmtDuration(sum + spacing)} total`;
+      };
+
+      /** Rebuilds the list. Focus is restored by the caller that moved a row. */
+      const draw = (): void => {
+        list.textContent = '';
+
+        order.forEach((source, position) => {
+          const row = document.createElement('div');
+          row.className = 'filelist__item';
+          row.setAttribute('role', 'listitem');
+          row.draggable = true;
+          row.dataset.pos = String(position);
+
+          const grip = document.createElement('span');
+          grip.className = 'filelist__grip';
+          grip.setAttribute('aria-hidden', 'true');
+          grip.textContent = '≡';
+
+          const idx = document.createElement('span');
+          idx.className = 'filelist__idx';
+          idx.textContent = String(position + 1);
+
+          const name = document.createElement('span');
+          name.className = 'filelist__name';
+          name.textContent = names[source] ?? '';
+          name.title = names[source] ?? '';
+
+          const dur = document.createElement('span');
+          dur.className = 'filelist__dur';
+          dur.textContent = fmtDuration(lengths[source] ?? 0);
+
+          row.append(grip, idx, name, dur);
+
+          const arrow = (direction: 'up' | 'down'): HTMLButtonElement => {
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'btn btn--ghost btn--sm btn--icon';
+            button.dataset.move = direction;
+            button.textContent = direction === 'up' ? '↑' : '↓';
+            button.setAttribute(
+              'aria-label',
+              `Move ${names[source] ?? 'track'} ${direction}`
+            );
+            button.disabled =
+              direction === 'up' ? position === 0 : position === order.length - 1;
+            button.addEventListener('click', () => {
+              move(position, direction === 'up' ? position - 1 : position + 1, direction);
+            });
+            return button;
+          };
+
+          row.append(arrow('up'), arrow('down'));
+
+          row.addEventListener('dragstart', (event) => {
+            row.dataset.dragging = 'true';
+            event.dataTransfer?.setData('text/plain', String(position));
+            if (event.dataTransfer) event.dataTransfer.effectAllowed = 'move';
+          });
+
+          row.addEventListener('dragend', () => {
+            delete row.dataset.dragging;
+          });
+
+          row.addEventListener('dragover', (event) => {
+            event.preventDefault();
+            if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+          });
+
+          row.addEventListener('drop', (event) => {
+            event.preventDefault();
+            // The page-wide file drop handler must not see an internal drag.
+            event.stopPropagation();
+            const from = Number(event.dataTransfer?.getData('text/plain'));
+            if (!Number.isInteger(from)) return;
+            move(from, position);
+          });
+
+          list.append(row);
+        });
+
+        showTotal();
+      };
+
+      /** Moves a row and keeps keyboard focus on the button that did it. */
+      const move = (from: number, to: number, focus?: 'up' | 'down'): void => {
+        if (to < 0 || to >= order.length || from === to) return;
+        const [moved] = order.splice(from, 1);
+        order.splice(to, 0, moved);
+        draw();
+
+        if (!focus) return;
+        const row = list.querySelector<HTMLElement>(`[data-pos="${to}"]`);
+        const wanted = row?.querySelector<HTMLButtonElement>(`[data-move="${focus}"]`);
+        if (wanted && !wanted.disabled) {
+          wanted.focus();
+          return;
+        }
+        // Reaching an end disables that arrow; land on the other one instead.
+        const other = focus === 'up' ? 'down' : 'up';
+        row?.querySelector<HTMLButtonElement>(`[data-move="${other}"]`)?.focus();
+      };
+
+      draw();
+
+      const gap = root.querySelector<HTMLInputElement>('[data-control="gap"]');
+      const gapNum = root.querySelector<HTMLInputElement>('[data-control="gap-num"]');
+      const gapOut = root.querySelector<HTMLElement>('[data-out="gap"]');
+
+      const paintGap = (): void => {
+        if (!gap) return;
+        const value = Number(gap.value);
+        gap.style.setProperty('--pct', `${(value / 5) * 100}%`);
+        if (gapOut) gapOut.textContent = `${value.toFixed(1)} s`;
+        showTotal();
+      };
+
+      gap?.addEventListener('input', () => {
+        if (gapNum) gapNum.value = gap.value;
+        paintGap();
+      });
+
+      gapNum?.addEventListener('input', () => {
+        if (gap) gap.value = gapNum.value;
+        paintGap();
+      });
+
+      gapNum?.addEventListener('change', () => {
+        if (gap && gapNum) gapNum.value = gap.value;
+      });
+
+      paintGap();
+    },
+
+    process(ctx) {
+      const gap = tool?.value('gap', 0) ?? 0;
+      const source = order.length > 0 ? order : ctx.buffers.map((_, index) => index);
+      const ordered = source
+        .map((index) => ctx.buffers[index])
+        .filter((buffer): buffer is AudioBuffer => Boolean(buffer));
+
+      if (gap <= 0) return concat(ordered);
+
+      // Silence goes between tracks, so the last one keeps no trailing pad.
+      const spaced = ordered.map((buffer, index) =>
+        index < ordered.length - 1 ? padSilence(buffer, 0, gap) : buffer
+      );
+      return concat(spaced);
+    },
+  });
+</script>

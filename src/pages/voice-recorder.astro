@@ -1,0 +1,787 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import Icon from '../components/Icon.astro';
+import { getTool, relatedTools } from '../data/tools';
+import { PRIVACY_LINE } from '../consts';
+
+const tool = getTool('voice-recorder');
+const chain = relatedTools(tool.slug).slice(0, 3);
+
+const steps = [
+  'Click Start recording. The browser asks for microphone permission at that moment and not before — the page does not touch your microphone on load, so nothing is listening until you decide it should be.',
+  'Watch the level meter while you talk. Aim for it to sit around two-thirds of the way across on your loudest phrases; a meter that never moves means the wrong input is selected, and one pinned at the far end is clipping.',
+  'Pause and resume as often as you need. The timer counts recorded time only, so a pause does not appear in the finished file.',
+  'Press Stop. The recording is drawn as a waveform you can play back, scrub and check before you commit to it.',
+  'Download it as the original WebM, as MP3, or as WAV — or hand it straight to the trimmer or the silence remover without saving anything first.',
+];
+
+const faq = [
+  {
+    q: 'Where is the recording stored?',
+    a: 'In this tab, in memory, and nowhere else. There is no upload, no account and no server copy, which also means that closing or reloading the tab destroys the recording permanently. Download it before you navigate away.',
+  },
+  {
+    q: 'Why does the browser ask for permission every time?',
+    a: 'That is the browser, not the page. Chrome and Edge remember an allow decision per site over HTTPS; Firefox asks each session unless you tick "Remember this decision"; Safari asks per session by default and can be changed under Settings for This Website. Whichever it does, permission is requested only when you press the record button.',
+  },
+  {
+    q: 'Why is the recording a WebM file?',
+    a: 'WebM containing Opus is what Chrome, Edge and Firefox produce natively from the recording API — it is efficient, high quality at speech bitrates, and involves no re-encoding. Safari produces MP4 with AAC instead. The MP3 and WAV options here decode that original and re-encode it, which is why they take a moment longer.',
+  },
+  {
+    q: 'It says the microphone is in use by another application.',
+    a: 'Some apps take exclusive control of the input device — Zoom, Teams, Discord, OBS and most DAWs do this. Quit the other application entirely rather than just leaving the meeting, then try again. On Windows, check that no background app holds the device under Settings → Privacy → Microphone.',
+  },
+  {
+    q: 'Can it record system audio, or the other side of a call?',
+    a: 'No. The microphone API gives a page microphone input and nothing else, by design — a web page that could silently capture your speakers would be a serious security problem. To record something playing on your computer you need a loopback device such as BlackHole on macOS or VB-Cable on Windows, selected as your input.',
+  },
+  {
+    q: 'Is there a length limit?',
+    a: 'Not on the recording itself, which streams to compressed chunks and costs only a few megabytes an hour. The limit is playback: to draw the waveform and offer MP3 or WAV, the file has to be decoded into memory, and past roughly forty minutes on a phone or a couple of hours on a desktop that fails. If it does, the original file is still offered for download intact.',
+  },
+  {
+    q: 'Why does my voice sound processed or oddly quiet?',
+    a: 'Browsers apply echo cancellation, noise suppression and automatic gain control to a default microphone stream. Gain control in particular rides your level up and down, which is helpful on a call and audible on a recording. Speaking at a consistent distance of about 15 to 20 centimetres gives it less to do.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <div class="tool">
+    <div class="note note--error" role="alert" data-error hidden>
+      <div class="note__body">
+        <div class="note__title" data-error-title></div>
+        <div data-error-body></div>
+      </div>
+    </div>
+
+    <div class="stage" data-live-stage>
+      <div
+        style="display:flex; flex-direction:column; align-items:center; gap:var(--s4); padding:var(--s10) var(--s5)"
+      >
+        <div
+          class="tnum"
+          data-elapsed
+          style="font-size:var(--t-display); font-weight:700; line-height:1; letter-spacing:-0.03em; color:var(--stage-ink)"
+        >
+          0:00.00
+        </div>
+
+        <div style="width:100%; max-width:420px">
+          <div class="progress__track">
+            <div class="progress__bar" data-level style="width:0%"></div>
+          </div>
+        </div>
+
+        <div style="display:flex; gap:var(--s3); align-items:baseline">
+          <span class="hint" data-state aria-live="polite" style="color:var(--stage-ink-2)">
+            Nothing recorded yet
+          </span>
+          <span class="hint tnum" data-level-db style="color:var(--stage-ink-2)"></span>
+        </div>
+      </div>
+    </div>
+
+    <div
+      class="card"
+      style="display:flex; flex-direction:column; align-items:center; gap:var(--s4)"
+    >
+      <div style="display:flex; gap:var(--s3); flex-wrap:wrap; justify-content:center">
+        <button type="button" class="btn btn--solid btn--lg" data-mic>
+          <Icon name="microphone" size={18} />
+          Start recording
+        </button>
+
+        <button type="button" class="btn btn--quiet btn--lg" data-pause hidden>
+          <Icon name="pause" size={18} weight="fill" />
+          <span data-pause-label>Pause</span>
+        </button>
+
+        <button type="button" class="btn btn--danger btn--lg" data-stop hidden>
+          <Icon name="stop" size={18} weight="fill" />
+          Stop
+        </button>
+      </div>
+
+      <p class="privacy">
+        <Icon name="shield-check" size={15} />
+        {PRIVACY_LINE}
+      </p>
+    </div>
+
+    <div class="tool" data-result hidden>
+      <div class="filebar">
+        <Icon name="file-audio" size={22} class="filebar__icon" />
+        <div class="filebar__text">
+          <div class="filebar__name" data-rec-name></div>
+          <div class="filebar__meta" data-rec-meta></div>
+        </div>
+        <button type="button" class="btn btn--ghost btn--sm" data-discard>
+          <Icon name="x" size={16} />
+          <span class="visually-hidden">Discard this recording and start over</span>
+          <span aria-hidden="true">Discard</span>
+        </button>
+      </div>
+
+      <div class="note note--warn" data-decode-note hidden>
+        <div class="note__body">
+          <div class="note__title">Too long to open for playback</div>
+          <div>
+            The recording itself is fine and can be downloaded as it was
+            captured. It is only too large to decode into memory on this device,
+            which is what playback, MP3 and WAV all need. Download the original
+            and split it with the audio splitter if you need to edit it.
+          </div>
+        </div>
+      </div>
+
+      <div class="stage" data-playback>
+        <div class="stage__canvas-wrap" data-canvas-wrap>
+          <canvas data-canvas aria-label="Recording waveform" role="img"></canvas>
+          <div class="stage__playhead" data-playhead></div>
+        </div>
+
+        <div class="transport">
+          <button
+            type="button"
+            class="transport__btn"
+            data-play
+            aria-label="Play"
+            aria-pressed="false"
+          >
+            <span data-icon-play style="display:flex">
+              <Icon name="play" size={18} weight="fill" />
+            </span>
+            <span data-icon-pause style="display:none">
+              <Icon name="pause" size={18} weight="fill" />
+            </span>
+          </button>
+
+          <button
+            type="button"
+            class="transport__btn"
+            data-skip-start
+            aria-label="Jump to start"
+          >
+            <Icon name="skip-back" size={16} weight="fill" />
+          </button>
+
+          <div class="transport__time tnum" data-time>0:00.00 <span>/ 0:00.00</span></div>
+          <div class="transport__spacer"></div>
+        </div>
+      </div>
+
+      <div class="export">
+        <div class="field export__field">
+          <label class="label" for="rec-format">Format</label>
+          <select class="select" id="rec-format" data-rec-format>
+            <option value="original">Original (no re-encode)</option>
+            <option value="mp3">MP3</option>
+            <option value="wav">WAV</option>
+          </select>
+        </div>
+
+        <div class="field export__field" data-rec-quality-field hidden>
+          <label class="label" for="rec-quality">Quality</label>
+          <select class="select" id="rec-quality" data-rec-quality>
+            <option value="96">96 kbps</option>
+            <option value="128">128 kbps</option>
+            <option value="192" selected>192 kbps</option>
+            <option value="256">256 kbps</option>
+          </select>
+        </div>
+
+        <div class="export__spacer"></div>
+        <div class="export__size tnum" data-rec-size></div>
+
+        <button type="button" class="btn btn--solid btn--lg" data-rec-download>
+          <Icon name="download-simple" size={18} />
+          Download
+        </button>
+      </div>
+
+      {
+        chain.length > 0 && (
+          <div class="chain">
+            <span class="chain__label">Recorded. Clean it up?</span>
+            <div class="chain__links">
+              {chain.map((next) => (
+                <a class="btn btn--quiet btn--sm" href={`/${next.slug}`} data-hand-off>
+                  {next.name}
+                  <Icon name="arrow-right" size={14} />
+                </a>
+              ))}
+            </div>
+          </div>
+        )
+      }
+    </div>
+  </div>
+
+  <Fragment slot="about">
+    <h2>What the browser is actually doing</h2>
+    <p>
+      Pressing record asks the browser for a microphone stream. The browser, not
+      this page, decides whether to grant it — which is why the permission
+      prompt is drawn by the browser chrome, why a page cannot suppress it, and
+      why the recording indicator in the tab strip stays lit for as long as the
+      stream is open. This page closes the stream the moment you press stop, so
+      that indicator goes out immediately.
+    </p>
+    <p>
+      The stream feeds two things at once. One branch goes to the recorder,
+      which encodes compressed chunks as it goes rather than holding raw audio,
+      so an hour of speech costs a few megabytes rather than several hundred.
+      The other goes to an analyser node that reads the raw waveform sixty times
+      a second purely to move the level meter — it is never connected to your
+      speakers, which is what stops the recording feeding back on itself.
+    </p>
+    <p>
+      Microphone access is also gated on a secure context. Over plain HTTP the
+      browser will not even offer the prompt, because an unencrypted page could
+      have been modified in transit by anyone between you and the server. HTTPS
+      or localhost, or no microphone.
+    </p>
+
+    <h2>Getting a level worth keeping</h2>
+    <p>
+      Recording levels are the single most common thing people get wrong, and
+      the mistake is almost always the same one: too quiet, then fixed
+      afterwards by turning it up. Amplifying a quiet recording amplifies the
+      room, the fan and the preamp hiss along with the voice, and none of that
+      can be separated out later.
+    </p>
+    <p>
+      Aim for the meter to reach around two-thirds on your loudest phrases and
+      to move visibly on quiet ones. Sit about 15 to 20 centimetres from the
+      microphone — close enough to dominate the room, far enough that plosives
+      do not thump. Speaking across the microphone rather than straight into it
+      helps with those too.
+    </p>
+    <p>
+      Note that a default browser microphone stream comes with echo
+      cancellation, noise suppression and automatic gain control applied before
+      the audio ever reaches the page. Gain control is the one you will notice:
+      it lifts quiet passages and pulls loud ones down, which flatters a video
+      call and can make a recording breathe unnaturally. Consistent distance and
+      a consistent voice give it less to correct.
+    </p>
+
+    <h2>What to do with the file afterwards</h2>
+    <p>
+      Keep the original if you only need to archive or send it. It is the actual
+      captured data with nothing re-encoded, and WebM with Opus is markedly
+      better than MP3 at speech bitrates. Choose MP3 when the recipient's
+      software is old or unknown, since it is the one format everything opens.
+      Choose WAV when the recording is going into an editor, because every
+      further edit then starts from lossless audio.
+    </p>
+    <p>
+      Most spoken recordings benefit from two quick passes before they go
+      anywhere: trimming the dead air at each end where you were reaching for
+      the mouse, and levelling the result so it plays back at a consistent
+      volume. Both are one click away below, and the recording is handed over
+      directly without you needing to save and re-open it.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { decodeFile, getAudioContext, resumeAudioContext } from '../lib/audio/decode';
+  import { Player } from '../lib/audio/player';
+  import { Waveform } from '../lib/audio/waveform';
+  import { exportAudio } from '../lib/audio/export';
+  import { saveBlob, stashForNextTool } from '../lib/files';
+  import { timecode, duration as fmtDuration, filesize } from '../lib/format';
+
+  const root = document.querySelector<HTMLElement>('[data-result]')?.closest('.tool');
+
+  const el = {
+    error: document.querySelector<HTMLElement>('[data-error]'),
+    errorTitle: document.querySelector<HTMLElement>('[data-error-title]'),
+    errorBody: document.querySelector<HTMLElement>('[data-error-body]'),
+    liveStage: document.querySelector<HTMLElement>('[data-live-stage]'),
+    elapsed: document.querySelector<HTMLElement>('[data-elapsed]'),
+    level: document.querySelector<HTMLElement>('[data-level]'),
+    levelDb: document.querySelector<HTMLElement>('[data-level-db]'),
+    state: document.querySelector<HTMLElement>('[data-state]'),
+    mic: document.querySelector<HTMLButtonElement>('[data-mic]'),
+    pause: document.querySelector<HTMLButtonElement>('[data-pause]'),
+    pauseLabel: document.querySelector<HTMLElement>('[data-pause-label]'),
+    stop: document.querySelector<HTMLButtonElement>('[data-stop]'),
+    result: document.querySelector<HTMLElement>('[data-result]'),
+    recName: document.querySelector<HTMLElement>('[data-rec-name]'),
+    recMeta: document.querySelector<HTMLElement>('[data-rec-meta]'),
+    discard: document.querySelector<HTMLButtonElement>('[data-discard]'),
+    decodeNote: document.querySelector<HTMLElement>('[data-decode-note]'),
+    playback: document.querySelector<HTMLElement>('[data-playback]'),
+    canvas: document.querySelector<HTMLCanvasElement>('[data-canvas]'),
+    canvasWrap: document.querySelector<HTMLElement>('[data-canvas-wrap]'),
+    playhead: document.querySelector<HTMLElement>('[data-playhead]'),
+    play: document.querySelector<HTMLButtonElement>('[data-play]'),
+    skipStart: document.querySelector<HTMLButtonElement>('[data-skip-start]'),
+    time: document.querySelector<HTMLElement>('[data-time]'),
+    format: document.querySelector<HTMLSelectElement>('[data-rec-format]'),
+    qualityField: document.querySelector<HTMLElement>('[data-rec-quality-field]'),
+    quality: document.querySelector<HTMLSelectElement>('[data-rec-quality]'),
+    size: document.querySelector<HTMLElement>('[data-rec-size]'),
+    download: document.querySelector<HTMLButtonElement>('[data-rec-download]'),
+  };
+
+  let stream: MediaStream | null = null;
+  let recorder: MediaRecorder | null = null;
+  let analyser: AnalyserNode | null = null;
+  let micSource: MediaStreamAudioSourceNode | null = null;
+  // Explicitly backed by ArrayBuffer, not ArrayBufferLike: the Web Audio
+  // typings reject a view that could sit on a SharedArrayBuffer.
+  let levelData: Uint8Array<ArrayBuffer> | null = null;
+
+  let chunks: Blob[] = [];
+  let recordedBlob: Blob | null = null;
+  let recordedBuffer: AudioBuffer | null = null;
+  let baseName = 'recording';
+
+  let accumulatedMs = 0;
+  let segmentStart = 0;
+  let running = false;
+  let paused = false;
+  let raf = 0;
+
+  let player: Player | null = null;
+  let waveform: Waveform | null = null;
+
+  // ---------- messaging ----------
+
+  function showError(title: string, body: string): void {
+    if (el.errorTitle) el.errorTitle.textContent = title;
+    if (el.errorBody) el.errorBody.textContent = body;
+    if (el.error) el.error.hidden = false;
+  }
+
+  function clearError(): void {
+    if (el.error) el.error.hidden = true;
+  }
+
+  function setState(text: string): void {
+    if (el.state) el.state.textContent = text;
+  }
+
+  /** Every way getUserMedia can refuse, with the fix that matches it. */
+  function describeMicFailure(error: unknown): { title: string; body: string } {
+    const name = error instanceof DOMException ? error.name : '';
+
+    if (name === 'NotAllowedError' || name === 'SecurityError') {
+      return {
+        title: 'Microphone access was blocked.',
+        body: 'The browser refused the request, either because permission was denied or because it was denied here before and remembered. Click the padlock or camera icon in the address bar, set Microphone to Allow, and reload the page. On macOS also check System Settings → Privacy & Security → Microphone and confirm your browser is listed.',
+      };
+    }
+    if (name === 'NotFoundError' || name === 'OverconstrainedError') {
+      return {
+        title: 'No microphone was found.',
+        body: 'The browser could not see any audio input device at all. Plug in a headset or an external microphone, or check your operating system sound settings to confirm an input exists, then try again.',
+      };
+    }
+    if (name === 'NotReadableError' || name === 'AbortError') {
+      return {
+        title: 'The microphone is in use by another application.',
+        body: 'Something else has taken exclusive control of the device — typically a video call, a recorder, or audio software. Quit that application completely, rather than just leaving the call, and try again.',
+      };
+    }
+    return {
+      title: 'Recording could not start.',
+      body: 'The browser refused the microphone without saying why. Reloading the page clears most transient causes; if it persists, try another browser.',
+    };
+  }
+
+  // ---------- level meter and timer ----------
+
+  function elapsedMs(): number {
+    if (!running || paused) return accumulatedMs;
+    return accumulatedMs + (performance.now() - segmentStart);
+  }
+
+  function tick(): void {
+    if (el.elapsed) el.elapsed.textContent = timecode(elapsedMs() / 1000);
+
+    if (analyser && levelData && !paused) {
+      analyser.getByteTimeDomainData(levelData);
+      let sum = 0;
+      for (let i = 0; i < levelData.length; i += 1) {
+        const centred = (levelData[i] - 128) / 128;
+        sum += centred * centred;
+      }
+      const rms = Math.sqrt(sum / levelData.length);
+      const db = rms > 0 ? 20 * Math.log10(rms) : -100;
+      // -60 dBFS to 0 across the bar: below that is room noise, not signal.
+      const pct = Math.max(0, Math.min(100, ((db + 60) / 60) * 100));
+      if (el.level) el.level.style.width = `${pct}%`;
+      if (el.levelDb) el.levelDb.textContent = db > -99 ? `${Math.round(db)} dBFS` : '';
+    }
+
+    raf = requestAnimationFrame(tick);
+  }
+
+  function stopTicking(): void {
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+    if (el.level) el.level.style.width = '0%';
+    if (el.levelDb) el.levelDb.textContent = '';
+  }
+
+  // ---------- recording ----------
+
+  function pickMimeType(): string {
+    const candidates = [
+      'audio/webm;codecs=opus',
+      'audio/webm',
+      'audio/ogg;codecs=opus',
+      'audio/mp4;codecs=mp4a.40.2',
+      'audio/mp4',
+    ];
+    for (const candidate of candidates) {
+      if (MediaRecorder.isTypeSupported(candidate)) return candidate;
+    }
+    return '';
+  }
+
+  function extensionFor(mime: string): string {
+    if (mime.includes('webm')) return 'webm';
+    if (mime.includes('ogg')) return 'ogg';
+    if (mime.includes('mp4') || mime.includes('m4a') || mime.includes('aac')) return 'm4a';
+    return 'bin';
+  }
+
+  function timestamp(): string {
+    const now = new Date();
+    const pad = (value: number): string => String(value).padStart(2, '0');
+    return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`;
+  }
+
+  async function startRecording(): Promise<void> {
+    clearError();
+
+    if (!window.isSecureContext) {
+      showError(
+        'This page needs a secure connection.',
+        'Browsers only release the microphone to pages served over HTTPS, or to localhost during development. Open the https:// version of this address and try again.'
+      );
+      return;
+    }
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      showError(
+        'This browser cannot record audio.',
+        'It does not provide the microphone recording APIs this page needs. Current versions of Chrome, Edge, Firefox and Safari all do — updating, or switching browser, will fix it.'
+      );
+      return;
+    }
+
+    setState('Waiting for microphone permission');
+
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (error) {
+      const described = describeMicFailure(error);
+      showError(described.title, described.body);
+      setState('Nothing recorded yet');
+      return;
+    }
+
+    const mimeType = pickMimeType();
+    try {
+      recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+    } catch {
+      releaseStream();
+      showError(
+        'Recording could not start.',
+        'The browser accepted the microphone but refused to open a recorder for it. Reload the page and try again.'
+      );
+      setState('Nothing recorded yet');
+      return;
+    }
+
+    chunks = [];
+    recorder.addEventListener('dataavailable', (event) => {
+      if (event.data.size > 0) chunks.push(event.data);
+    });
+    recorder.addEventListener('stop', () => void finalise());
+
+    // The analyser is deliberately never connected to the destination —
+    // routing the mic to the speakers would feed back.
+    await resumeAudioContext();
+    const audioCtx = getAudioContext();
+    micSource = audioCtx.createMediaStreamSource(stream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 1024;
+    levelData = new Uint8Array(analyser.fftSize);
+    micSource.connect(analyser);
+
+    // A timeslice means chunks arrive as we go rather than all at the end.
+    recorder.start(1000);
+
+    accumulatedMs = 0;
+    segmentStart = performance.now();
+    running = true;
+    paused = false;
+
+    if (el.result) el.result.hidden = true;
+    if (el.mic) el.mic.hidden = true;
+    if (el.pause) el.pause.hidden = false;
+    if (el.stop) el.stop.hidden = false;
+    setState('Recording');
+    stopTicking();
+    raf = requestAnimationFrame(tick);
+  }
+
+  function togglePause(): void {
+    if (!recorder || !running) return;
+
+    if (paused) {
+      recorder.resume();
+      segmentStart = performance.now();
+      paused = false;
+      if (el.pauseLabel) el.pauseLabel.textContent = 'Pause';
+      setState('Recording');
+    } else {
+      recorder.pause();
+      accumulatedMs += performance.now() - segmentStart;
+      paused = true;
+      if (el.pauseLabel) el.pauseLabel.textContent = 'Resume';
+      setState('Paused');
+      if (el.level) el.level.style.width = '0%';
+    }
+  }
+
+  function stopRecording(): void {
+    if (!recorder || !running) return;
+    if (!paused) accumulatedMs += performance.now() - segmentStart;
+    running = false;
+    paused = false;
+    setState('Preparing the recording');
+    recorder.stop();
+  }
+
+  function releaseStream(): void {
+    // Stopping every track is what turns the browser's recording indicator off.
+    stream?.getTracks().forEach((track) => track.stop());
+    stream = null;
+    micSource?.disconnect();
+    micSource = null;
+    analyser = null;
+    levelData = null;
+  }
+
+  async function finalise(): Promise<void> {
+    stopTicking();
+    const mimeType = recorder?.mimeType || 'audio/webm';
+    releaseStream();
+    recorder = null;
+
+    const blob = new Blob(chunks, { type: mimeType });
+    chunks = [];
+    recordedBlob = blob;
+    baseName = `recording-${timestamp()}`;
+
+    if (el.mic) el.mic.hidden = false;
+    if (el.pause) {
+      el.pause.hidden = true;
+      if (el.pauseLabel) el.pauseLabel.textContent = 'Pause';
+    }
+    if (el.stop) el.stop.hidden = true;
+    if (el.elapsed) el.elapsed.textContent = timecode(accumulatedMs / 1000);
+
+    if (blob.size === 0) {
+      showError(
+        'Nothing was recorded.',
+        'The microphone opened but produced no audio. Check that the right input is selected in your system sound settings and that it is not muted in hardware.'
+      );
+      setState('Nothing recorded yet');
+      return;
+    }
+
+    if (el.recName) el.recName.textContent = `${baseName}.${extensionFor(mimeType)}`;
+    if (el.result) el.result.hidden = false;
+
+    // Decoding is what playback, MP3 and WAV all need; a very long recording
+    // can exceed what the device will hold, and that must not lose the file.
+    recordedBuffer = null;
+    try {
+      const decoded = await decodeFile(blob);
+      recordedBuffer = decoded.buffer;
+    } catch {
+      recordedBuffer = null;
+    }
+
+    if (el.decodeNote) el.decodeNote.hidden = recordedBuffer !== null;
+    if (el.playback) el.playback.hidden = recordedBuffer === null;
+
+    for (const option of Array.from(el.format?.options ?? [])) {
+      if (option.value !== 'original') option.disabled = recordedBuffer === null;
+    }
+    if (recordedBuffer === null && el.format) el.format.value = 'original';
+    syncFormat();
+
+    const seconds = recordedBuffer ? recordedBuffer.duration : accumulatedMs / 1000;
+    if (el.recMeta) {
+      const parts = [fmtDuration(seconds), filesize(blob.size)];
+      if (recordedBuffer) {
+        parts.push(`${recordedBuffer.sampleRate / 1000} kHz`);
+        parts.push(recordedBuffer.numberOfChannels === 1 ? 'Mono' : 'Stereo');
+      }
+      el.recMeta.textContent = parts.join(' · ');
+    }
+
+    if (recordedBuffer) mountPlayback(recordedBuffer);
+    setState('Recorded. Press record again to replace it.');
+  }
+
+  // ---------- playback ----------
+
+  function setPlayButton(playing: boolean): void {
+    const button = el.play;
+    if (!button) return;
+    button.setAttribute('aria-pressed', String(playing));
+    button.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+    const playIcon = button.querySelector<HTMLElement>('[data-icon-play]');
+    const pauseIcon = button.querySelector<HTMLElement>('[data-icon-pause]');
+    if (playIcon) playIcon.style.display = playing ? 'none' : 'flex';
+    if (pauseIcon) pauseIcon.style.display = playing ? 'flex' : 'none';
+  }
+
+  function renderPlayhead(seconds: number, total: number): void {
+    if (el.playhead && total > 0) {
+      el.playhead.dataset.visible = 'true';
+      el.playhead.style.left = `${(seconds / total) * 100}%`;
+    }
+    if (el.time) {
+      el.time.textContent = '';
+      const head = document.createTextNode(`${timecode(seconds)} `);
+      const tail = document.createElement('span');
+      tail.textContent = `/ ${timecode(total)}`;
+      el.time.append(head, tail);
+    }
+  }
+
+  function mountPlayback(buffer: AudioBuffer): void {
+    if (el.canvas) {
+      if (!waveform) waveform = new Waveform(el.canvas);
+      waveform.setBuffer(buffer);
+      el.canvas.removeAttribute('data-enter');
+      void el.canvas.offsetWidth;
+      el.canvas.setAttribute('data-enter', 'true');
+    }
+
+    if (!player) {
+      player = new Player({
+        time: (seconds) => renderPlayhead(seconds, buffer.duration),
+        play: () => setPlayButton(true),
+        pause: () => setPlayButton(false),
+        ended: () => setPlayButton(false),
+      });
+    }
+    player.setBuffer(buffer);
+    renderPlayhead(0, buffer.duration);
+  }
+
+  // ---------- export ----------
+
+  function syncFormat(): void {
+    const value = el.format?.value ?? 'original';
+    if (el.qualityField) el.qualityField.hidden = value !== 'mp3';
+
+    if (!el.size) return;
+    if (value === 'original') {
+      el.size.textContent = recordedBlob ? filesize(recordedBlob.size) : '';
+      return;
+    }
+    if (!recordedBuffer) {
+      el.size.textContent = '';
+      return;
+    }
+    const seconds = recordedBuffer.duration;
+    const bytes =
+      value === 'wav'
+        ? 44 + seconds * recordedBuffer.sampleRate * recordedBuffer.numberOfChannels * 2
+        : (Number(el.quality?.value ?? 192) * 1000 * seconds) / 8;
+    el.size.textContent = `about ${filesize(bytes)}`;
+  }
+
+  async function downloadRecording(): Promise<void> {
+    const button = el.download;
+    const value = el.format?.value ?? 'original';
+    if (!recordedBlob) return;
+
+    if (value === 'original') {
+      saveBlob(recordedBlob, `${baseName}.${extensionFor(recordedBlob.type)}`);
+      markReady();
+      return;
+    }
+    if (!recordedBuffer) return;
+
+    if (button) button.dataset.loading = 'true';
+    try {
+      const encoded = await exportAudio(recordedBuffer, value, {
+        bitrate: Number(el.quality?.value ?? 192),
+      });
+      saveBlob(encoded, `${baseName}.${value}`);
+      markReady();
+    } catch {
+      showError(
+        'The recording could not be encoded.',
+        'Downloading the original instead always works, since it needs no conversion at all.'
+      );
+    } finally {
+      if (button) delete button.dataset.loading;
+    }
+  }
+
+  function markReady(): void {
+    const button = el.download;
+    if (!button) return;
+    button.classList.remove('btn--ready');
+    void button.offsetWidth;
+    button.classList.add('btn--ready');
+  }
+
+  function discard(): void {
+    player?.destroy();
+    player = null;
+    waveform?.destroy();
+    waveform = null;
+    recordedBlob = null;
+    recordedBuffer = null;
+    accumulatedMs = 0;
+    if (el.result) el.result.hidden = true;
+    if (el.elapsed) el.elapsed.textContent = '0:00.00';
+    setState('Nothing recorded yet');
+    clearError();
+  }
+
+  // ---------- wiring ----------
+
+  el.mic?.addEventListener('click', () => void startRecording());
+  el.pause?.addEventListener('click', togglePause);
+  el.stop?.addEventListener('click', stopRecording);
+  el.discard?.addEventListener('click', discard);
+  el.play?.addEventListener('click', () => player?.toggle());
+  el.skipStart?.addEventListener('click', () => player?.seek(0));
+  el.format?.addEventListener('change', syncFormat);
+  el.quality?.addEventListener('change', syncFormat);
+  el.download?.addEventListener('click', () => void downloadRecording());
+
+  el.canvasWrap?.addEventListener('pointerdown', (event) => {
+    if (!waveform) return;
+    player?.seek(waveform.timeAt(event.clientX));
+  });
+
+  // Hand the recording to the next tool without a save-and-reopen round trip.
+  root?.querySelectorAll<HTMLAnchorElement>('[data-hand-off]').forEach((link) => {
+    link.addEventListener('click', () => {
+      if (!recordedBlob) return;
+      stashForNextTool(recordedBlob, `${baseName}.${extensionFor(recordedBlob.type)}`);
+    });
+  });
+</script>

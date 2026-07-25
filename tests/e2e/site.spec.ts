@@ -1,0 +1,157 @@
+import { test, expect, type Page } from '@playwright/test';
+import { TOOLS } from '../../src/data/tools';
+
+const STATIC_PAGES = ['/', '/loudness-targets', '/audio-formats', '/about', '/privacy'];
+const ALL_PATHS = [...STATIC_PAGES, ...TOOLS.map((tool) => `/${tool.slug}`)];
+
+/** Console errors that are environmental rather than our bugs. */
+function isIgnorableError(text: string): boolean {
+  return (
+    // The service worker is not registered from the preview origin in CI.
+    /service ?worker/i.test(text) ||
+    /Failed to load resource.*favicon/i.test(text) ||
+    /apple-touch-icon|icon-192|icon-512|og\.png/i.test(text)
+  );
+}
+
+function collectErrors(page: Page): string[] {
+  const errors: string[] = [];
+  page.on('console', (message) => {
+    if (message.type() === 'error' && !isIgnorableError(message.text())) {
+      errors.push(message.text());
+    }
+  });
+  page.on('pageerror', (error) => errors.push(error.message));
+  return errors;
+}
+
+test.describe('every page', () => {
+  for (const path of ALL_PATHS) {
+    test(`${path} loads clean`, async ({ page }) => {
+      const errors = collectErrors(page);
+      const response = await page.goto(path);
+
+      expect(response?.status(), `${path} should return 200`).toBe(200);
+
+      // Exactly one h1, and it must not be empty.
+      const h1 = page.locator('h1');
+      await expect(h1).toHaveCount(1);
+      expect((await h1.textContent())?.trim().length).toBeGreaterThan(0);
+
+      // Title and description must be present and within sane SEO lengths.
+      const title = await page.title();
+      expect(title.length).toBeGreaterThan(10);
+      expect(title.length).toBeLessThan(75);
+
+      const description = await page
+        .locator('meta[name="description"]')
+        .getAttribute('content');
+      expect(description, `${path} needs a meta description`).toBeTruthy();
+      expect(description!.length).toBeGreaterThan(70);
+      expect(description!.length).toBeLessThan(185);
+
+      // Canonical must be absolute and point at this page.
+      const canonical = await page
+        .locator('link[rel="canonical"]')
+        .getAttribute('href');
+      expect(canonical).toContain('https://ihateaudio.com');
+
+      expect(errors, `console errors on ${path}`).toEqual([]);
+    });
+  }
+});
+
+test.describe('structured data', () => {
+  for (const tool of TOOLS.slice(0, 8)) {
+    test(`/${tool.slug} emits valid JSON-LD`, async ({ page }) => {
+      await page.goto(`/${tool.slug}`);
+
+      const blocks = await page
+        .locator('script[type="application/ld+json"]')
+        .allTextContents();
+
+      expect(blocks.length).toBeGreaterThanOrEqual(3);
+
+      const parsed = blocks.map((block) => JSON.parse(block));
+      const types = parsed.map((item) => item['@type']);
+
+      expect(types).toContain('SoftwareApplication');
+      expect(types).toContain('HowTo');
+      expect(types).toContain('FAQPage');
+      expect(types).toContain('BreadcrumbList');
+
+      const faq = parsed.find((item) => item['@type'] === 'FAQPage');
+      expect(faq.mainEntity.length).toBeGreaterThanOrEqual(4);
+
+      const howTo = parsed.find((item) => item['@type'] === 'HowTo');
+      expect(howTo.step.length).toBeGreaterThanOrEqual(3);
+    });
+  }
+});
+
+test.describe('content quality', () => {
+  test('tool pages carry enough unique prose to not read as templated', async ({
+    page,
+  }) => {
+    for (const tool of TOOLS.slice(0, 10)) {
+      await page.goto(`/${tool.slug}`);
+      const words = ((await page.locator('main').innerText()) ?? '')
+        .split(/\s+/)
+        .filter(Boolean).length;
+      expect(words, `/${tool.slug} is too thin`).toBeGreaterThan(450);
+    }
+  });
+
+  test('no two tool pages share an identical description', async ({ page }) => {
+    const seen = new Map<string, string>();
+    for (const tool of TOOLS) {
+      await page.goto(`/${tool.slug}`);
+      const description =
+        (await page.locator('meta[name="description"]').getAttribute('content')) ?? '';
+      const clash = seen.get(description);
+      expect(clash, `${tool.slug} duplicates ${clash}'s description`).toBeUndefined();
+      seen.set(description, tool.slug);
+    }
+  });
+});
+
+test.describe('navigation', () => {
+  test('homepage links to every tool', async ({ page }) => {
+    await page.goto('/');
+    for (const tool of TOOLS) {
+      await expect(
+        page.locator(`a[href="/${tool.slug}"]`).first(),
+        `homepage is missing a link to ${tool.slug}`
+      ).toBeAttached();
+    }
+  });
+
+  test('search filters the tool grid', async ({ page }) => {
+    await page.goto('/');
+    const tiles = page.locator('[data-tile]:not([hidden])');
+    const before = await tiles.count();
+
+    await page.fill('#tool-search', 'ringtone');
+    await expect.poll(async () => tiles.count()).toBeLessThan(before);
+    // Scoped to the grid: the footer also links every tool.
+    await expect(page.locator('[data-tile][href="/ringtone-maker"]')).toBeVisible();
+
+    await page.fill('#tool-search', 'zzzznothing');
+    await expect(page.locator('[data-search-empty]')).toBeVisible();
+  });
+
+  test('sitemap lists every tool', async ({ request }) => {
+    const response = await request.get('/sitemap.xml');
+    expect(response.status()).toBe(200);
+    const body = await response.text();
+    for (const tool of TOOLS) {
+      expect(body, `sitemap missing ${tool.slug}`).toContain(`/${tool.slug}`);
+    }
+  });
+
+  test('robots.txt points at the sitemap', async ({ request }) => {
+    const body = await (await request.get('/robots.txt')).text();
+    expect(body).toContain('Sitemap: https://ihateaudio.com/sitemap.xml');
+    expect(body).toContain('Disallow: /ffmpeg/');
+  });
+});

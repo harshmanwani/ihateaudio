@@ -1,0 +1,330 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('volume-booster');
+
+const steps = [
+  'Drop the quiet file onto the page. Before you touch anything, the tool measures the loudest sample in it and tells you how much headroom you have left.',
+  'Pick a method: add a fixed number of decibels, or normalize so the loudest moment lands exactly on a level you choose.',
+  'Press play. The transport plays the boosted version rather than the original, so what you hear is what you are about to download.',
+  'If the clipping warning appears, lower the boost by the amount it names, or switch to normalizing — that method measures first and cannot clip.',
+  'Choose an output format and download. The original file on your disk is never modified.',
+];
+
+const faq = [
+  {
+    q: 'How much louder is +6 dB?',
+    a: 'Exactly twice the amplitude of the waveform, but not twice as loud to your ear. Perceived loudness roughly doubles every 10 dB, so +6 dB is a clear, obvious lift rather than a dramatic one. If a recording is barely audible you are usually looking for +15 to +25 dB.',
+  },
+  {
+    q: 'Why does the tool warn me about clipping?',
+    a: 'Digital audio cannot store a value above full scale. When a boost pushes samples past that point they are flattened at the ceiling, which turns smooth waves into squared-off ones and sounds like crackle or fuzz. The warning tells you the exact number of decibels you would lose so you can back off by that much.',
+  },
+  {
+    q: 'What is the difference between boosting and normalizing here?',
+    a: 'Boosting multiplies every sample by the same fixed amount, whatever the file contains. Normalizing measures the single loudest sample first, then applies precisely enough gain to land it on your target — so it can never clip, but a single stray thump can cap the level of the whole recording.',
+  },
+  {
+    q: 'It is still too quiet at maximum boost. What now?',
+    a: 'That means the peaks are already near the ceiling even though the average level is low — a voice that mumbles and then laughs, for example. Gain cannot fix that, because there is no headroom left. Run it through the dynamics compressor to pull the peaks down first, then boost.',
+  },
+  {
+    q: 'Does boosting make the background hiss louder too?',
+    a: 'Yes, by exactly the same amount. Gain is a single multiplication applied to everything in the file, so the ratio between the voice and the hiss does not change at all. If the noise becomes obvious after boosting, it was always there — it was just below the threshold of your attention.',
+  },
+  {
+    q: 'Can I boost only one section of the file?',
+    a: 'Not in this tool — the gain applies to the whole file. Trim out the quiet section with the audio trimmer, boost it here, then put it back with the audio joiner. Chain links appear under the download button so you can hand the file straight to the next tool.',
+  },
+  {
+    q: 'Which target should I normalize the peak to?',
+    a: 'Around −1 dBFS is the usual choice. Leaving a decibel of headroom means that when the file is later encoded to MP3 or AAC, the encoder’s reconstruction of the waveform still has somewhere to go — lossy encoding can push peaks slightly above where they sat in the original.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Download">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Volume</span>
+        <span class="hint">Preview plays the boosted audio, not the original.</span>
+      </div>
+
+      <div class="field controls__full">
+        <span class="label" id="vb-mode-label">Method</span>
+        <div class="seg" role="group" aria-labelledby="vb-mode-label">
+          <button type="button" class="seg__btn" data-mode="boost" aria-pressed="true">
+            Boost by amount
+          </button>
+          <button type="button" class="seg__btn" data-mode="normalize" aria-pressed="false">
+            Normalize to peak
+          </button>
+        </div>
+      </div>
+
+      <div class="field" data-panel="boost">
+        <label class="label" for="vb-gain">
+          Boost <span class="label__value" data-out="gain">+6.0 dB</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="vb-gain"
+            data-control="gain"
+            type="range"
+            min="-20"
+            max="30"
+            step="0.5"
+            value="6"
+          />
+          <input
+            class="num"
+            data-control="gain-num"
+            type="number"
+            min="-20"
+            max="30"
+            step="0.5"
+            value="6"
+            aria-label="Boost in decibels"
+          />
+        </div>
+        <span class="hint">
+          Negative values turn the file down. +6 dB doubles the waveform; +20 dB multiplies it
+          by ten.
+        </span>
+      </div>
+
+      <div class="field" data-panel="normalize" hidden>
+        <label class="label" for="vb-target">
+          Target peak <span class="label__value" data-out="target">−1.0 dBFS</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="vb-target"
+            data-control="target"
+            type="range"
+            min="-12"
+            max="0"
+            step="0.1"
+            value="-1"
+          />
+          <input
+            class="num"
+            data-control="target-num"
+            type="number"
+            min="-12"
+            max="0"
+            step="0.1"
+            value="-1"
+            aria-label="Target peak in dBFS"
+          />
+        </div>
+        <span class="hint">
+          The loudest sample in the file is moved to exactly this level. −1 dBFS leaves a little
+          room for the encoder.
+        </span>
+      </div>
+
+      <div class="controls__full">
+        <div class="note note--info">
+          <div class="note__body">
+            <div class="note__title">This file</div>
+            <div data-readout>Measuring the peak level…</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls__full" data-clip hidden>
+        <div class="note note--warn" role="status">
+          <div class="note__body">
+            <div class="note__title">This boost will clip</div>
+            <div data-clip-detail></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>What a decibel actually adds</h2>
+    <p>
+      Decibels are a ratio, not an amount. Going up 6 dB doubles the amplitude of the
+      waveform; going up 20 dB multiplies it by ten. Perceived loudness moves far more
+      slowly than that — as a rough rule it takes about 10 dB before most people describe a
+      sound as twice as loud. So a +3 dB nudge is a polite adjustment, +10 dB is a genuine
+      change of character, and if you need +25 dB the original recording was very nearly
+      silent.
+    </p>
+    <p>
+      Digital levels are quoted in <strong>dBFS</strong>, decibels relative to full scale, and
+      they are always negative or zero. Zero is not a volume — it is the ceiling, the largest
+      number the format can store. A file whose loudest sample reads −18 dBFS has 18 dB of
+      headroom: you can add 18 dB before anything touches the ceiling, and every decibel past
+      that starts flattening the tops of the waves.
+    </p>
+
+    <h2>Boosting versus normalizing</h2>
+    <p>
+      Adding a fixed amount is blind. You are telling the tool to multiply every sample by
+      the same number, and whether that ends well depends entirely on what the file already
+      contained. It is the right choice when you know how far off you are, or when several
+      files need identical treatment so their levels stay in the same relationship to each
+      other.
+    </p>
+    <p>
+      Normalizing measures first. The tool finds the single loudest sample, works out how far
+      below your target it sits, and applies exactly that much gain and no more. It cannot
+      clip, because the arithmetic is built around the peak. Its weakness is the mirror image:
+      one stray click, a chair scrape, a door closing sets the level for the entire recording,
+      and everything else ends up quieter than it needed to be. If a normalized file still
+      sounds thin, find that one peak, trim or lower it, and normalize again.
+    </p>
+
+    <h2>When more gain is the wrong tool</h2>
+    <p>
+      Gain is indiscriminate. It lifts the speech and the air-conditioning hum by the same
+      amount, so the ratio between them — the thing you actually care about — does not move
+      at all. A recording that sounds quiet because it was made from across the room becomes
+      a louder recording of a room, not a closer one. No amount of gain undoes distance.
+    </p>
+    <p>
+      The other case gain cannot solve is a file with a low average level but peaks already
+      near the ceiling: a voice that drops to a mumble and then laughs. There is no headroom
+      left to give it. That needs compression to bring the peaks down before any gain is
+      useful. And if the goal is a delivery target rather than simply "louder" — a podcast
+      host, a streaming platform — normalize to LUFS instead, which measures loudness across
+      the whole programme rather than looking at one sample.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { applyGain, normalizePeak } from '../lib/audio/dsp';
+  import { peakDb } from '../lib/audio/analysis';
+  import { db } from '../lib/format';
+
+  type Mode = 'boost' | 'normalize';
+
+  let mode: Mode = 'boost';
+  /** Peak of the loaded file, in dBFS. Measured once per file. */
+  let sourcePeak = -Infinity;
+
+  /** Levels read better with a real minus sign than a hyphen. */
+  function level(value: number): string {
+    if (!Number.isFinite(value)) return 'silence';
+    return `${value < 0 ? '−' : ''}${Math.abs(value).toFixed(1)} dBFS`;
+  }
+
+  const tool = createTool({
+    suffix: 'louder',
+    defaultFormat: 'mp3',
+
+    onReady(ctx, runtime) {
+      const root = runtime.root;
+      sourcePeak = peakDb(ctx.buffer);
+
+      const readout = root.querySelector<HTMLElement>('[data-readout]');
+      const clip = root.querySelector<HTMLElement>('[data-clip]');
+      const clipDetail = root.querySelector<HTMLElement>('[data-clip-detail]');
+
+      if (readout) {
+        readout.textContent = Number.isFinite(sourcePeak)
+          ? `The loudest sample sits at ${level(sourcePeak)}, leaving ${Math.max(
+              0,
+              -sourcePeak
+            ).toFixed(1)} dB of headroom before anything clips.`
+          : 'This file contains no signal at all, so there is nothing to boost.';
+      }
+
+      const refreshWarning = (): void => {
+        const gain = runtime.value('gain', 0);
+        const after = sourcePeak + gain;
+        const clips = mode === 'boost' && Number.isFinite(sourcePeak) && after > 0.05;
+
+        if (clip) clip.hidden = !clips;
+        if (clips && clipDetail) {
+          clipDetail.textContent =
+            `${db(gain)} puts the loudest peak at ${level(after)}, which is ${after.toFixed(
+              1
+            )} dB above the ceiling. Anything past 0 dBFS is squared off rather than stored, ` +
+            `so those moments will crackle. Lower the boost to ${db(
+              -sourcePeak
+            )} or less, or switch to normalizing.`;
+        }
+      };
+
+      /** Slider and number input stay in step; the slider is authoritative. */
+      const pair = (name: string, format: (value: number) => string): void => {
+        const slider = root.querySelector<HTMLInputElement>(`[data-control="${name}"]`);
+        const num = root.querySelector<HTMLInputElement>(`[data-control="${name}-num"]`);
+        const out = root.querySelector<HTMLElement>(`[data-out="${name}"]`);
+        if (!slider) return;
+
+        const paint = (): void => {
+          if (out) out.textContent = format(Number(slider.value));
+          refreshWarning();
+        };
+
+        const commit = (): void => runtime.refreshPreview();
+
+        slider.addEventListener('input', () => {
+          if (num) num.value = slider.value;
+          paint();
+        });
+        slider.addEventListener('change', commit);
+
+        num?.addEventListener('input', () => {
+          slider.value = num.value;
+          paint();
+        });
+        num?.addEventListener('change', commit);
+
+        paint();
+      };
+
+      pair('gain', (value) => db(value));
+      pair('target', (value) => level(value));
+
+      const panels = root.querySelectorAll<HTMLElement>('[data-panel]');
+      const buttons = root.querySelectorAll<HTMLButtonElement>('[data-mode]');
+
+      buttons.forEach((button) => {
+        button.addEventListener('click', () => {
+          mode = button.dataset.mode === 'normalize' ? 'normalize' : 'boost';
+          buttons.forEach((other) => {
+            other.setAttribute('aria-pressed', String(other === button));
+          });
+          panels.forEach((panel) => {
+            panel.hidden = panel.dataset.panel !== mode;
+          });
+          refreshWarning();
+          runtime.refreshPreview();
+        });
+      });
+
+      refreshWarning();
+    },
+
+    preview(ctx) {
+      return render(ctx.buffer);
+    },
+
+    process(ctx) {
+      return render(ctx.buffer);
+    },
+  });
+
+  function render(buffer: AudioBuffer): AudioBuffer {
+    if (mode === 'normalize') {
+      return normalizePeak(buffer, tool?.value('target', -1) ?? -1);
+    }
+    // applyGain hard-limits at the ceiling rather than wrapping, which is what
+    // the clipping warning is describing.
+    return applyGain(buffer, tool?.value('gain', 6) ?? 6);
+  }
+</script>

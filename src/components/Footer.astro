@@ -1,0 +1,46 @@
+---
+import { CATEGORIES, toolsIn } from '../data/tools';
+import { PRIVACY_LINE, SITE } from '../consts';
+import Icon from './Icon.astro';
+
+const year = new Date().getFullYear();
+---
+
+<footer class="ftr">
+  <div class="wrap">
+    <div class="ftr__grid">
+      {
+        CATEGORIES.map((category) => (
+          <div class="ftr__col">
+            <h3>{category.name}</h3>
+            <ul>
+              {toolsIn(category.id).map((tool) => (
+                <li>
+                  <a href={`/${tool.slug}`}>{tool.name}</a>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))
+      }
+
+      <div class="ftr__col">
+        <h3>Reference</h3>
+        <ul>
+          <li><a href="/loudness-targets">Loudness targets by platform</a></li>
+          <li><a href="/audio-formats">Audio format guide</a></li>
+          <li><a href="/privacy">Privacy</a></li>
+          <li><a href="/about">About</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="ftr__base">
+      <span class="privacy">
+        <Icon name="shield-check" size={16} />
+        {PRIVACY_LINE}
+      </span>
+      <span>&copy; {year} {SITE.name}</span>
+    </div>
+  </div>
+</footer>

@@ -1,0 +1,257 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('sample-rate-converter');
+
+const steps = [
+  'Drop your audio file onto the page. Its current sample rate is read from the file header and shown below.',
+  'Pick the rate the destination system needs — 16 kHz for speech models, 44.1 kHz for CD and music, 48 kHz for anything going into video.',
+  'Check the warnings. Choosing a rate higher than the original cannot add detail, and the page says so rather than letting you assume otherwise.',
+  'Export as WAV or FLAC to keep the rate exactly as chosen. MP3 supports only a fixed list of rates and will move you to the nearest one.',
+];
+
+const faq = [
+  {
+    q: 'Does converting to a higher sample rate improve quality?',
+    a: 'No. Resampling upward interpolates between samples that already exist; it invents plausible values, it does not recover anything. A 22 kHz recording converted to 96 kHz still contains nothing above 11 kHz, because nothing above 11 kHz was ever captured. The only reason to upsample is that a piece of software or hardware refuses to accept the lower rate.',
+  },
+  {
+    q: 'What rate do speech recognition models want?',
+    a: '16 kHz mono, almost universally. Whisper and most other speech models resample everything to 16 kHz internally as their first step, so handing them a 48 kHz stereo file just makes them do the work. Converting first makes the file three to six times smaller with no effect on the transcription.',
+  },
+  {
+    q: 'Why is 44.1 kHz such an odd number?',
+    a: 'It comes from videotape. Before dedicated digital audio recorders existed, engineers stored digital audio as fake video on U-matic tape using a PCM adaptor. Fitting three samples per usable line worked out to 245 lines at 60 fields per second on NTSC and 294 lines at 50 fields on PAL — both of which multiply out to exactly 44,100. The CD standard inherited it in 1980 and it never went away.',
+  },
+  {
+    q: 'What is aliasing, and does this tool avoid it?',
+    a: 'When you lower the sample rate, frequencies above the new ceiling have nowhere to go and fold back down into the audible range as inharmonic whistles and grit. Proper converters run a steep low-pass filter first to remove them. This tool uses linear interpolation without that filter, which is fine for speech and most spoken-word material, but bright cymbal-heavy music taken down to 22.05 kHz or below can show artifacts. For mastering-grade work, use a DAW or SoX.',
+  },
+  {
+    q: 'Does changing the sample rate change the pitch or the length?',
+    a: 'Not here. Resampling recalculates the sample values so the audio occupies the same amount of time at the new rate. What people are usually thinking of is reinterpreting a file at a different rate without recalculating it, which does shift both pitch and length — that is the speed changer, and it is a separate tool.',
+  },
+  {
+    q: 'I chose 96 kHz but the MP3 came out at 48 kHz. Why?',
+    a: 'MP3 permits only nine sample rates: 8, 11.025, 12, 16, 22.05, 24, 32, 44.1 and 48 kHz. Anything else is resampled to the nearest permitted rate during encoding, and 96 kHz becomes 48 kHz. Export as WAV or FLAC if you need the rate preserved exactly; both accept any rate.',
+  },
+  {
+    q: 'What do game engines and telephony systems expect?',
+    a: 'Unity and Godot are happy with 44.1 or 48 kHz and will often downsample short effects themselves to save memory. Asterisk and most VoIP systems want 8 kHz for narrowband codecs or 16 kHz for wideband. Embedded devices and microcontroller audio libraries frequently insist on 22.05 kHz or 16 kHz mono, and will simply refuse anything else.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Convert and download">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Sample rate</span>
+        <span class="hint" data-source-rate>Read from the file when it loads.</span>
+      </div>
+
+      <div class="field">
+        <label class="label" for="target-rate">Convert to</label>
+        <select class="select" id="target-rate" data-control="rate">
+          <option value="8000">8 kHz — telephone, narrowband VoIP</option>
+          <option value="16000">16 kHz — speech models, wideband voice</option>
+          <option value="22050">22.05 kHz — half of CD, embedded audio</option>
+          <option value="32000">32 kHz — broadcast and DAT long-play</option>
+          <option value="44100" selected>44.1 kHz — CD and music standard</option>
+          <option value="48000">48 kHz — video, film and pro audio</option>
+          <option value="96000">96 kHz — high-resolution production</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <span class="label">Highest frequency it can hold</span>
+        <p class="hint" data-nyquist>
+          Half the sample rate, which is 22.05 kHz at 44.1 kHz.
+        </p>
+      </div>
+
+      <div class="controls__full" data-notes hidden>
+        <div class="note note--warn" data-upsample-note hidden>
+          <div class="note__body">
+            <div class="note__title">This is upsampling</div>
+            <div data-upsample-text></div>
+          </div>
+        </div>
+
+        <div class="note note--info" data-mp3-note hidden>
+          <div class="note__body">
+            <div class="note__title">MP3 cannot store this rate</div>
+            <div data-mp3-text></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>What the number actually means</h2>
+    <p>
+      A digital recording is a list of amplitude measurements taken at fixed
+      intervals. The sample rate is how many of those measurements happen per
+      second, and the Nyquist–Shannon theorem sets the consequence: the highest
+      frequency a recording can represent is exactly half its sample rate. At
+      44.1 kHz the ceiling is 22.05 kHz, comfortably above the roughly 20 kHz
+      limit of good young hearing. At 8 kHz the ceiling is 4 kHz, which is why a
+      phone call renders "S" and "F" almost identically — the energy that
+      distinguishes those consonants lives above 4 kHz and is simply not there.
+    </p>
+    <p>
+      Everything else about the rate follows from that. Doubling it does not make
+      the audio twice as good; it moves a ceiling that was already above your
+      hearing further above it, while doubling the storage and the processing
+      cost. Where higher rates genuinely help is during production, because
+      effects that generate new harmonics — distortion, saturation, aggressive
+      compression — have somewhere to put them before they fold back down.
+    </p>
+
+    <h2>Why the standard rates are the numbers they are</h2>
+    <p>
+      44.1 kHz is an artefact of 1970s video hardware. There were no digital
+      audio recorders, so engineers used a PCM adaptor to write digital audio
+      onto U-matic videotape as though it were a picture. Three samples per
+      usable scan line gave 44,100 samples per second on both NTSC and PAL
+      timing, and when the Compact Disc standard was written in 1980 it adopted
+      the rate the existing masters were already recorded at.
+    </p>
+    <p>
+      48 kHz came from professional video and film, where it divides cleanly
+      against frame rates and leaves slightly more room for anti-aliasing
+      filters; it remains the default in every video editor. 32 kHz served
+      broadcast and the long-play mode of DAT. 22.05 kHz, exactly half of 44.1,
+      was the workhorse of 1990s multimedia and still turns up in embedded
+      systems. 16 kHz is the wideband speech rate, adopted by AMR-WB and now by
+      practically every speech recognition model. And 8 kHz is the telephone
+      network, unchanged since digital trunking arrived in the 1960s.
+    </p>
+
+    <h2>What downsampling costs, and what this tool does not do</h2>
+    <p>
+      Lowering the rate is not free. Any content above the new ceiling has to be
+      removed first, and if it is not, it does not vanish — it folds back down
+      into the audible range as inharmonic tones. A shimmering cymbal becomes a
+      metallic warble; sibilance becomes grit. Proper sample rate converters run
+      a steep low-pass filter before discarding samples, precisely to prevent
+      this.
+    </p>
+    <p>
+      This tool resamples by linear interpolation and does not apply that filter.
+      For speech, voice notes, lectures, podcasts and anything destined for a
+      transcription model, the difference is inaudible and the convenience is
+      worth it. For bright, dense music going to 22.05 kHz or below, it is not:
+      use a DAW, SoX or a dedicated converter with a proper filter. Saying so is
+      more useful than pretending otherwise, and it is the one case on this page
+      where a desktop tool is genuinely the better answer.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { resampleLinear } from '../lib/audio/dsp';
+  import { nearestMp3Rate } from '../lib/audio/encode-mp3';
+
+  let sourceRate = 0;
+
+  /**
+   * Rates are shown to three decimals when they need them: 22.05 and 11.025 are
+   * real, standard numbers that a single-decimal format would round away.
+   */
+  function khz(hz: number): string {
+    const value = hz / 1000;
+    return `${Number.isInteger(value) ? value : Number(value.toFixed(3))} kHz`;
+  }
+
+  const tool = createTool({
+    suffix: 'resampled',
+    defaultFormat: 'wav',
+    formats: ['wav', 'flac', 'mp3', 'm4a', 'ogg'],
+
+    onReady(ctx, runtime) {
+      sourceRate = ctx.buffer.sampleRate;
+
+      const info = runtime.root.querySelector<HTMLElement>('[data-source-rate]');
+      if (info) {
+        info.textContent = `This file is ${khz(sourceRate)}.`;
+      }
+
+      // Default to leaving the rate alone; changing it should be a decision.
+      const select = runtime.root.querySelector<HTMLSelectElement>('[data-control="rate"]');
+      if (select) {
+        const match = Array.from(select.options).find(
+          (option) => Number(option.value) === sourceRate
+        );
+        if (match) select.value = match.value;
+      }
+
+      sync();
+    },
+
+    process(ctx) {
+      const rate = targetRate();
+      return rate === ctx.buffer.sampleRate ? ctx.buffer : resampleLinear(ctx.buffer, rate);
+    },
+  });
+
+  const root = tool?.root ?? null;
+  const rateSel = root?.querySelector<HTMLSelectElement>('[data-control="rate"]') ?? null;
+  const formatSel = root?.querySelector<HTMLSelectElement>('[data-format]') ?? null;
+
+  function targetRate(): number {
+    const value = Number(rateSel?.value);
+    return Number.isFinite(value) && value > 0 ? value : 44100;
+  }
+
+  function sync(): void {
+    if (!root) return;
+    const rate = targetRate();
+
+    const nyquist = root.querySelector<HTMLElement>('[data-nyquist]');
+    if (nyquist) {
+      nyquist.textContent = `Half the sample rate, which is ${khz(
+        rate / 2
+      )} at ${khz(rate)}.`;
+    }
+
+    const upNote = root.querySelector<HTMLElement>('[data-upsample-note]');
+    const upText = root.querySelector<HTMLElement>('[data-upsample-text]');
+    if (upNote && upText) {
+      const upsampling = sourceRate > 0 && rate > sourceRate;
+      upNote.hidden = !upsampling;
+      if (upsampling) {
+        upText.textContent = `The file was recorded at ${khz(
+          sourceRate
+        )}, so it contains nothing above ${khz(
+          sourceRate / 2
+        )}. Converting up to ${khz(
+          rate
+        )} interpolates new samples between the existing ones — it makes the file larger and cannot add detail that was never recorded. Do this only because something downstream demands the higher rate.`;
+      }
+    }
+
+    const mp3Note = root.querySelector<HTMLElement>('[data-mp3-note]');
+    const mp3Text = root.querySelector<HTMLElement>('[data-mp3-text]');
+    if (mp3Note && mp3Text) {
+      const nearest = nearestMp3Rate(rate);
+      const mismatch = formatSel?.value === 'mp3' && nearest !== rate;
+      mp3Note.hidden = !mismatch;
+      if (mismatch) {
+        mp3Text.textContent = `MP3 permits only a fixed set of sample rates, and ${khz(
+          rate
+        )} is not one of them. The encoder will resample your file again, to ${khz(
+          nearest
+        )}. Choose WAV or FLAC in the export bar to keep the rate you picked.`;
+      }
+    }
+  }
+
+  rateSel?.addEventListener('change', sync);
+  formatSel?.addEventListener('change', sync);
+  sync();
+</script>

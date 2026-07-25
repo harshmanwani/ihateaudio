@@ -1,0 +1,317 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('bpm-detector');
+
+const steps = [
+  'Drop the track onto the page. Analysis starts as soon as it has decoded — there is no button to press and nothing to download afterwards.',
+  'Read the tempo. The figure underneath it tells you in plain words how clear the beat was, which matters more than the number itself.',
+  'If the reading looks wrong, drag a selection across a section with a steady, drum-led beat and switch on "Measure the selection only". Intros, breakdowns and applause all confuse the measurement.',
+  'Check the half-time and double-time rows before you trust the answer. Autocorrelation cannot tell 87 BPM from 174 BPM, so pick whichever matches how you count the track.',
+];
+
+const faq = [
+  {
+    q: 'How does it find the tempo?',
+    a: 'It builds an energy envelope from 10-millisecond frames, keeps only the rises so that attacks count and decays do not, and then correlates that onset signal against a time-shifted copy of itself. The shift that lines the onsets up best is the beat period. Sixty divided by that period, in seconds, is the BPM.',
+  },
+  {
+    q: 'Why did it report half or double the tempo I expected?',
+    a: 'Because both answers are mathematically correct. If beats land every 0.5 seconds they also line up every 1.0 and every 0.25 seconds, so autocorrelation peaks at all of them. The detector folds its result into the 70–180 range where most music sits, which is right for pop and house and wrong for drum and bass or a slow ballad. The half-time and double-time rows exist so you can pick the one that matches how you actually count.',
+  },
+  {
+    q: 'What counts as a good confidence reading?',
+    a: 'Anything described as high confidence came from a clear, repeating peak and is usually exact on grid-locked electronic music. A fair reading is normally correct within a beat or so. An unclear reading means no single spacing stood out — treat the number as a guess and re-run it on a selected section with obvious percussion.',
+  },
+  {
+    q: 'Can it handle a track whose tempo changes?',
+    a: 'Not as a single figure, no. The measurement assumes one steady tempo across whatever it is given and reports one number, so a track that speeds up halfway lands somewhere between the two. Select each section separately and measure them one at a time.',
+  },
+  {
+    q: 'Does it find the downbeat or the time signature?',
+    a: 'No. It measures the spacing between beats and nothing else, so it does not know where bar one starts, whether the track is in 4/4 or 3/4, or where the first kick lands. Those need a different kind of analysis. For beat-matching purposes the spacing is what you need anyway.',
+  },
+  {
+    q: 'Why does a live or classical recording give a poor result?',
+    a: 'Rubato, orchestral swells and human timing all smear the onset peaks that the method depends on. A string section has no sharp attack to detect, and a drummer who breathes with the music produces a spacing that wanders by several percent. Anything programmed to a grid measures cleanly; anything played to feel does not.',
+  },
+  {
+    q: 'Is it accurate enough to beat-match a set?',
+    a: 'For anything produced on a grid, the reading is normally exact or within a tenth of a BPM. For live-played material, verify by ear before you trust it. Nothing is uploaded either way, so you can run it over a promo you have not released yet.',
+  },
+];
+
+const readings = [
+  {
+    id: 'half',
+    name: 'Half-time',
+    when: 'Count this way for drum and bass, jungle, and anything you would tap on every other beat.',
+  },
+  {
+    id: 'main',
+    name: 'Detected',
+    when: 'The spacing that correlated most strongly, folded into the 70–180 range.',
+  },
+  {
+    id: 'double',
+    name: 'Double-time',
+    when: 'Count this way for slow hip-hop and ballads, where the pulse you feel is half the programmed grid.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} selection exportBar={false}>
+    <div
+      class="card"
+      style="display:flex; flex-direction:column; align-items:center; gap:var(--s2); text-align:center"
+    >
+      <span class="hint">Tempo</span>
+      <div
+        class="tnum"
+        data-bpm
+        style="font-size:var(--t-display); font-weight:700; line-height:1; letter-spacing:-0.03em"
+        aria-live="polite"
+      >
+        —
+      </div>
+      <span class="hint">beats per minute</span>
+      <span class="chip" data-confidence>Measuring</span>
+      <p class="hint" data-confidence-text style="max-width:56ch"></p>
+    </div>
+
+    <div class="tablewrap">
+      <table class="datatable">
+        <thead>
+          <tr>
+            <th scope="col">Reading</th>
+            <th scope="col">BPM</th>
+            <th scope="col" style="white-space:normal; min-width:24rem">
+              When to count it this way
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            readings.map((row) => (
+              <tr>
+                <th scope="row" style="font-weight:600">
+                  {row.name}
+                </th>
+                <td class="tnum" data-reading={row.id}>
+                  —
+                </td>
+                <td style="white-space:normal">{row.when}</td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Where to measure</span>
+        <span class="hint">Drag across the waveform to pick a section.</span>
+      </div>
+
+      <div class="field controls__full">
+        <label class="switch">
+          <input type="checkbox" data-control="selected" />
+          <span>Measure the selection only</span>
+        </label>
+        <span class="hint">
+          Useful when an intro, an outro or a breakdown is dragging the result
+          off. Turn it on and select eight bars of steady drums.
+        </span>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>How a computer finds a beat</h2>
+    <p>
+      A beat is not a thing in an audio file. There is no marker in the data
+      saying "kick drum here" — there is only a long list of sample values.
+      Tempo detection has to infer the pulse from how the energy in those
+      samples changes over time.
+    </p>
+    <p>
+      The first step is an <strong>onset envelope</strong>. The file is chopped
+      into 10-millisecond frames, the energy of each is measured, and the
+      difference between consecutive frames is kept only when it is positive.
+      That last detail is what makes the method work: a drum hit is a sudden
+      rise in energy, while the decay afterwards is a fall, so keeping only the
+      rises turns a continuous waveform into something close to a list of
+      attacks.
+    </p>
+    <p>
+      The second step is <strong>autocorrelation</strong>. The onset signal is
+      compared against a copy of itself shifted forward in time, once for every
+      plausible beat spacing. When the shift happens to match the real beat
+      period, peaks land on peaks and the correlation score jumps. The best-
+      scoring shift is the beat period, and 60 divided by it gives beats per
+      minute. How far that best score stands above the average of all the others
+      is what the confidence line reports.
+    </p>
+
+    <h2>Octave errors, and why 87 and 174 are the same answer</h2>
+    <p>
+      Autocorrelation has one structural weakness. If onsets repeat every half
+      second, they also repeat every quarter second and every full second, so
+      those shifts correlate strongly too. The algorithm has no musical opinion
+      about which one you would call the tempo — all three describe the same
+      grid. This is known as an octave error, and every tempo detector has it,
+      including the ones inside professional DAWs.
+    </p>
+    <p>
+      The usual mitigation, used here, is to fold the answer into the range most
+      music occupies, roughly 70 to 180 BPM. That is right far more often than
+      it is wrong, and wrong in predictable places: drum and bass genuinely runs
+      at 174, not 87, and a slow hip-hop track written at 140 is normally
+      counted at 70. That is exactly why the half-time and double-time rows are
+      shown next to the main figure rather than hidden. Pick the one that
+      matches how you would tap your foot.
+    </p>
+
+    <h2>When the number is meaningless</h2>
+    <p>
+      Some material has no measurable tempo, and a detector that returns a
+      confident figure anyway is lying to you. Solo piano with pedal, orchestral
+      strings, ambient pads, spoken word and unaccompanied vocals all lack the
+      sharp attacks the envelope depends on. So does anything with heavy
+      applause or crowd noise, which fills the envelope with rises that have
+      nothing to do with the beat.
+    </p>
+    <p>
+      Live recordings are a softer version of the same problem. A human drummer
+      drifts by a percent or two across a song, so the correlation peak spreads
+      out and the answer becomes an average rather than a value. If you need to
+      match a tempo to a live recording, measure a short, steady section with
+      the selection switch and treat the result as a starting point for the
+      <a href="/tempo-changer">tempo changer</a> rather than a fact.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { detectTempo } from '../lib/audio/analysis';
+  import { slice } from '../lib/audio/dsp';
+
+  interface Verdict {
+    label: string;
+    brand: boolean;
+    text: string;
+  }
+
+  function verdictFor(bpm: number, confidence: number): Verdict {
+    if (bpm === 0) {
+      return {
+        label: 'No tempo found',
+        brand: false,
+        text: 'Nothing in this audio repeats regularly enough to measure. That is normal for speech, ambient material and unaccompanied vocals.',
+      };
+    }
+    if (confidence >= 0.55) {
+      return {
+        label: 'High confidence',
+        brand: true,
+        text: 'One beat spacing stood out clearly above every other. On grid-produced music a reading this strong is usually exact.',
+      };
+    }
+    if (confidence >= 0.3) {
+      return {
+        label: 'Fair confidence',
+        brand: false,
+        text: 'The beat is there but not perfectly even — typical of a live take. Expect the figure to be right within a beat or so.',
+      };
+    }
+    return {
+      label: 'Unclear',
+      brand: false,
+      text: 'No single spacing stood out, so treat this as a guess. Try again on a section with a steady, audible beat using the switch below.',
+    };
+  }
+
+  createTool({
+    suffix: 'bpm',
+    selection: true,
+    stage: true,
+
+    onReady(ctx, runtime) {
+      const root = runtime.root;
+      const bpmOut = root.querySelector<HTMLElement>('[data-bpm]');
+      const chip = root.querySelector<HTMLElement>('[data-confidence]');
+      const chipText = root.querySelector<HTMLElement>('[data-confidence-text]');
+      const useSelection = root.querySelector<HTMLInputElement>('[data-control="selected"]');
+
+      const readingCell = (id: string): HTMLElement | null =>
+        root.querySelector<HTMLElement>(`[data-reading="${id}"]`);
+
+      const setReadings = (bpm: number): void => {
+        const show = (id: string, value: number): void => {
+          const cell = readingCell(id);
+          if (cell) cell.textContent = value > 0 ? value.toFixed(1) : '—';
+        };
+        show('half', bpm / 2);
+        show('main', bpm);
+        show('double', bpm * 2);
+      };
+
+      const measure = (): void => {
+        if (bpmOut) bpmOut.textContent = '···';
+        if (chip) {
+          chip.textContent = 'Measuring';
+          chip.className = 'chip';
+        }
+        if (chipText) chipText.textContent = '';
+
+        // detectTempo is synchronous and scans every sample, so let the
+        // "Measuring" state paint before the main thread is tied up.
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            const selection = runtime.getSelection();
+            const source =
+              useSelection?.checked && selection.end - selection.start > 2
+                ? slice(ctx.buffer, selection.start, selection.end)
+                : ctx.buffer;
+
+            const { bpm, confidence } = detectTempo(source);
+            const verdict = verdictFor(bpm, confidence);
+
+            if (bpmOut) bpmOut.textContent = bpm > 0 ? bpm.toFixed(1) : '—';
+            if (chip) {
+              chip.textContent = verdict.label;
+              chip.className = verdict.brand ? 'chip chip--brand' : 'chip';
+            }
+            if (chipText) chipText.textContent = verdict.text;
+            setReadings(bpm);
+          });
+        });
+      };
+
+      // Dragging a handle fires continuously; only measure once it settles.
+      let pending = 0;
+      const scheduleMeasure = (): void => {
+        window.clearTimeout(pending);
+        pending = window.setTimeout(measure, 250);
+      };
+
+      useSelection?.addEventListener('change', measure);
+      root.addEventListener('selectionchange', () => {
+        if (useSelection?.checked) scheduleMeasure();
+      });
+
+      measure();
+    },
+
+    // This page has no export button, so process is never reached. The runtime
+    // requires one, and handing back the source is the honest no-op.
+    process(ctx) {
+      return ctx.buffer;
+    },
+  });
+</script>

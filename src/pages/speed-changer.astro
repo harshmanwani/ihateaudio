@@ -1,0 +1,314 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('speed-changer');
+
+const steps = [
+  'Drop an audio file onto the page, or click to browse. The file is decoded by your browser and never leaves your device.',
+  'Set the speed with the slider, or tap a preset. The new running time updates as you move it, so you can aim for a target length.',
+  'Decide what happens to the pitch. Leave "Keep original pitch" off and the whole recording shifts up or down like a record played at the wrong speed; switch it on and the pitch stays put.',
+  'Press play to hear the result. Resampled speed changes preview instantly; the pitch-preserving mode is rendered when you download, because it is far heavier to compute.',
+  'Pick a format and click Download. The filename records the speed you chose, so 1.5x saves as song-1-5x.mp3.',
+];
+
+const faq = [
+  {
+    q: 'What does "Keep original pitch" actually change?',
+    a: 'With it off, the tool resamples: it reads the same samples at a different rate, so every frequency in the file moves by the same ratio. With it on, the tool time-stretches instead — it chops the audio into overlapping 46 ms windows and reassembles them at a new spacing, so the number of cycles per second never changes. Same speed, two completely different sounds.',
+  },
+  {
+    q: 'Why does a voice sound like a chipmunk when I speed it up?',
+    a: 'Because a plain speed change multiplies every frequency by the speed factor. At 1.5x a 200 Hz voice becomes 300 Hz, which is a jump of about seven semitones, and the vocal formants — the resonances that make a voice sound like it came from a human-sized throat — move up with it. Your ear reads the mismatch as a smaller head. Turning on pitch preservation leaves the formants alone.',
+  },
+  {
+    q: 'How far can I push the speed before it sounds bad?',
+    a: 'Resampled speed changes stay clean at any ratio; they just sound higher or lower. Pitch-preserving stretching is the fussy one. Speech survives roughly 0.6x to 1.8x without complaint. Dense music with strong transients starts to develop a faint flutter past about 1.4x or below about 0.75x, because the overlap-add has to reuse or discard more material at those ratios.',
+  },
+  {
+    q: 'Does changing the speed change the file size?',
+    a: 'It changes with the new length, not the speed number. At 2x the file is roughly half as long and roughly half the size at the same bitrate; at 0.5x it doubles. The estimate in the export bar is based on the original length, so treat it as a rough figure until the file lands.',
+  },
+  {
+    q: 'Can I make a clip land on an exact duration?',
+    a: 'Yes, arithmetically. Divide the current length by the length you want and use that as the speed. A 3:20 recording that has to fit a 3:00 slot needs 200 / 180, or about 1.11x. Type it into the number box rather than dragging, then check the new length shown under the slider.',
+  },
+  {
+    q: 'Why is the pitch-preserving mode slower to process?',
+    a: 'Resampling is one pass of interpolation over the samples. Time-stretching runs a similarity search for every output window, comparing thousands of candidate offsets to find the one that continues the waveform most smoothly. That is what keeps the result from sounding metallic, and it costs perhaps a second or two per minute of stereo audio.',
+  },
+  {
+    q: 'Can I use this on a video file?',
+    a: 'Not directly — this page handles audio only. Run the video through the video-to-audio extractor first, change the speed here, and recombine it in your editor. Remember that a sped-up audio track will no longer match the picture unless the video is retimed by the same factor.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Download">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Speed</span>
+        <span class="hint">1x is the original. Below 1 is slower, above 1 is faster.</span>
+      </div>
+
+      <div class="field controls__full">
+        <label class="label" for="speed">
+          Playback speed
+          <span class="label__value" data-out="speed">1.00x</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="speed"
+            data-control="speed"
+            type="range"
+            min="0.25"
+            max="4"
+            step="0.05"
+            value="1"
+          />
+          <input
+            class="num"
+            data-control="speed-num"
+            type="number"
+            min="0.25"
+            max="4"
+            step="0.05"
+            value="1"
+            aria-label="Playback speed multiplier"
+          />
+        </div>
+      </div>
+
+      <div class="field controls__full">
+        <span class="label" id="speed-presets">Presets</span>
+        <div class="seg" role="group" aria-labelledby="speed-presets">
+          <button type="button" class="seg__btn" data-preset="0.5" aria-label="Half speed" aria-pressed="false">0.5</button>
+          <button type="button" class="seg__btn" data-preset="0.75" aria-label="Three quarter speed" aria-pressed="false">0.75</button>
+          <button type="button" class="seg__btn" data-preset="1" aria-label="Original speed" aria-pressed="true">1</button>
+          <button type="button" class="seg__btn" data-preset="1.25" aria-label="One and a quarter times speed" aria-pressed="false">1.25</button>
+          <button type="button" class="seg__btn" data-preset="1.5" aria-label="One and a half times speed" aria-pressed="false">1.5</button>
+          <button type="button" class="seg__btn" data-preset="2" aria-label="Double speed" aria-pressed="false">2</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="label">Pitch</span>
+        <label class="switch">
+          <input type="checkbox" data-control="keep-pitch" />
+          <span>Keep original pitch</span>
+        </label>
+        <span class="hint" data-out="pitch-hint">
+          Off: the pitch rises and falls with the speed, like a record.
+        </span>
+      </div>
+
+      <div class="field">
+        <span class="label">
+          New length
+          <span class="label__value tnum" data-out="length">—</span>
+        </span>
+        <span class="hint" data-out="length-hint">Load a file to see the new running time.</span>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>Two different ways to change speed</h2>
+    <p>
+      A speed control looks like one setting, but underneath there are two
+      unrelated operations and they sound nothing alike.
+    </p>
+    <p>
+      The first is <strong>resampling</strong>. The samples are read out at a
+      different rate than they were recorded at, exactly like spinning a record
+      at 45 rpm when it was cut for 33. Everything in the file moves together:
+      play at 2x and every frequency doubles, which is a rise of exactly one
+      octave. Play at 1.5x and the pitch climbs about seven semitones, a perfect
+      fifth. Nothing is invented or thrown away, so the result is mathematically
+      clean at any ratio — it simply sounds like a different recording.
+    </p>
+    <p>
+      The second is <strong>time-stretching</strong>. The audio is cut into
+      overlapping windows of about 46 milliseconds and laid back down at a new
+      spacing — closer together to speed up, further apart to slow down. Because
+      each window still contains the original waveform at its original
+      frequency, the pitch never moves. The hard part is joining the windows:
+      butt them together at the wrong phase and you get a rasp on every join. The
+      fix is to search a small range around each target position for the offset
+      where the waveform best continues what has already been written, which is
+      why this mode takes real computation rather than a single pass.
+    </p>
+
+    <h2>Which mode you want</h2>
+    <p>
+      Leave pitch preservation <em>off</em> when the pitch change is the point:
+      sped-up meme audio, slowed edits, deep or squeaky voice effects, sound
+      design where you want a hit to sit lower. It is also the honest choice for
+      anything short and percussive, because there are no stretching artefacts to
+      worry about at all.
+    </p>
+    <p>
+      Turn it <em>on</em> for anything you intend to listen to for information:
+      lectures, podcasts, audiobooks, interview recordings you are transcribing,
+      or a backing track you are playing along to. Speech at 1.4x with the pitch
+      held is comfortable for most people after a minute of adjustment. The same
+      1.4x resampled is comprehensible but tiring, because your brain is
+      simultaneously correcting for a voice that has moved into the wrong
+      register.
+    </p>
+
+    <h2>Choosing a number</h2>
+    <p>
+      For speech, 1.25x is nearly free — most listeners stop noticing within a
+      sentence. 1.5x needs attention but works for familiar material. Past 2x
+      intelligibility falls off quickly, because consonants get shorter than the
+      ear needs to tell them apart. Going the other way, 0.75x is the usual
+      setting for transcribing an unclear recording, and 0.5x is about as slow as
+      speech stays natural before it turns into a drawl.
+    </p>
+    <p>
+      For music, remember that halving the speed drops the pitch a full octave
+      and doubling raises it one. If you want a smaller move than that with the
+      timing untouched, the pitch shifter is the right tool; if you want the
+      timing changed with the key untouched, use the tempo changer, which is the
+      same stretching engine expressed as a percentage.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { changeSpeed } from '../lib/audio/dsp';
+  import { changeTempo } from '../lib/audio/stretch';
+  import { clamp, duration, pct } from '../lib/format';
+
+  let sourceDuration = 0;
+  let wired = false;
+
+  function rateOf(): number {
+    return clamp(tool?.value('speed', 1) ?? 1, 0.25, 4);
+  }
+
+  function keepsPitch(): boolean {
+    return tool?.flag('keep-pitch') ?? false;
+  }
+
+  /** 1.5 -> "1-5x", so the download name records what was done to it. */
+  function rateSuffix(rate: number): string {
+    return `${String(Number(rate.toFixed(2))).replace('.', '-')}x`;
+  }
+
+  const tool = createTool({
+    suffix: 'speed',
+    defaultFormat: 'mp3',
+
+    onReady(ctx, runtime) {
+      sourceDuration = ctx.buffer.duration;
+      const root = runtime.root;
+
+      const range = root.querySelector<HTMLInputElement>('[data-control="speed"]');
+      const num = root.querySelector<HTMLInputElement>('[data-control="speed-num"]');
+      const keep = root.querySelector<HTMLInputElement>('[data-control="keep-pitch"]');
+      const readout = root.querySelector<HTMLElement>('[data-out="speed"]');
+      const length = root.querySelector<HTMLElement>('[data-out="length"]');
+      const lengthHint = root.querySelector<HTMLElement>('[data-out="length-hint"]');
+      const pitchHint = root.querySelector<HTMLElement>('[data-out="pitch-hint"]');
+      const presets = root.querySelectorAll<HTMLButtonElement>('[data-preset]');
+      if (!range) return;
+
+      const paint = (): void => {
+        const rate = rateOf();
+        range.style.setProperty('--pct', `${pct(rate, 0.25, 4)}%`);
+        if (readout) readout.textContent = `${rate.toFixed(2)}x`;
+        if (length) length.textContent = duration(sourceDuration / rate);
+        if (lengthHint) {
+          lengthHint.textContent =
+            rate === 1
+              ? `Unchanged — ${duration(sourceDuration)}.`
+              : `Was ${duration(sourceDuration)}.`;
+        }
+        if (pitchHint) {
+          pitchHint.textContent = keepsPitch()
+            ? 'On: the pitch is held. Rendered on download, not previewed.'
+            : 'Off: the pitch rises and falls with the speed, like a record.';
+        }
+        presets.forEach((button) => {
+          button.setAttribute(
+            'aria-pressed',
+            String(Math.abs(Number(button.dataset.preset) - rate) < 0.001)
+          );
+        });
+      };
+
+      const commit = (): void => {
+        paint();
+        runtime.refreshPreview();
+      };
+
+      if (wired) {
+        paint();
+        return;
+      }
+      wired = true;
+
+      // Readouts follow the drag; the resample waits for the pointer to lift,
+      // so dragging over a long track does not stutter.
+      range.addEventListener('input', () => {
+        if (num) num.value = range.value;
+        paint();
+      });
+      range.addEventListener('change', commit);
+
+      num?.addEventListener('input', () => {
+        const typed = Number(num.value);
+        if (num.value.trim() === '' || !Number.isFinite(typed)) return;
+        range.value = String(clamp(typed, 0.25, 4));
+        paint();
+      });
+
+      // Snap the box back to the clamped value once the user is done typing.
+      num?.addEventListener('change', () => {
+        if (num) num.value = range.value;
+        commit();
+      });
+
+      keep?.addEventListener('change', commit);
+
+      presets.forEach((button) => {
+        button.addEventListener('click', () => {
+          range.value = button.dataset.preset ?? '1';
+          if (num) num.value = range.value;
+          commit();
+        });
+      });
+
+      paint();
+    },
+
+    // Resampling is cheap enough to redo on every change. WSOLA is not, so the
+    // pitch-preserving mode auditions the source and renders on download.
+    preview(ctx) {
+      const rate = rateOf();
+      if (rate === 1 || keepsPitch()) return ctx.buffer;
+      return changeSpeed(ctx.buffer, rate);
+    },
+
+    async process(ctx) {
+      const rate = rateOf();
+      if (Math.abs(rate - 1) < 0.001) return ctx.buffer;
+
+      if (!keepsPitch()) {
+        return { buffer: changeSpeed(ctx.buffer, rate), suffix: rateSuffix(rate) };
+      }
+
+      // Let the progress bar paint before the synchronous stretch takes the
+      // main thread for a second or two.
+      ctx.progress(0.05);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      return { buffer: changeTempo(ctx.buffer, rate), suffix: rateSuffix(rate) };
+    },
+  });
+</script>

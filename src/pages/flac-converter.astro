@@ -1,0 +1,165 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+import ConversionPanel from '../components/ConversionPanel.astro';
+
+const tool = getTool('flac-converter');
+
+const steps = [
+  'Drop a WAV, AIFF or other lossless file onto the page. FLAC is worth doing from a lossless source; from an MP3 it only wastes space.',
+  'There is no quality setting to choose. FLAC keeps every sample exactly, so the only thing that varies is how hard the encoder works to shrink it.',
+  'Click Download. The first FLAC of your session loads the encoder, about 31 MB, reported as its own progress step.',
+  'Expect roughly half the size of the equivalent WAV. Sparse or quiet material compresses further; dense loud masters compress less.',
+];
+
+const faq = [
+  {
+    q: 'Is FLAC genuinely lossless, or just very high quality?',
+    a: 'Genuinely lossless, and it is provable. Decoding a FLAC returns the identical sample values that went in, and the format stores an MD5 checksum of the original raw audio in its header so a decoder can verify the match. This is a mathematical guarantee, not a listening judgement.',
+  },
+  {
+    q: 'How much smaller than WAV will it be?',
+    a: 'Usually 50 to 60 percent of the original for modern pop, rock and electronic music. Loud, dense masters compress worst, sometimes only to 70 percent. Solo piano, acoustic recordings, audiobooks and anything with real silence in it can drop to 30 or 40 percent. Pure noise barely compresses at all, because there is no pattern to predict.',
+  },
+  {
+    q: 'Should I convert my MP3 collection to FLAC?',
+    a: 'No, and this is the single most common mistake with the format. FLAC will faithfully preserve every artifact the MP3 encoder introduced while producing a file three to five times larger. The audio does not improve by one decibel. FLAC is only worth making from a source that is already lossless.',
+  },
+  {
+    q: 'Why is there no quality slider?',
+    a: 'Because there is nothing to trade. FLAC has compression levels from 0 to 8, but they only change how much effort the encoder spends searching for a better prediction — the decoded audio is identical at every level. Level 8 typically saves under one percent over level 5 and takes several times longer, which is why level 5 is the near-universal default.',
+  },
+  {
+    q: 'Will FLAC play on my phone and in my car?',
+    a: 'Android has supported FLAC natively for years, as do Windows, most modern smart TVs and network players. Apple is the awkward case: iOS will play a FLAC in the Files app or a third-party player, but the Music app expects ALAC, Apple\'s own lossless format. Car head units are hit and miss. If in doubt for playback, keep FLAC as your archive and make an MP3 or M4A to actually carry around.',
+  },
+  {
+    q: 'Who actually distributes FLAC?',
+    a: 'Bandcamp, Qobuz and Tidal\'s lossless tier all offer it, as do most hi-res download stores. The Internet Archive\'s live music collection is built on it, and cultural institutions use it for preservation masters because the specification is open, patent-free and now formally documented as an IETF standard.',
+  },
+  {
+    q: 'Does FLAC keep tags and cover art?',
+    a: 'The format does — it carries Vorbis comments and embedded pictures, which is one of its advantages over WAV. This tool does not, because it decodes to raw audio and re-encodes, discarding the original container. Re-tag the result afterwards in your music player or a tag editor.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Convert to FLAC">
+    <ConversionPanel
+      hint="FLAC size depends on the material — sparse or quiet recordings compress much further than dense ones, so treat the estimate as approximate."
+    />
+
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Lossless output</span>
+        <span class="hint">No bitrate to choose — nothing is discarded.</span>
+      </div>
+
+      <div class="controls__full">
+        <div class="note note--info">
+          <div class="note__body">
+            <div class="note__title">The FLAC encoder loads once</div>
+            <div>
+              No browser can write FLAC on its own, so the first conversion of
+              your session downloads an encoder of about 31 MB from this site.
+              Your file stays in the tab throughout. Later conversions reuse the
+              encoder and start straight away.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="controls__full">
+        <div class="note note--warn">
+          <div class="note__body">
+            <div class="note__title">Only worth doing from a lossless source</div>
+            <div>
+              If the file you dropped in is an MP3, M4A, OGG or Opus, the audio
+              has already been through a lossy encoder and the damage is
+              permanent. FLAC will preserve it perfectly and hand you a much
+              larger file for no gain. Convert from WAV, AIFF or a CD rip.
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>How lossless compression is possible at all</h2>
+    <p>
+      Lossy codecs shrink audio by deciding what you will not miss. FLAC shrinks
+      it by noticing that audio is highly predictable from one sample to the
+      next. The encoder takes a block of samples, fits a mathematical predictor
+      to them — either a fixed low-order polynomial or a linear predictor with
+      coefficients calculated for that specific block — and then stores only the
+      difference between what the predictor guessed and what actually happened.
+    </p>
+    <p>
+      Those differences cluster tightly around zero, which is precisely the case
+      Rice coding handles well: small numbers get short codes, large ones get
+      long codes. Nothing is discarded at any point; the predictor and the
+      residuals together reconstruct the original exactly. That is also why the
+      compression ratio varies so much with material. A solo cello line is easy
+      to predict and compresses hard. A loud, limited, cymbal-heavy master looks
+      much closer to noise, and noise is by definition unpredictable.
+    </p>
+
+    <h2>Origins and why it won the lossless argument</h2>
+    <p>
+      Josh Coalson started FLAC in 2000 and released version 1.0 in July 2001,
+      with the reference implementation under a BSD licence and the format
+      specification free of patent claims from the outset. Xiph.Org took the
+      project under its umbrella in 2003, alongside Vorbis and later Opus. In
+      2024 the format was finally written up as a formal IETF specification,
+      RFC 9639, which matters to the archives and institutions that need a
+      standards-track document before they will commit collections to a format.
+    </p>
+    <p>
+      Competing lossless codecs existed and some compressed marginally better,
+      but they were proprietary, slow to decode, or both. FLAC decodes fast
+      enough for cheap hardware, seeks properly thanks to its seek table, and
+      costs nothing to implement. That combination is why it ended up in Android,
+      in network streamers, in Bandcamp downloads and in preservation workflows,
+      while its rivals did not.
+    </p>
+
+    <h2>What FLAC is not for</h2>
+    <p>
+      It is not a repair tool. Everything it does is preservation of what it was
+      given, so a FLAC made from a 192 kbps MP3 is a large, faithful copy of a
+      192 kbps MP3. It is not a distribution format for casual sharing either —
+      half of a WAV is still five or six megabytes a minute, which is a poor fit
+      for messaging apps and email.
+    </p>
+    <p>
+      And it is not the lossless format Apple's ecosystem expects. Apple Music
+      and the iOS Music app are built around ALAC, which is technically similar
+      and equally lossless but a different file entirely. If your library lives
+      in Apple software, FLAC works fine as an archive on disk and badly as the
+      thing you actually play. Keep the FLAC, and make a lossy copy for the
+      device.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { wireConversionPanel } from '../lib/conversion';
+
+  createTool({
+    suffix: 'flac',
+    onReady(_ctx, runtime) {
+      wireConversionPanel(runtime);
+    },
+    formats: ['flac'],
+    defaultFormat: 'flac',
+
+    // FLAC encoding happens in the export step; every sample passes through.
+    process(ctx) {
+      return ctx.buffer;
+    },
+  });
+</script>

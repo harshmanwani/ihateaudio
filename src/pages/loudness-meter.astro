@@ -1,0 +1,335 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('loudness-meter');
+
+const steps = [
+  'Drop the file onto the page. Measurement starts by itself once the audio has decoded, and takes a second or two for a full track.',
+  'Read the integrated loudness first. That single LUFS figure is what every streaming platform compares against its own target, and it is the number that decides whether your file gets turned down.',
+  'Check the true peak. If it sits above -1 dBTP the file may clip once it is encoded to MP3 or AAC, even though it never clipped in your editor.',
+  'Compare the table against the platform you are publishing to, then use the audio normalizer to move the file to that target while holding the peak below its ceiling.',
+];
+
+const faq = [
+  {
+    q: 'What is LUFS, and why not just use dB?',
+    a: 'LUFS is loudness weighted for how human hearing works, averaged over the whole programme, with silence gated out so pauses do not drag the reading down. A plain dB peak reading tells you the height of the tallest sample, which correlates poorly with how loud something sounds. Two files can share a 0 dBFS peak and differ by 12 LUFS.',
+  },
+  {
+    q: 'Why does my DAW report a slightly different number?',
+    a: 'Almost always gating or a different measurement window. This meter implements ITU-R BS.1770-4 with both gates — the absolute gate at -70 LUFS and the relative gate 10 LU below the ungated mean — which is what Spotify, YouTube and the podcast hosts use. A meter without the relative gate reads lower on material with quiet passages. Differences under about 0.3 LU are normal and inconsequential.',
+  },
+  {
+    q: 'The true peak is higher than the sample peak. Is that a bug?',
+    a: 'No, and it is the whole reason true peak exists. Digital audio stores discrete samples, but playback reconstructs a continuous curve through them, and that curve can rise above every sample it passes through. This meter oversamples four times to estimate the reconstructed peak. A file reading 0.0 dBFS sample peak and +0.8 dBTP true peak will clip on some hardware.',
+  },
+  {
+    q: 'What is loudness range and what should mine be?',
+    a: 'Loudness range, in LU, is the spread between the quiet and loud parts of the programme, measured as the 10th to 95th percentile of three-second blocks. There is no correct value, only wrong ones for a context: a modern pop master sits around 3–6 LU, a podcast around 5–8, orchestral recordings above 15. A podcast with an 18 LU range is unlistenable in a car.',
+  },
+  {
+    q: 'Is louder better?',
+    a: 'Not since normalization became the default. If you master four decibels above the target, the platform turns the file down four decibels on playback, and all you have done is squash the dynamics for no gain in perceived loudness. The one thing worth avoiding is landing far below the target on YouTube, which turns loud files down but never turns quiet ones up.',
+  },
+  {
+    q: 'Does it measure the whole file or just part of it?',
+    a: 'The whole file, which is what integrated loudness means. Blocks quieter than the gates are excluded from the average, so a long silence at the start or a fade-out at the end does not skew the result. Loudness range and both peak figures are also taken across the entire file.',
+  },
+  {
+    q: 'My file reads as silent or shows no number.',
+    a: 'That happens when every 400 ms block falls below the -70 LUFS absolute gate — the file is either genuinely silent or so quiet it is indistinguishable from silence. Check the waveform above the readout. If it looks flat, the recording failed rather than the measurement.',
+  },
+];
+
+interface Target {
+  id: string;
+  name: string;
+  lufs: number;
+  kind: string;
+}
+
+/** Published platform targets. Kept in the same order as /loudness-targets. */
+const targets: Target[] = [
+  { id: 'spotify', name: 'Spotify', lufs: -14, kind: 'Music' },
+  { id: 'apple-music', name: 'Apple Music', lufs: -16, kind: 'Music' },
+  { id: 'youtube', name: 'YouTube', lufs: -14, kind: 'Music & video' },
+  { id: 'amazon', name: 'Amazon Music', lufs: -14, kind: 'Music' },
+  { id: 'tidal', name: 'Tidal', lufs: -14, kind: 'Music' },
+  { id: 'apple-podcasts', name: 'Apple Podcasts', lufs: -16, kind: 'Podcast (stereo)' },
+  { id: 'spotify-podcasts', name: 'Spotify Podcasts', lufs: -14, kind: 'Podcast' },
+  { id: 'ebu', name: 'EBU R128 broadcast', lufs: -23, kind: 'Broadcast' },
+];
+
+const stats = [
+  {
+    id: 'integrated',
+    label: 'Integrated loudness',
+    unit: 'LUFS',
+    note: 'Gated average across the whole file',
+  },
+  {
+    id: 'range',
+    label: 'Loudness range',
+    unit: 'LU',
+    note: 'Spread between quiet and loud passages',
+  },
+  {
+    id: 'truepeak',
+    label: 'True peak',
+    unit: 'dBTP',
+    note: 'Reconstructed peak, 4x oversampled',
+  },
+  {
+    id: 'peak',
+    label: 'Sample peak',
+    unit: 'dBFS',
+    note: 'Tallest single sample in the file',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} exportBar={false}>
+    <div class="card">
+      <div
+        style="display:grid; gap:var(--s5); grid-template-columns:repeat(auto-fit, minmax(160px, 1fr))"
+      >
+        {
+          stats.map((stat) => (
+            <div>
+              <div class="hint">{stat.label}</div>
+              <div
+                class="tnum"
+                data-stat={stat.id}
+                style="font-size:var(--t-h1); font-weight:700; line-height:1.2"
+                aria-live="polite"
+              >
+                —
+              </div>
+              <div class="hint">
+                {stat.unit} · {stat.note}
+              </div>
+            </div>
+          ))
+        }
+      </div>
+    </div>
+
+    <div class="note note--warn" data-peak-note hidden>
+      <div class="note__body">
+        <div class="note__title">True peak is above -1 dBTP</div>
+        <div data-peak-body></div>
+      </div>
+    </div>
+
+    <div class="tablewrap">
+      <table class="datatable">
+        <thead>
+          <tr>
+            <th scope="col">Platform</th>
+            <th scope="col">Target</th>
+            <th scope="col">Difference</th>
+            <th scope="col" style="white-space:normal; min-width:22rem">What happens to your file</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            targets.map((target) => (
+              <tr>
+                <th scope="row" style="font-weight:600">
+                  {target.name}
+                </th>
+                <td>
+                  {target.lufs} LUFS
+                </td>
+                <td class="tnum" data-delta={target.id}>
+                  —
+                </td>
+                <td style="white-space:normal" data-verdict={target.id}>
+                  Waiting for a measurement
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note note--info">
+      <div class="note__body">
+        To move the file onto any of these targets while keeping the true peak
+        under its ceiling, use the <a href="/audio-normalizer">audio normalizer</a>.
+        It applies the same BS.1770 measurement in reverse. The full reference,
+        including peak ceilings and what each service does with files that miss,
+        is on the <a href="/loudness-targets">loudness targets</a> page.
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>What integrated loudness actually measures</h2>
+    <p>
+      Peak meters answer a question nobody asks. Knowing that the tallest sample
+      in a file reached -0.1 dBFS tells you almost nothing about how loud the
+      file sounds, because loudness is a function of energy over time and of
+      which frequencies carry that energy. A bass-heavy track and a bright one
+      can share a peak and be four decibels apart to the ear.
+    </p>
+    <p>
+      ITU-R BS.1770 fixes this in three stages. First it applies K-weighting —
+      a high shelf that approximates the effect of a human head in a sound
+      field, followed by a high-pass that discards rumble which contributes
+      nothing to perceived loudness. Then it measures mean square energy in
+      400-millisecond blocks that overlap by 75 per cent. Finally it gates:
+      blocks below -70 LUFS are dropped as silence, and blocks more than 10 LU
+      below the average of what remains are dropped as well.
+    </p>
+    <p>
+      That second gate is the part people miss when they write their own meter.
+      Without it, a track with long quiet verses reads far lower than it sounds,
+      and normalizing to the ungated figure makes the loud sections
+      uncomfortably loud. The gated result is what Spotify, YouTube, Apple and
+      every podcast host compute, which is why it is what this page reports.
+    </p>
+
+    <h2>Two peaks, and the gap between them</h2>
+    <p>
+      Sample peak is the largest absolute value stored in the file. True peak is
+      an estimate of the largest value the signal reaches after a converter
+      reconstructs the continuous waveform running through those samples — and
+      that curve can overshoot every sample it passes through. Four times
+      oversampling, used here, catches most of the difference.
+    </p>
+    <p>
+      The gap matters because it is where unexplained distortion comes from. A
+      master that shows exactly 0.0 dBFS in an editor can measure +0.9 dBTP,
+      clip on a phone's DAC, and clip harder once an MP3 or AAC encoder has
+      moved the waveform around. Lossy encoding does not preserve peaks; it
+      preserves what things sound like, and the decoded output routinely
+      overshoots the input by half a decibel or more. Every platform target
+      therefore specifies a ceiling below zero, usually -1 dBTP, and that
+      ceiling is insurance rather than pedantry.
+    </p>
+
+    <h2>Reading the comparison table</h2>
+    <p>
+      The difference column is your measured loudness minus the platform target.
+      A positive number means the file is louder than the platform wants, and
+      playback normalization will turn it down by that amount. Nothing is
+      damaged when this happens — but if you compressed heavily to reach that
+      level, you gave up dynamic range and received nothing in exchange.
+    </p>
+    <p>
+      A negative number means the file is quieter than the target. What happens
+      next depends on the service. Spotify will lift quiet tracks, but only for
+      listeners on the "Loud" setting; YouTube never lifts anything, so
+      undershooting there costs you real loudness against everything else on the
+      platform. Within roughly half a decibel either way, there is nothing to
+      fix and no audible difference to gain.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { measureLoudness } from '../lib/audio/analysis';
+
+  interface Target {
+    id: string;
+    lufs: number;
+  }
+
+  const TARGETS: Target[] = [
+    { id: 'spotify', lufs: -14 },
+    { id: 'apple-music', lufs: -16 },
+    { id: 'youtube', lufs: -14 },
+    { id: 'amazon', lufs: -14 },
+    { id: 'tidal', lufs: -14 },
+    { id: 'apple-podcasts', lufs: -16 },
+    { id: 'spotify-podcasts', lufs: -14 },
+    { id: 'ebu', lufs: -23 },
+  ];
+
+  /** One decimal, always signed, so a column of them lines up and reads fast. */
+  function signed(value: number): string {
+    if (!Number.isFinite(value)) return '—';
+    const rounded = Math.abs(value) < 0.05 ? 0 : value;
+    return `${rounded > 0 ? '+' : rounded < 0 ? '−' : ''}${Math.abs(rounded).toFixed(1)}`;
+  }
+
+  function verdictFor(delta: number): string {
+    if (!Number.isFinite(delta)) return 'Nothing measurable in this file.';
+    if (Math.abs(delta) <= 0.5) return 'On target. Nothing to change.';
+    if (delta > 0) {
+      return `${delta.toFixed(1)} LU too loud — playback normalization will turn it down by that much.`;
+    }
+    return `${Math.abs(delta).toFixed(1)} LU quieter than the target. Some services lift it, some do not.`;
+  }
+
+  createTool({
+    suffix: 'measured',
+    stage: true,
+
+    onReady(ctx, runtime) {
+      const root = runtime.root;
+
+      const statEl = (id: string): HTMLElement | null =>
+        root.querySelector<HTMLElement>(`[data-stat="${id}"]`);
+
+      const setStat = (id: string, value: number, digits = 1): void => {
+        const el = statEl(id);
+        if (!el) return;
+        el.textContent = Number.isFinite(value) ? value.toFixed(digits) : '−∞';
+      };
+
+      for (const id of ['integrated', 'range', 'truepeak', 'peak']) {
+        const el = statEl(id);
+        if (el) el.textContent = '···';
+      }
+
+      // measureLoudness runs two biquads over every sample and blocks the main
+      // thread, so let the "measuring" state paint before it starts.
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          const result = measureLoudness(ctx.buffer);
+
+          setStat('integrated', result.integrated);
+          setStat('range', result.range);
+          setStat('truepeak', result.truePeak);
+          setStat('peak', result.peak);
+
+          const peakNote = root.querySelector<HTMLElement>('[data-peak-note]');
+          const peakBody = root.querySelector<HTMLElement>('[data-peak-body]');
+          const overCeiling = Number.isFinite(result.truePeak) && result.truePeak > -1;
+          if (peakNote) peakNote.hidden = !overCeiling;
+          if (peakBody && overCeiling) {
+            peakBody.textContent =
+              `The reconstructed waveform reaches ${result.truePeak.toFixed(1)} dBTP, ` +
+              'which is above the -1 dBTP ceiling every streaming platform asks for. ' +
+              'It may survive as a WAV and still clip once encoded to MP3 or AAC. ' +
+              'Normalizing with a peak ceiling fixes it.';
+          }
+
+          for (const target of TARGETS) {
+            const delta = result.integrated - target.lufs;
+            const deltaCell = root.querySelector<HTMLElement>(`[data-delta="${target.id}"]`);
+            const verdictCell = root.querySelector<HTMLElement>(
+              `[data-verdict="${target.id}"]`
+            );
+            if (deltaCell) {
+              deltaCell.textContent = Number.isFinite(delta) ? `${signed(delta)} LU` : '—';
+            }
+            if (verdictCell) verdictCell.textContent = verdictFor(delta);
+          }
+        });
+      });
+    },
+
+    // No export button on this page; the runtime still requires a process.
+    process(ctx) {
+      return ctx.buffer;
+    },
+  });
+</script>

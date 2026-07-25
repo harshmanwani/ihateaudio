@@ -1,0 +1,85 @@
+---
+import Base from '../layouts/Base.astro';
+import { TOOLS } from '../data/tools';
+---
+
+<Base
+  title="About — ihateaudio"
+  description="Why this exists, how it works, and what it costs. Free audio tools that run in your browser with no upload, no account and no ads."
+  path="/about"
+>
+  <div class="wrap page prose">
+    <h1>About</h1>
+    <p class="toolhead__sub" style="margin-bottom: var(--s8)">
+      {TOOLS.length} audio tools, no upload, no account, no ads.
+    </p>
+
+    <h2>Why this exists</h2>
+    <p>
+      Every free audio tool on the web works the same way. You hand your file to
+      a server, wait through an upload, wait in a queue, wait through a
+      download, and dodge four advertisements on the way. Somewhere in there you
+      hit a size cap, or a watermark, or a prompt to make an account.
+    </p>
+    <p>
+      None of that is necessary any more. Browsers have had a complete audio
+      engine built in for over a decade — the same one behind web games and
+      video calls. It can decode almost every format, process audio faster than
+      real time, and write files back out. The server was never doing anything
+      your own machine could not.
+    </p>
+    <p>
+      So these tools do the work locally. That removes the upload, the queue,
+      the size cap and the privacy problem in one move, and it makes the tools
+      faster than the paid alternatives.
+    </p>
+
+    <h2>How it is built</h2>
+    <p>
+      Every page is static HTML with no framework runtime. The audio engine is
+      tiered so that common tasks stay small: trimming, volume, fades, speed and
+      effects use the browser's own audio nodes and download nothing extra. MP3
+      output loads a 110 KB encoder. Only genuinely non-native formats — M4A,
+      OGG, FLAC, WMA, AIFF — load a full converter, and only when you ask for
+      one.
+    </p>
+    <p>
+      The practical result is that a fully working audio editor page weighs
+      about 50 KB. Most comparable sites ship two to four megabytes before you
+      have done anything.
+    </p>
+
+    <h2>What it costs</h2>
+    <p>
+      A domain name, and nothing else. There are no servers to run because there
+      is no server-side processing, and static hosting at this scale is free.
+      That is the reason these tools can stay free without advertising: they
+      barely cost anything to operate.
+    </p>
+    <p>
+      There is no premium tier, no "pro" version, and no plan to add one. If
+      that changes, the existing tools will keep working exactly as they do now.
+    </p>
+
+    <h2>What is missing</h2>
+    <p>
+      Some things genuinely need more than a browser can do well today. AI-based
+      vocal removal and stem separation need large models; automatic
+      transcription needs a speech model measured in hundreds of megabytes.
+      Those are on the list, and they will only ship if they can run locally
+      like everything else.
+    </p>
+    <p>
+      Multi-track editing is deliberately absent. These are single-purpose
+      tools: one job each, no learning curve. If you need a timeline with
+      layers, you need a DAW, and there are good free ones.
+    </p>
+
+    <h2>Requests</h2>
+    <p>
+      If a tool is missing, or one of them mangled your file, that is worth
+      knowing about. The tools that get built next are the ones people actually
+      ask for.
+    </p>
+  </div>
+</Base>

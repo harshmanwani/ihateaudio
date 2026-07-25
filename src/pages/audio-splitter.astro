@@ -1,0 +1,413 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('audio-splitter');
+
+const steps = [
+  'Drop the file you want to break up. A two-hour recording opens as fast as a two-minute one, because it is read from disk rather than sent to a server.',
+  'Choose where the cuts go: a fixed number of equal parts, a fixed length for every part, or one cut at each silent gap in the recording.',
+  'Read the summary before you commit. It tells you how many pieces you will get and roughly how long each one is, and it updates as you move the controls.',
+  'Press split. Each piece appears in a list with its own download button, numbered in playing order.',
+];
+
+const faq = [
+  {
+    q: 'Which of the three methods should I use?',
+    a: 'Equal parts when the total matters more than the boundaries — splitting a 60-minute file into four 15-minute uploads, for example. Fixed length when a platform imposes a hard cap, such as a 10-minute limit. Silence when the recording has real structure in it, like separate questions in an interview or tracks separated by applause.',
+  },
+  {
+    q: 'The silence mode found no gaps, or only one. Why?',
+    a: 'The threshold is measured in dBFS, where 0 is the loudest a file can be and everything real is negative. Room tone in a normal indoor recording sits somewhere around -50 dBFS, so a threshold of -45 catches it while a threshold of -60 catches nothing. Raise the threshold until the count looks right, and lower the minimum gap length if the pauses in your recording are short.',
+  },
+  {
+    q: 'Can I split a continuous DJ mix into individual tracks?',
+    a: 'By length, yes. By silence, no — a beat-matched mix is specifically engineered to have no gaps, so there is nothing for the detector to find. The same applies to a live album with applause between songs, since applause is far too loud to read as silence. For those, find the transitions by ear in the trimmer instead.',
+  },
+  {
+    q: 'How are the pieces named?',
+    a: 'Each takes the original filename plus "-part-1", "-part-2" and so on. When there are ten or more, the numbers are zero-padded — "part-01" through "part-12" — so your file manager and your media player sort them in the right order instead of putting part 10 immediately after part 1.',
+  },
+  {
+    q: 'Is anything lost at the cut points?',
+    a: 'No. Cuts are made at exact sample positions, and the pieces are back-to-back with no overlap and no gap. Joining them again in the audio joiner reconstructs the original, sample for sample, provided you export losslessly. Export to MP3 and each part carries one generation of encoding, exactly as a single MP3 export would.',
+  },
+  {
+    q: 'Can I download all the parts at once?',
+    a: 'Each part has its own button, so it is one click per file. Browsers deliberately make bulk downloads awkward — most will show a permission prompt after the second or third file in quick succession. Allow it once and the rest go through.',
+  },
+  {
+    q: 'I wanted to split the left and right channels apart, not the timeline.',
+    a: 'That is a different operation, and it lives in the stereo to mono tool. This one cuts along time; that one cuts along channels, giving you one file containing everything that was on the left and another containing the right.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} results action="Split file">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">How to split</span>
+        <span class="hint">Every piece is copied from the original samples, not re-timed.</span>
+      </div>
+
+      <div class="field controls__full">
+        <span class="label" id="split-mode-label">Split method</span>
+        <div class="seg" role="group" aria-labelledby="split-mode-label">
+          <button type="button" class="seg__btn" data-mode="equal" aria-pressed="true">
+            Equal parts
+          </button>
+          <button type="button" class="seg__btn" data-mode="length" aria-pressed="false">
+            Fixed length
+          </button>
+          <button type="button" class="seg__btn" data-mode="silence" aria-pressed="false">
+            At every silence
+          </button>
+        </div>
+      </div>
+
+      <div class="field" data-when="equal">
+        <label class="label" for="split-parts">
+          Number of parts
+          <span class="label__value" data-out="parts">4</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="split-parts"
+            data-control="parts"
+            type="range"
+            min="2"
+            max="40"
+            step="1"
+            value="4"
+          />
+          <input
+            class="num"
+            data-control="parts-num"
+            type="number"
+            min="2"
+            max="40"
+            step="1"
+            value="4"
+            aria-label="Number of parts"
+          />
+        </div>
+      </div>
+
+      <div class="field" data-when="length" hidden>
+        <label class="label" for="split-length">
+          Length of each part
+          <span class="label__value" data-out="length">60 s</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="split-length"
+            data-control="length"
+            type="range"
+            min="5"
+            max="900"
+            step="5"
+            value="60"
+          />
+          <input
+            class="num"
+            data-control="length-num"
+            type="number"
+            min="5"
+            max="900"
+            step="5"
+            value="60"
+            aria-label="Length of each part in seconds"
+          />
+        </div>
+      </div>
+
+      <div class="field" data-when="silence" hidden>
+        <label class="label" for="split-threshold">
+          Counts as silence below
+          <span class="label__value" data-out="threshold">-45 dB</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="split-threshold"
+            data-control="threshold"
+            type="range"
+            min="-70"
+            max="-20"
+            step="1"
+            value="-45"
+          />
+          <input
+            class="num"
+            data-control="threshold-num"
+            type="number"
+            min="-70"
+            max="-20"
+            step="1"
+            value="-45"
+            aria-label="Silence threshold in decibels relative to full scale"
+          />
+        </div>
+      </div>
+
+      <div class="field" data-when="silence" hidden>
+        <label class="label" for="split-gap">
+          Gap must last at least
+          <span class="label__value" data-out="gap">1.0 s</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="split-gap"
+            data-control="gap"
+            type="range"
+            min="0.3"
+            max="5"
+            step="0.1"
+            value="1"
+          />
+          <input
+            class="num"
+            data-control="gap-num"
+            type="number"
+            min="0.3"
+            max="5"
+            step="0.1"
+            value="1"
+            aria-label="Minimum gap length in seconds"
+          />
+        </div>
+      </div>
+
+      <div class="note note--info controls__full" data-plan hidden>
+        <div class="note__body" data-plan-text></div>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>Three ways to divide one file</h2>
+    <p>
+      Splitting audio is the rare editing job where the interesting decision is not
+      <em>how</em> to cut but <em>where</em>. The cut itself is trivial — copy a range
+      of samples into a new file — so the three methods here differ only in how the
+      boundaries are chosen, and each answers a different question.
+    </p>
+    <p>
+      Equal parts answers "I need this in <em>n</em> pieces": you fix the count and
+      the durations fall out of it. Fixed length answers "nothing may exceed
+      <em>x</em>": you fix the duration and the count falls out, with a shorter
+      remainder at the end. Silence answers "cut where the recording already has
+      seams", which is the only one of the three that pays attention to the audio
+      rather than the clock.
+    </p>
+
+    <h2>How silence detection places a cut</h2>
+    <p>
+      The file is scanned in 20-millisecond windows, and the RMS level of each window
+      is compared against your threshold. Twenty milliseconds is short enough to
+      notice a breath and long enough that individual zero crossings in a normal
+      waveform do not register as silence. A run of consecutive quiet windows becomes
+      a candidate gap, and it only counts if it lasts at least the minimum length you
+      set — which is what stops a two-second pause between speakers from being
+      confused with the tenth-of-a-second beat between words.
+    </p>
+    <p>
+      The cut goes in the middle of each gap rather than at its start or end. That
+      way both neighbouring parts keep half the pause: the part before it does not
+      end on a hard stop, and the part after it does not start on the first syllable
+      with no run-up. It is a small thing that makes the pieces sound like recordings
+      rather than fragments.
+    </p>
+    <p>
+      Threshold is the control that matters. It is in dBFS — decibels relative to full
+      scale — so 0 is the maximum a digital file can hold and every real level is
+      negative. Quiet room tone lands near -50, a hissy phone recording nearer -35, a
+      properly noise-floored studio take below -60. If you get no cuts, your threshold
+      is below your room tone; raise it until the count looks plausible.
+    </p>
+
+    <h2>What each part inherits</h2>
+    <p>
+      Every piece carries the sample rate, bit depth and channel count of the source,
+      because the samples are copied rather than reprocessed. That means the parts
+      reassemble exactly: run them back through the joiner in order and you get the
+      original file, provided you exported losslessly on the way out. Export to MP3
+      and each part picks up one generation of encoding — the same single generation a
+      normal MP3 export would add, not one per part.
+    </p>
+    <p>
+      One practical caution: splitting into very many pieces means very many
+      downloads, and browsers throttle those. Around twenty parts is where the process
+      stops being pleasant. If you need a hundred clips out of one file, splitting by
+      length in a few passes is less painful than doing it in one.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { slice, findSilence } from '../lib/audio/dsp';
+  import { duration as fmtDuration, baseName } from '../lib/format';
+
+  type Mode = 'equal' | 'length' | 'silence';
+
+  let mode: Mode = 'equal';
+
+  /** Cut positions in seconds, always starting at 0 and ending at the duration. */
+  function boundaries(buffer: AudioBuffer): number[] {
+    const total = buffer.duration;
+
+    if (mode === 'equal') {
+      const parts = Math.max(2, Math.round(tool?.value('parts', 4) ?? 4));
+      const points: number[] = [];
+      for (let i = 0; i <= parts; i += 1) points.push(Math.min(total, (i * total) / parts));
+      return points;
+    }
+
+    if (mode === 'length') {
+      const step = Math.max(1, tool?.value('length', 60) ?? 60);
+      const points = [0];
+      // A final sliver shorter than a tenth of a second is noise, not a part.
+      for (let at = step; at < total - 0.1; at += step) points.push(at);
+      points.push(total);
+      return points;
+    }
+
+    const regions = findSilence(
+      buffer,
+      tool?.value('threshold', -45) ?? -45,
+      tool?.value('gap', 1) ?? 1
+    );
+    const points = [0];
+    for (const region of regions) {
+      // Cutting mid-gap leaves both neighbours with some breathing room.
+      const middle = (region.start + region.end) / 2;
+      if (middle > 0.25 && middle < total - 0.25) points.push(middle);
+    }
+    points.push(total);
+    return points;
+  }
+
+  const tool = createTool({
+    suffix: 'part',
+    defaultFormat: 'mp3',
+
+    onReady(ctx, runtime) {
+      const root = runtime.root;
+      const plan = root.querySelector<HTMLElement>('[data-plan]');
+      const planText = root.querySelector<HTMLElement>('[data-plan-text]');
+
+      const describe = (): void => {
+        if (!plan || !planText) return;
+        const points = boundaries(ctx.buffer);
+        const count = Math.max(0, points.length - 1);
+
+        if (count < 1) {
+          planText.textContent = 'Nothing to split with these settings.';
+          plan.hidden = false;
+          return;
+        }
+
+        const spans = points.slice(0, -1).map((start, i) => points[i + 1] - start);
+        const shortest = Math.min(...spans);
+        const longest = Math.max(...spans);
+        const sizes =
+          longest - shortest < 0.5
+            ? `${fmtDuration(longest)} each`
+            : `${fmtDuration(shortest)} to ${fmtDuration(longest)} each`;
+
+        const crowded =
+          count > 20 ? ' That is a lot of separate downloads — your browser may ask permission part way through.' : '';
+
+        planText.textContent =
+          mode === 'silence'
+            ? `${count - 1} gap${count - 1 === 1 ? '' : 's'} found, giving ${count} part${count === 1 ? '' : 's'}, ${sizes}.${crowded}`
+            : `${count} part${count === 1 ? '' : 's'}, ${sizes}.${crowded}`;
+        plan.hidden = false;
+      };
+
+      // findSilence walks every sample, so a drag must not run it per frame.
+      let timer = 0;
+      const scheduleDescribe = (): void => {
+        window.clearTimeout(timer);
+        timer = window.setTimeout(describe, 140);
+      };
+
+      const bindSlider = (name: string, format: (value: number) => string): void => {
+        const slider = root.querySelector<HTMLInputElement>(`[data-control="${name}"]`);
+        const num = root.querySelector<HTMLInputElement>(`[data-control="${name}-num"]`);
+        const out = root.querySelector<HTMLElement>(`[data-out="${name}"]`);
+        if (!slider) return;
+
+        const paint = (): void => {
+          const min = Number(slider.min);
+          const max = Number(slider.max);
+          const value = Number(slider.value);
+          const span = max - min || 1;
+          slider.style.setProperty('--pct', `${((value - min) / span) * 100}%`);
+          if (out) out.textContent = format(value);
+        };
+
+        slider.addEventListener('input', () => {
+          if (num) num.value = slider.value;
+          paint();
+          scheduleDescribe();
+        });
+
+        num?.addEventListener('input', () => {
+          slider.value = num.value;
+          paint();
+          scheduleDescribe();
+        });
+
+        num?.addEventListener('change', () => {
+          if (num) num.value = slider.value;
+        });
+
+        paint();
+      };
+
+      bindSlider('parts', (value) => String(Math.round(value)));
+      bindSlider('length', (value) => (value < 60 ? `${value} s` : fmtDuration(value)));
+      bindSlider('threshold', (value) => `${value} dB`);
+      bindSlider('gap', (value) => `${value.toFixed(1)} s`);
+
+      const buttons = root.querySelectorAll<HTMLButtonElement>('[data-mode]');
+      buttons.forEach((button) => {
+        button.addEventListener('click', () => {
+          const next = button.dataset.mode;
+          if (next !== 'equal' && next !== 'length' && next !== 'silence') return;
+          mode = next;
+          buttons.forEach((other) => {
+            other.setAttribute('aria-pressed', String(other === button));
+          });
+          root.querySelectorAll<HTMLElement>('[data-when]').forEach((field) => {
+            field.hidden = field.dataset.when !== mode;
+          });
+          describe();
+        });
+      });
+
+      describe();
+    },
+
+    process(ctx) {
+      const { buffer } = ctx;
+      const points = boundaries(buffer);
+      // A dot in the stem would read as an extension and swallow the real one.
+      const stem = (baseName(ctx.files[0]?.name ?? 'audio') || 'audio').replace(/\./g, '-');
+      const count = points.length - 1;
+      const width = count >= 10 ? String(count).length : 1;
+
+      return points.slice(0, -1).map((start, index) => ({
+        name: `${stem}-part-${String(index + 1).padStart(width, '0')}`,
+        buffer: slice(buffer, start, points[index + 1]),
+      }));
+    },
+  });
+</script>

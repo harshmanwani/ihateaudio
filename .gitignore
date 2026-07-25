@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.astro/
+.DS_Store
+*.log
+
+# Regenerated from node_modules by scripts/sync-ffmpeg-core.mjs (31 MB).
+public/ffmpeg/
+
+# Playwright
+test-results/
+playwright-report/

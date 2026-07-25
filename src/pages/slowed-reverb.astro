@@ -1,0 +1,494 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('slowed-reverb');
+
+const steps = [
+  'Drop the song onto the page. It is read straight off your device — nothing is uploaded, so there is no queue and no watermark.',
+  'Pick a preset, or drag the Intensity slider. One knob moves the slowdown and the reverb together, which is how the two settings actually behave in this style.',
+  'Press Preview to render it, then play it back. Listen to a chorus rather than the intro, because that is where too much reverb shows up first.',
+  'Open Advanced if you want to separate the two: speed on its own, reverb amount on its own, and how long the tail rings for.',
+  'Download as MP3. The file is named song-slowed-reverb.mp3, ready to drop straight into a video editor.',
+];
+
+const faq = [
+  {
+    q: 'What actually makes a song "slowed and reverb"?',
+    a: 'Two things and nothing else. The track is played back at roughly 80–90% of its original speed, which drops the pitch by two or three semitones as a side effect, and reverb is mixed in to blur the edges and make it sound like it is playing in a large empty room. Everything else people add — bass boosts, vinyl crackle, muffling — is decoration on top of those two moves.',
+  },
+  {
+    q: 'Should the pitch drop, or should I keep it where it is?',
+    a: 'It should drop. The lowered voice is the sound, not a side effect to be fixed. This tool slows the audio the old-fashioned way, exactly like a record played at the wrong speed, so the pitch comes down with the tempo. If you keep the pitch and only stretch the timing you get something that sounds carefully processed rather than nostalgic, which is the opposite of the effect.',
+  },
+  {
+    q: 'What speed do most edits actually use?',
+    a: 'Around 0.85x is the centre of gravity — slow enough to be obvious in the first two seconds, not so slow that the vocal starts to drag. 0.9x reads as subtle and works well under talking-head video. Below 0.8x the vocal begins to smear and the track starts to feel like a different genre; that is where the deep and "super slowed" edits live.',
+  },
+  {
+    q: 'How much reverb is too much?',
+    a: 'Watch the consonants. When you stop being able to hear the ends of words clearly, the wet mix is too high for that song. Sparse tracks with a lot of empty space can take 45% and a long tail; a dense mix with layered production usually falls apart above about 30%, because the reverb has nowhere to sit and just raises the noise floor.',
+  },
+  {
+    q: 'Why is the exported file longer than the original?',
+    a: 'Both effects add length. Slowing to 0.85x makes the song about 18% longer on its own, and the reverb tail has to keep ringing after the last note or it would be chopped off mid-decay. A three minute song at 0.85x with a three second tail comes out around three and a half minutes.',
+  },
+  {
+    q: 'Can I do just one of the two?',
+    a: 'Yes. Open Advanced, set the reverb mix to 0 and you have a plain slowdown; set the speed to 1.00 and you have reverb on its own. If reverb alone is what you want, the dedicated reverb tool gives you more control over the room than this page does.',
+  },
+  {
+    q: 'Will a slowed version avoid a copyright claim on TikTok or YouTube?',
+    a: 'Do not count on it. Automated matching systems have handled pitch and speed changes for years, and slowed edits are matched routinely. Whether a match becomes a mute, a claim or nothing at all depends on what the rights holder has chosen for that recording, not on how far you slowed it.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} action="Download">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Intensity</span>
+        <span class="hint">One control for both the slowdown and the reverb.</span>
+      </div>
+
+      <div class="field controls__full">
+        <label class="label" for="intensity">
+          How slowed
+          <span class="label__value tnum" data-out="intensity">Classic</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="intensity"
+            data-control="intensity"
+            type="range"
+            min="0"
+            max="100"
+            step="1"
+            value="59"
+          />
+          <input
+            class="num"
+            data-control="intensity-num"
+            type="number"
+            min="0"
+            max="100"
+            step="1"
+            value="59"
+            aria-label="Intensity from 0 to 100"
+          />
+        </div>
+      </div>
+
+      <div class="field controls__full">
+        <span class="label" id="sr-presets">Presets</span>
+        <div class="seg" role="group" aria-labelledby="sr-presets">
+          <button type="button" class="seg__btn" data-preset="18" aria-label="Subtle — 0.92x with light reverb" aria-pressed="false">Subtle</button>
+          <button type="button" class="seg__btn" data-preset="59" aria-label="Classic slowed — 0.85x with medium reverb" aria-pressed="true">Classic</button>
+          <button type="button" class="seg__btn" data-preset="88" aria-label="Deep slowed — 0.80x with heavy reverb" aria-pressed="false">Deep</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <span class="label">
+          New length
+          <span class="label__value tnum" data-out="length">—</span>
+        </span>
+        <span class="hint" data-out="drop">The pitch comes down with the speed.</span>
+      </div>
+
+      <div class="field">
+        <span class="label">Audition</span>
+        <button type="button" class="btn btn--quiet" data-audition>Preview</button>
+        <span class="hint" data-out="state">Rendering the first preview…</span>
+      </div>
+
+      <div class="field controls__full">
+        <button
+          type="button"
+          class="btn btn--ghost btn--sm"
+          data-advanced
+          aria-expanded="false"
+          aria-controls="sr-advanced"
+        >
+          Advanced controls
+        </button>
+      </div>
+    </div>
+
+    <div class="controls" id="sr-advanced" data-advanced-panel hidden>
+      <div class="controls__head">
+        <span class="controls__title">Advanced</span>
+        <span class="hint">Moving Intensity rewrites these three. Editing one here overrides it.</span>
+      </div>
+
+      <div class="field">
+        <label class="label" for="sr-speed">
+          Speed
+          <span class="label__value tnum" data-out="speed">0.85x</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="sr-speed"
+            data-control="speed"
+            type="range"
+            min="0.7"
+            max="1"
+            step="0.01"
+            value="0.85"
+          />
+          <input
+            class="num"
+            data-control="speed-num"
+            type="number"
+            min="0.7"
+            max="1"
+            step="0.01"
+            value="0.85"
+            aria-label="Playback speed multiplier"
+          />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="sr-mix">
+          Reverb mix
+          <span class="label__value tnum" data-out="mix">34%</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="sr-mix"
+            data-control="mix"
+            type="range"
+            min="0"
+            max="80"
+            step="1"
+            value="34"
+          />
+          <input
+            class="num"
+            data-control="mix-num"
+            type="number"
+            min="0"
+            max="80"
+            step="1"
+            value="34"
+            aria-label="Reverb mix percentage"
+          />
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label" for="sr-decay">
+          Tail length
+          <span class="label__value tnum" data-out="decay">2.9 s</span>
+        </label>
+        <div class="slider-row">
+          <input
+            class="slider"
+            id="sr-decay"
+            data-control="decay"
+            type="range"
+            min="0.5"
+            max="6"
+            step="0.1"
+            value="2.9"
+          />
+          <input
+            class="num"
+            data-control="decay-num"
+            type="number"
+            min="0.5"
+            max="6"
+            step="0.1"
+            value="2.9"
+            aria-label="Reverb tail length in seconds"
+          />
+        </div>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>Where this sound came from</h2>
+    <p>
+      Slowing records down is not a TikTok invention. DJ Screw was doing it in
+      Houston in the early nineties, dragging tapes down to a crawl and creating
+      the chopped and screwed style that shaped a generation of southern rap.
+      Vaporwave picked the idea up in the 2010s and pointed it at old pop and
+      lounge music. The specific "slowed + reverb" version — a normal song,
+      slowed maybe fifteen percent, drowned in room reverb, posted as a whole
+      track — spread through SoundCloud and YouTube around 2016 and then became
+      one of the default ways short-form video sets a mood.
+    </p>
+    <p>
+      What all of these share is that the pitch drops. That is the point. A voice
+      pitched down a couple of semitones sounds heavier, more tired, further
+      away. The reverb does the rest of the work, pushing the recording out of
+      your headphones and into a room you are standing at the back of. Together
+      they turn a song you know into something that sounds remembered rather than
+      played.
+    </p>
+
+    <h2>What the controls do to the audio</h2>
+    <p>
+      Speed here is a genuine playback-rate change, the same operation as a
+      turntable running slow. At 0.85x every frequency in the recording drops to
+      85% of where it was, which is a fall of about 2.8 semitones — a bit less
+      than a minor third. At 0.8x it is roughly 3.9 semitones, near a major
+      third. Nothing is stretched or reconstructed, so there are no processing
+      artefacts at all; it is simply a lower, longer version of the same file.
+    </p>
+    <p>
+      The reverb is convolution. A short burst of decaying, gradually darkening
+      noise stands in for the impulse response of a room, and every sample of
+      your song is smeared through it. <em>Mix</em> sets how much of that wet
+      signal is blended back with the dry track — 20% is a suggestion of space,
+      45% is properly cavernous. <em>Tail length</em> sets how long the room
+      keeps ringing after a sound stops. Long tails suit slow, sparse songs;
+      anything busy needs a short one or the reverb from one bar will still be
+      audible over the next.
+    </p>
+
+    <h2>Getting one that sounds good, not just slow</h2>
+    <p>
+      The most common mistake is treating both controls as "more is better".
+      Reverb past about 45% stops sounding atmospheric and starts sounding like a
+      bad room recording, because the consonants that carry the words get buried
+      under the tail. If the vocal is losing intelligibility, pull the mix down
+      before you pull the speed up — the slowdown is doing the heavy lifting and
+      the reverb is there to support it.
+    </p>
+    <p>
+      Slowed audio also comes out quieter, partly because the reverb spreads
+      energy across time. If the result feels weak next to the original, run it
+      through the normalizer afterwards rather than reaching for more effect.
+      And render with the preview before you commit: a setting that sounds
+      perfect over the intro is frequently too much once the full arrangement
+      arrives.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { changeSpeed } from '../lib/audio/dsp';
+  import { applyReverb } from '../lib/audio/effects';
+  import { clamp, duration, pct } from '../lib/format';
+
+  const PRE_DELAY = 0.03;
+
+  let source: AudioBuffer | null = null;
+  let auditionBuffer: AudioBuffer | null = null;
+  let wired = false;
+
+  function speedOf(): number {
+    return clamp(tool?.value('speed', 0.85) ?? 0.85, 0.7, 1);
+  }
+
+  function mixOf(): number {
+    return clamp(tool?.value('mix', 34) ?? 34, 0, 80) / 100;
+  }
+
+  function decayOf(): number {
+    return clamp(tool?.value('decay', 2.9) ?? 2.9, 0.5, 6);
+  }
+
+  /** Slow first, then put the slowed track in the room. */
+  function render(buffer: AudioBuffer): Promise<AudioBuffer> {
+    const slowed = changeSpeed(buffer, speedOf());
+    return applyReverb(slowed, {
+      mix: mixOf(),
+      decay: decayOf(),
+      preDelay: PRE_DELAY,
+    });
+  }
+
+  const tool = createTool({
+    suffix: 'slowed-reverb',
+    defaultFormat: 'mp3',
+
+    onReady(ctx, runtime) {
+      source = ctx.buffer;
+      auditionBuffer = null;
+
+      const root = runtime.root;
+      const q = <T extends HTMLElement>(selector: string): T | null =>
+        root.querySelector<T>(selector);
+
+      const intensity = q<HTMLInputElement>('[data-control="intensity"]');
+      const intensityNum = q<HTMLInputElement>('[data-control="intensity-num"]');
+      const speed = q<HTMLInputElement>('[data-control="speed"]');
+      const speedNum = q<HTMLInputElement>('[data-control="speed-num"]');
+      const mix = q<HTMLInputElement>('[data-control="mix"]');
+      const mixNum = q<HTMLInputElement>('[data-control="mix-num"]');
+      const decay = q<HTMLInputElement>('[data-control="decay"]');
+      const decayNum = q<HTMLInputElement>('[data-control="decay-num"]');
+
+      const intensityOut = q('[data-out="intensity"]');
+      const speedOut = q('[data-out="speed"]');
+      const mixOut = q('[data-out="mix"]');
+      const decayOut = q('[data-out="decay"]');
+      const lengthOut = q('[data-out="length"]');
+      const dropOut = q('[data-out="drop"]');
+      const state = q('[data-out="state"]');
+
+      const button = q<HTMLButtonElement>('[data-audition]');
+      const advancedBtn = q<HTMLButtonElement>('[data-advanced]');
+      const advancedPanel = q('[data-advanced-panel]');
+      const presets = root.querySelectorAll<HTMLButtonElement>('[data-preset]');
+
+      if (!intensity || !speed || !mix || !decay) return;
+
+      const fill = (input: HTMLInputElement): void => {
+        input.style.setProperty(
+          '--pct',
+          `${pct(Number(input.value), Number(input.min), Number(input.max))}%`
+        );
+      };
+
+      const label = (value: number): string => {
+        if (value < 10) return 'Barely there';
+        if (value < 35) return 'Subtle';
+        if (value < 72) return 'Classic';
+        if (value < 92) return 'Deep';
+        return 'Very deep';
+      };
+
+      const paint = (): void => {
+        for (const input of [intensity, speed, mix, decay]) fill(input);
+
+        const level = Number(intensity.value);
+        if (intensityOut) intensityOut.textContent = `${label(level)} · ${level}`;
+        if (speedOut) speedOut.textContent = `${Number(speed.value).toFixed(2)}x`;
+        if (mixOut) mixOut.textContent = `${mix.value}%`;
+        if (decayOut) decayOut.textContent = `${Number(decay.value).toFixed(1)} s`;
+
+        const rate = Number(speed.value);
+        const total = (source?.duration ?? 0) / rate + Number(decay.value) + PRE_DELAY;
+        if (lengthOut) lengthOut.textContent = duration(total);
+        if (dropOut) {
+          const semitones = Math.abs(12 * Math.log2(rate));
+          dropOut.textContent =
+            rate >= 0.999
+              ? 'No slowdown — the pitch stays where it is.'
+              : `Pitch drops about ${semitones.toFixed(1)} semitones. Was ${duration(source?.duration ?? 0)}.`;
+        }
+
+        presets.forEach((preset) => {
+          preset.setAttribute('aria-pressed', String(Number(preset.dataset.preset) === level));
+        });
+      };
+
+      const stale = (): void => {
+        if (state) state.textContent = 'Settings changed. Press Preview to hear them.';
+      };
+
+      /** The macro knob: one intensity value writes all three parameters. */
+      const derive = (): void => {
+        const level = Number(intensity.value) / 100;
+        speed.value = (0.95 - level * 0.17).toFixed(2);
+        mix.value = String(Math.round(12 + level * 38));
+        decay.value = (1.6 + level * 2.2).toFixed(1);
+        if (speedNum) speedNum.value = speed.value;
+        if (mixNum) mixNum.value = mix.value;
+        if (decayNum) decayNum.value = decay.value;
+        paint();
+        stale();
+      };
+
+      const audition = async (): Promise<void> => {
+        if (!source || !button) return;
+        button.dataset.loading = 'true';
+        if (state) state.textContent = 'Rendering…';
+        // Yield so the spinner paints before the resample takes the thread.
+        await new Promise((resolve) => setTimeout(resolve, 0));
+        try {
+          auditionBuffer = await render(source);
+          runtime.refreshPreview();
+          if (state) state.textContent = 'Preview ready. Press play.';
+        } catch {
+          if (state) {
+            state.textContent = 'The preview could not be rendered. Downloading still works.';
+          }
+        } finally {
+          delete button.dataset.loading;
+        }
+      };
+
+      const bind = (
+        range: HTMLInputElement,
+        box: HTMLInputElement | null,
+        after: () => void
+      ): void => {
+        range.addEventListener('input', () => {
+          if (box) box.value = range.value;
+          after();
+        });
+        box?.addEventListener('input', () => {
+          const typed = Number(box.value);
+          if (box.value.trim() === '' || !Number.isFinite(typed)) return;
+          range.value = String(clamp(typed, Number(range.min), Number(range.max)));
+          after();
+        });
+        box?.addEventListener('change', () => {
+          box.value = range.value;
+          paint();
+        });
+      };
+
+      if (!wired) {
+        wired = true;
+
+        bind(intensity, intensityNum, derive);
+        for (const [range, box] of [
+          [speed, speedNum],
+          [mix, mixNum],
+          [decay, decayNum],
+        ] as const) {
+          bind(range, box, () => {
+            paint();
+            stale();
+          });
+        }
+
+        presets.forEach((preset) => {
+          preset.addEventListener('click', () => {
+            intensity.value = preset.dataset.preset ?? '59';
+            if (intensityNum) intensityNum.value = intensity.value;
+            derive();
+          });
+        });
+
+        advancedBtn?.addEventListener('click', () => {
+          const open = advancedBtn.getAttribute('aria-expanded') === 'true';
+          advancedBtn.setAttribute('aria-expanded', String(!open));
+          advancedBtn.textContent = open ? 'Advanced controls' : 'Hide advanced controls';
+          if (advancedPanel) advancedPanel.toggleAttribute('hidden', open);
+        });
+
+        button?.addEventListener('click', () => void audition());
+      }
+
+      paint();
+      // Drop a file and the slowed version is waiting — that is the whole tool.
+      void audition();
+    },
+
+    preview(ctx) {
+      return auditionBuffer ?? ctx.buffer;
+    },
+
+    async process(ctx) {
+      ctx.progress(0.1);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      const out = await render(ctx.buffer);
+      ctx.progress(0.9);
+      return out;
+    },
+  });
+</script>

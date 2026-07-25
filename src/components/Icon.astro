@@ -1,0 +1,77 @@
+---
+/**
+ * Inlines a single Phosphor glyph at build time.
+ *
+ * Reading from node_modules here rather than importing an icon package means
+ * only the glyphs actually referenced end up in the output — there is no
+ * runtime, no sprite request, and no unused icon data shipped to the browser.
+ */
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+
+interface Props {
+  name: string;
+  size?: number;
+  weight?: 'thin' | 'light' | 'regular' | 'bold' | 'fill' | 'duotone';
+  class?: string;
+  title?: string;
+  [key: string]: unknown;
+}
+
+const {
+  name,
+  size = 20,
+  weight = 'regular',
+  class: className,
+  title,
+  ...rest
+} = Astro.props;
+
+const require = createRequire(import.meta.url);
+
+const cache = ((globalThis as Record<string, unknown>).__iconCache ??=
+  new Map<string, string>()) as Map<string, string>;
+
+const key = `${weight}/${name}`;
+let body = cache.get(key);
+
+if (body === undefined) {
+  // Phosphor names non-regular weights with a suffix: play.svg is regular,
+  // play-fill.svg is the fill weight.
+  const filename = weight === 'regular' ? name : `${name}-${weight}`;
+
+  let file: string;
+  try {
+    file = require.resolve(`@phosphor-icons/core/assets/${weight}/${filename}.svg`);
+  } catch {
+    throw new Error(
+      `Icon "${name}" (${weight}) not found in @phosphor-icons/core. ` +
+        `Check the name against https://phosphoricons.com.`
+    );
+  }
+  const raw = readFileSync(file, 'utf8');
+  const inner = raw.match(/<svg[^>]*>([\s\S]*)<\/svg>/);
+  const contents = inner?.[1]?.trim();
+  if (!contents) throw new Error(`Could not parse icon SVG for "${name}".`);
+  body = contents;
+  cache.set(key, body);
+}
+
+const labelled = Boolean(title);
+---
+
+<svg
+  xmlns="http://www.w3.org/2000/svg"
+  viewBox="0 0 256 256"
+  width={size}
+  height={size}
+  fill="currentColor"
+  class={className}
+  role={labelled ? 'img' : undefined}
+  aria-hidden={labelled ? undefined : 'true'}
+  focusable="false"
+  {...rest}
+>
+  {title && <title>{title}</title>}
+  <Fragment set:html={body} />
+</svg>
