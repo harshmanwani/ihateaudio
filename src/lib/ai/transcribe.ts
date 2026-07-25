@@ -3,19 +3,25 @@
  *
  * transformers.js does the heavy lifting — the mel filterbank, the byte-level BPE
  * tokenizer, the encoder-decoder loop with its key-value cache, and the parsing of
- * timestamp tokens back into times. Reimplementing that on top of bare ONNX Runtime
- * was the alternative and it is several hundred lines of well-trodden work with a
- * lot of room for subtle mistakes, particularly around timestamps.
+ * timestamp tokens back into times. Reimplementing that on bare ONNX Runtime is
+ * several hundred lines of well-trodden work with a lot of room for subtle mistakes,
+ * particularly around timestamps.
  *
- * What is not delegated is where the model comes from. Left alone, transformers.js
- * fetches weights from huggingface.co, which would mean that opening the
- * transcriber tells a third party you did — on a site whose promise is that nothing
- * leaves your device. So the host is repointed at our own origin, and the whole
- * library is configured to refuse anything else.
+ * It is driven from a worker in public/workers/ rather than imported here, and that
+ * is the whole reason this file was rewritten. Importing the library lets Vite
+ * pre-bundle it, after which it spawns its own worker referencing module ids from
+ * the main bundle that do not exist in worker scope — surfacing as a missing method
+ * with a generated name that changes on every rebuild. Loading it as a static file
+ * by URL avoids the bundler entirely.
+ *
+ * What is not delegated is where the weights come from. Left alone, transformers.js
+ * fetches them from huggingface.co, which would mean opening the transcriber tells a
+ * third party you did, on a site whose promise is that nothing leaves your device.
+ * The worker is handed our own origin and the library is configured to refuse
+ * anything else.
  */
-import { WHISPER } from './models';
-import { ORT_VERSION } from './ort-version';
-import { MODELS_VERSION } from './models';
+import { MODELS_VERSION, WHISPER } from './models';
+import { TRANSFORMERS_VERSION } from './transformers-version';
 
 export interface Segment {
   /** Seconds from the start of the audio. */
@@ -46,86 +52,41 @@ export interface TranscribeOptions {
   timestamps?: boolean;
 }
 
-/** The pipeline is expensive to build and safe to keep, so it is built once. */
-let pipelinePromise: Promise<unknown> | null = null;
+interface WorkerDone {
+  type: 'done';
+  text: string;
+  chunks: { text: string; start: number; end: number | null }[];
+}
 
-async function getPipeline(
-  options: TranscribeOptions
-): Promise<(input: Float32Array, config: Record<string, unknown>) => Promise<unknown>> {
-  if (!pipelinePromise) {
-    pipelinePromise = (async () => {
-      const { pipeline, env } = await import('@huggingface/transformers');
+type WorkerMessage =
+  | { type: 'progress'; stage: 'model' | 'listening'; ratio: number; loaded?: number; total?: number }
+  | WorkerDone
+  | { type: 'error'; message: string };
 
-      // Our origin, not huggingface.co. `remotePathTemplate` is flattened because
-      // the default expects a hub-shaped path with a revision in it, and R2 holds
-      // the files under a plain directory.
-      env.remoteHost = new URL(`/models/${MODELS_VERSION}/`, location.origin).href;
-      env.remotePathTemplate = '{model}';
-      env.allowLocalModels = false;
-      env.allowRemoteModels = true;
+/**
+ * One worker, kept alive across runs.
+ *
+ * Building the pipeline means parsing 40 MB of ONNX and standing up the runtime, so
+ * throwing the worker away after each transcription would make every run after the
+ * first as slow as the first.
+ */
+let worker: Worker | null = null;
+let nextId = 1;
 
-      // One runtime for the whole project, forced by an npm override. Before that,
-      // installing onnxruntime-web for the separation tools hoisted a third
-      // onnxruntime-common to the top of node_modules alongside transformers' own
-      // nested pair, and the web build ended up resolved against a version of
-      // common it was not built for. That fails as a missing method deep inside
-      // the bundle, which points nowhere near its cause.
-      //
-      // The wasm backend object is created lazily, so it may not exist yet. Missing
-      // it entirely would silently fall back to fetching the binary from a CDN,
-      // which is the one outcome this whole arrangement exists to prevent — so it
-      // is created rather than skipped.
-      const onnx = env.backends.onnx as {
-        wasm?: { wasmPaths?: unknown; numThreads?: number; proxy?: boolean };
-      };
-      onnx.wasm ??= {};
-      onnx.wasm.wasmPaths = {
-        wasm: `/ort/${ORT_VERSION}/ort-wasm-simd-threaded.wasm`,
-      };
-      // Run the runtime in its own worker. Without this, model loading and every
-      // inference step happen on the main thread, which locks the page solid for
-      // the duration — no progress bar repaint, no cancel, and on a long recording
-      // a browser that may decide the tab has hung.
-      onnx.wasm.proxy = true;
-      onnx.wasm.numThreads =
-        typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated
-          ? Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1))
-          : 1;
-
-      return pipeline('automatic-speech-recognition', WHISPER.dir, {
-        // The quantized graphs, which is what the 41 MB figure refers to. The
-        // float32 pair is four times the size for a difference that does not
-        // survive contact with a phone recording.
-        dtype: 'q8',
-        device: 'wasm',
-        progress_callback: (event: {
-          status?: string;
-          loaded?: number;
-          total?: number;
-          progress?: number;
-        }) => {
-          if (event.status === 'progress' && event.total) {
-            options.onStage?.({
-              phase: 'downloading',
-              ratio: (event.loaded ?? 0) / event.total,
-              loaded: event.loaded,
-              total: event.total,
-            });
-          } else if (event.status === 'ready') {
-            options.onStage?.({ phase: 'starting', ratio: null });
-          }
-        },
-      });
-    })().catch((error: unknown) => {
-      // A failed build must not be cached, or every retry resolves to the same
-      // rejection for the life of the page.
-      pipelinePromise = null;
-      throw error;
-    });
+function getWorker(): Worker {
+  if (!worker) {
+    // A plain URL string, not new URL(..., import.meta.url): the second form is
+    // exactly what invites Vite to process the file, which is what this whole
+    // arrangement exists to avoid.
+    worker = new Worker('/workers/whisper.worker.js', { type: 'module' });
   }
-  return pipelinePromise as Promise<
-    (input: Float32Array, config: Record<string, unknown>) => Promise<unknown>
-  >;
+  return worker;
+}
+
+/** Drops the worker, freeing the model's wasm heap. Used when a run fails. */
+function resetWorker(): void {
+  worker?.terminate();
+  worker = null;
 }
 
 /**
@@ -206,29 +167,99 @@ export async function transcribe(
   buffer: AudioBuffer,
   options: TranscribeOptions = {}
 ): Promise<Transcript> {
-  const run = await getPipeline(options);
   if (options.signal?.aborted) throw new DOMException('Aborted', 'AbortError');
 
   const audio = await toWhisperInput(buffer);
   const totalSeconds = buffer.duration;
+  const id = nextId++;
 
-  options.onStage?.({ phase: 'listening', ratio: null });
+  options.onStage?.({ phase: 'downloading', ratio: 0 });
 
-  /**
-   * Whisper reasons over 30-second windows. Anything longer has to be chunked, and
-   * the stride is what stops a word being cut in half at a boundary: the model sees
-   * overlapping context on each side and the library stitches the results.
-   */
-  const output = (await run(audio, {
-    chunk_length_s: WHISPER.windowSeconds,
-    stride_length_s: 5,
-    return_timestamps: options.timestamps ?? false,
-  })) as { text?: string; chunks?: RawChunk[] };
+  const active = getWorker();
 
-  const segments = options.timestamps ? toSegments(output.chunks ?? [], totalSeconds) : [];
-  const text = (output.text ?? segments.map((s) => s.text).join(' ')).trim();
+  return new Promise<Transcript>((resolve, reject) => {
+    const cleanup = (): void => {
+      active.removeEventListener('message', onMessage);
+      active.removeEventListener('error', onError);
+      options.signal?.removeEventListener('abort', onAbort);
+    };
 
-  return { text, segments };
+    const onAbort = (): void => {
+      cleanup();
+      // Terminating is the point of doing this in a worker: it stops the
+      // arithmetic immediately rather than at the next chunk boundary.
+      resetWorker();
+      reject(new DOMException('Aborted', 'AbortError'));
+    };
+
+    const onError = (event: ErrorEvent): void => {
+      cleanup();
+      resetWorker();
+      reject(new Error(event.message || 'The transcriber failed to start.'));
+    };
+
+    const onMessage = (event: MessageEvent<WorkerMessage & { id: number }>): void => {
+      const message = event.data;
+      // One worker serves every run on the page, so anything for another job is
+      // not ours to act on.
+      if (message.id !== id) return;
+
+      if (message.type === 'progress') {
+        if (message.stage === 'model') {
+          options.onStage?.({
+            phase: 'downloading',
+            ratio: message.ratio,
+            loaded: message.loaded,
+            total: message.total,
+          });
+        } else {
+          options.onStage?.({ phase: 'listening', ratio: message.ratio });
+        }
+        return;
+      }
+
+      cleanup();
+
+      if (message.type === 'error') {
+        resetWorker();
+        reject(new Error(message.message));
+        return;
+      }
+
+      const segments = options.timestamps
+        ? toSegments(
+            message.chunks.map((chunk) => ({
+              text: chunk.text,
+              timestamp: [chunk.start, chunk.end] as [number | null, number | null],
+            })),
+            totalSeconds
+          )
+        : [];
+      const text = (message.text || segments.map((s) => s.text).join(' ')).trim();
+      resolve({ text, segments });
+    };
+
+    active.addEventListener('message', onMessage);
+    active.addEventListener('error', onError);
+    options.signal?.addEventListener('abort', onAbort, { once: true });
+
+    active.postMessage(
+      {
+        type: 'transcribe',
+        id,
+        pcm: audio.buffer,
+        modelDir: WHISPER.dir,
+        libUrl: `/lib/transformers/${TRANSFORMERS_VERSION}/transformers.min.js`,
+        wasmDir: `/lib/transformers/${TRANSFORMERS_VERSION}/`,
+        host: new URL(`/models/${MODELS_VERSION}/`, location.origin).href,
+        expectedBytes: 40_843_851,
+        timestamps: options.timestamps ?? false,
+      },
+      // The audio is ours and is transferred; a long recording is tens of
+      // megabytes and structured-cloning it would briefly need it twice.
+      [audio.buffer]
+    );
+  });
 }
 
 /** `HH:MM:SS,mmm`, which is SRT's format and is not negotiable. */

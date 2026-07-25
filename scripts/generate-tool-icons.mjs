@@ -149,6 +149,30 @@ const SUBJECTS = {
     'one single chunky rounded analogue VU meter gauge, a round cream dial face with a thick mint green needle swung to the upper right, set in a rounded mint green case, nothing else in the frame',
   'waveform-generator':
     'a chunky rounded cream picture frame standing upright with five solid mint green bars of different heights inside it',
+
+  // Utility, continued.
+  'key-finder':
+    'a chunky rounded cream tuning fork standing upright on its handle, two thick prongs pointing up, with one small solid mint green music note floating beside its tip',
+
+  /**
+   * AI studio. These are the group most at risk of turning into six variations
+   * on a robot head, so each one is the physical thing the tool does to the
+   * audio rather than a picture of intelligence. No brains, no circuit boards,
+   * no glowing edges — those read as stock AI clipart and would break the family
+   * the other thirty-nine belong to.
+   */
+  'vocal-remover':
+    'a chunky rounded cream studio microphone standing upright, with a thick solid mint green diagonal bar crossing over it like a no-entry stroke, simple toy object',
+  'acapella-extractor':
+    'a chunky rounded cream studio microphone standing upright inside a thick rounded mint green spotlight cone shining down onto it, nothing else in frame',
+  'stem-splitter':
+    'four thick rounded horizontal bars stacked in four separate parallel layers with clear gaps between them, the top two mint green and the bottom two cream, like separated tracks in a stack',
+  'audio-transcriber':
+    'a chunky rounded cream speech bubble standing upright with three thick solid mint green horizontal lines inside it representing lines of text, simple toy object',
+  'subtitle-generator':
+    'a chunky rounded cream rectangular screen standing upright with two thick solid mint green horizontal bars across its lower third, like a caption box on a video frame',
+  'noise-remover':
+    'a chunky rounded cream handheld brush sweeping, with three small soft mint green rounded specks lifting away from its bristles, simple toy object',
 };
 
 const targets = process.argv.slice(2).length

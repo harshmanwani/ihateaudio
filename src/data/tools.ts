@@ -791,6 +791,42 @@ export const TOOLS: Tool[] = [
     // the all-four figure rather than a fixed cost.
     modelBytes: 118_812_816,
   },
+  {
+    slug: 'audio-transcriber',
+    name: 'Audio Transcriber',
+    title: 'Audio to Text: Transcribe Audio Online Free',
+    description:
+      'Turn speech in an audio file into text you can copy or download. Whisper runs in your browser, so recordings are never uploaded. Free, no length limit.',
+    tagline: "Speech in, text out, nothing uploaded.",
+    short: "Turn a recording of someone talking into text.",
+    category: 'ai',
+    icon: 'text-t',
+    keywords: [
+      'audio to text transcribe transcription speech to text whisper convert voice to text dictation interview transcript free',
+    ],
+    related: ['subtitle-generator', 'vocal-remover', 'silence-remover', 'voice-recorder'],
+    instant: false,
+    ai: true,
+    modelBytes: 40_843_851,
+  },
+  {
+    slug: 'subtitle-generator',
+    name: 'Subtitle Generator',
+    title: 'Subtitle Generator: Make SRT Subtitles Free',
+    description:
+      'Generate timed SRT or VTT subtitles from audio or video. Whisper runs in your browser, so your file is never uploaded. Free, and it handles long recordings.',
+    tagline: "Timed captions, written by listening to the file.",
+    short: "Make an SRT or VTT subtitle file from speech.",
+    category: 'ai',
+    icon: 'closed-captioning',
+    keywords: [
+      'subtitle generator srt vtt captions auto subtitles caption maker video subtitles timed transcript free auto captions',
+    ],
+    related: ['audio-transcriber', 'video-to-audio', 'vocal-remover', 'silence-remover'],
+    instant: false,
+    ai: true,
+    modelBytes: 40_843_851,
+  },
 ];
 
 export const TOOLS_BY_SLUG = new Map(TOOLS.map((tool) => [tool.slug, tool]));

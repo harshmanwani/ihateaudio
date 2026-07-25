@@ -13,6 +13,10 @@ public/ffmpeg/
 # the site rather than from R2.
 public/ort/
 
+# Regenerated from node_modules by scripts/sync-transformers.mjs. Served as a
+# static file rather than bundled — see the script for why that is load-bearing.
+public/lib/
+
 # Playwright
 test-results/
 playwright-report/
