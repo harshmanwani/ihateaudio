@@ -80,7 +80,19 @@ if (!existsSync(constants) || readFileSync(constants, 'utf8') !== generated) {
  * reads it.
  */
 const ignore = join(root, 'public', '.assetsignore');
-const ignoreBody = 'ffmpeg/\n';
+/**
+ * Everything served from R2 by worker/ rather than as a static asset.
+ *
+ * Both directories live under public/ so that `astro dev` and the verification
+ * harness can serve them locally, which means Astro copies them into dist/ — and
+ * wrangler then refuses the deploy, because Cloudflare caps a single asset at
+ * 25 MiB and these are 64 MB and 31 MB. Listing them here keeps them out of the
+ * upload while leaving local development working.
+ *
+ * public/ort/ is deliberately absent: at 13 MB it is under the cap, and shipping it
+ * with the site is simpler than routing it through R2.
+ */
+const ignoreBody = 'ffmpeg/\nmodels/\n';
 if (!existsSync(ignore) || readFileSync(ignore, 'utf8') !== ignoreBody) {
   writeFileSync(ignore, ignoreBody);
 }

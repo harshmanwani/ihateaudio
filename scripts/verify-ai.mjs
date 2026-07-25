@@ -227,8 +227,17 @@ for (const [slug, plan] of Object.entries(PLAN)) {
    * nothing to do with the tool and does not exist in a built site, but it was
    * enough to fail a run whose separation had already succeeded — which is exactly
    * the sort of false negative that teaches people to ignore their own checks.
+   *
+   * The Cloudflare entries are the same problem from the other direction. Against
+   * production, the edge injects its Web Analytics beacon and its JavaScript
+   * Detections shim into our HTML, and our CSP has no 'unsafe-inline' and does not
+   * list static.cloudflareinsights.com, so the browser blocks both and logs a
+   * violation on every page. Those are real problems — they are in the notes for the
+   * dashboard — but they are Cloudflare's injections rather than our code, and they
+   * were failing three tools whose separation had already been measured and passed.
    */
-  const IGNORE = /favicon|service ?worker|Outdated Optimize Dep|dev-toolbar|astro\/runtime/i;
+  const IGNORE =
+    /favicon|service ?worker|Outdated Optimize Dep|dev-toolbar|astro\/runtime|cloudflareinsights|beacon\.min\.js|Executing inline script violates/i;
 
   const problems = [];
   page.on('console', (m) => {
