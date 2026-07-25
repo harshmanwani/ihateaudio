@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  computeWaveform,
   measureLoudness,
   normalizeLoudness,
   detectTempo,
@@ -166,6 +167,100 @@ describe('detectTempo', () => {
 
   it('gives up gracefully on input that is too short', () => {
     expect(detectTempo(toneBuffer(0.1, 440, RATE, 1)).bpm).toBe(0);
+  });
+});
+
+describe('computeWaveform', () => {
+  it('returns one peak pair and one RMS value per column', () => {
+    const data = computeWaveform(toneBuffer(2, 440, RATE, 1, -6), 128);
+    expect(data.columns).toBe(128);
+    expect(data.peaks.length).toBe(256);
+    expect(data.rms.length).toBe(128);
+  });
+
+  it('keeps RMS inside the peak hull', () => {
+    const data = computeWaveform(toneBuffer(2, 440, RATE, 2, -6), 64);
+    for (let x = 0; x < data.columns; x += 1) {
+      const min = data.peaks[x * 2];
+      const max = data.peaks[x * 2 + 1];
+      const hull = Math.max(Math.abs(min), Math.abs(max));
+      expect(data.rms[x]).toBeLessThanOrEqual(hull + 1e-6);
+    }
+  });
+
+  it('reports RMS at the correct level for a sine', () => {
+    // A sine's RMS is its amplitude over root two.
+    const amplitude = gainFactor(-6);
+    const data = computeWaveform(toneBuffer(2, 440, RATE, 1, -6), 32);
+    expect(data.rms[16]).toBeCloseTo(amplitude / Math.SQRT2, 2);
+  });
+
+  it('separates a loud passage from a quiet one', () => {
+    const rate = RATE;
+    const buffer = createBuffer(1, rate * 4, rate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i += 1) {
+      const t = i / rate;
+      const amp = t < 2 ? 0.8 : 0.05;
+      data[i] = Math.sin(2 * Math.PI * 300 * t) * amp;
+    }
+
+    const wave = computeWaveform(buffer, 100);
+    const loud = wave.rms[25];
+    const quiet = wave.rms[75];
+    expect(loud).toBeGreaterThan(quiet * 8);
+  });
+
+  it('distinguishes a lone click from a genuinely loud column', () => {
+    // This is the whole reason RMS is drawn alongside peak: one stray sample
+    // must not make a quiet stretch look as loud as a chorus.
+    const buffer = createBuffer(1, RATE, RATE);
+    const data = buffer.getChannelData(0);
+    data.fill(0.01);
+    data[500] = 1;
+
+    const wave = computeWaveform(buffer, 10);
+    // The peak hull reaches full scale...
+    expect(wave.peaks[1]).toBeCloseTo(1, 3);
+    // ...while the body stays near the real level.
+    expect(wave.rms[0]).toBeLessThan(0.05);
+  });
+
+  it('scans every sample, including the remainder in the last column', () => {
+    // 1000 samples into 3 columns leaves a remainder that naive flooring drops.
+    const buffer = createBuffer(1, 1000, RATE);
+    const data = buffer.getChannelData(0);
+    data[999] = 1;
+
+    const wave = computeWaveform(buffer, 3);
+    expect(wave.peaks[2 * 2 + 1]).toBeCloseTo(1, 5);
+  });
+
+  it('reports zero for digital silence', () => {
+    const wave = computeWaveform(silentBuffer(1, RATE, 2), 16);
+    for (let x = 0; x < wave.columns; x += 1) {
+      expect(wave.rms[x]).toBe(0);
+      expect(wave.peaks[x * 2]).toBe(0);
+      expect(wave.peaks[x * 2 + 1]).toBe(0);
+    }
+  });
+
+  it('handles more columns than samples without producing NaN', () => {
+    const wave = computeWaveform(createBuffer(1, 8, RATE), 64);
+    for (let x = 0; x < wave.columns; x += 1) {
+      expect(Number.isFinite(wave.rms[x])).toBe(true);
+      expect(Number.isFinite(wave.peaks[x * 2])).toBe(true);
+    }
+  });
+
+  it('widens the hull across channels rather than picking one', () => {
+    const buffer = createBuffer(2, 100, RATE);
+    buffer.getChannelData(0).fill(0.3);
+    buffer.getChannelData(1).fill(-0.9);
+
+    const wave = computeWaveform(buffer, 1);
+    expect(wave.peaks[0]).toBeCloseTo(-0.9, 5);
+    expect(wave.peaks[1]).toBeCloseTo(0.3, 5);
   });
 });
 

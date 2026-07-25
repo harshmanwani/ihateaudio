@@ -389,6 +389,69 @@ export function detectTempo(buffer: AudioBuffer, minBpm = 60, maxBpm = 200): Tem
   return { bpm: Math.round(bpm * 10) / 10, confidence };
 }
 
+export interface WaveformData {
+  columns: number;
+  /** Interleaved min, max per column — the outer hull of the signal. */
+  peaks: Float32Array;
+  /** RMS per column — the perceived body of the signal. */
+  rms: Float32Array;
+}
+
+/**
+ * Reduces a buffer to per-column peak and RMS in a single pass.
+ *
+ * Both are needed to draw a waveform that reads accurately. Peak alone is what
+ * makes cheap waveforms look like solid blocks: a single stray sample stretches
+ * the whole column to full height, so a quiet passage with one click in it
+ * looks as loud as a chorus. RMS traces the energy the ear actually follows.
+ * Drawing the hull and the body together is what every serious editor does.
+ */
+export function computeWaveform(
+  buffer: AudioBuffer,
+  columns: number
+): WaveformData {
+  const width = Math.max(1, Math.floor(columns));
+  const peaks = new Float32Array(width * 2);
+  const rms = new Float32Array(width);
+  const channels = buffer.numberOfChannels;
+  const length = buffer.length;
+
+  // Hoist channel references: getChannelData is a getter, and calling it
+  // inside the sample loop dominates the profile on long files.
+  const data: Float32Array[] = [];
+  for (let c = 0; c < channels; c += 1) data.push(buffer.getChannelData(c));
+
+  const perColumn = length / width;
+
+  for (let x = 0; x < width; x += 1) {
+    const start = Math.floor(x * perColumn);
+    // The last column absorbs any rounding remainder so no sample is skipped.
+    const end = x === width - 1 ? length : Math.min(length, Math.floor((x + 1) * perColumn));
+
+    let min = 0;
+    let max = 0;
+    let sumSquares = 0;
+    let count = 0;
+
+    for (let c = 0; c < channels; c += 1) {
+      const channel = data[c];
+      for (let i = start; i < end; i += 1) {
+        const v = channel[i];
+        if (v < min) min = v;
+        if (v > max) max = v;
+        sumSquares += v * v;
+      }
+      count += end - start;
+    }
+
+    peaks[x * 2] = min;
+    peaks[x * 2 + 1] = max;
+    rms[x] = count > 0 ? Math.sqrt(sumSquares / count) : 0;
+  }
+
+  return { columns: width, peaks, rms };
+}
+
 /**
  * Downsamples to min/max pairs per pixel column for waveform drawing.
  * Drawing from these instead of raw samples is what keeps a one-hour file

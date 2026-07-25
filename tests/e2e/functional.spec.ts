@@ -167,6 +167,137 @@ test.describe('multi-output tools', () => {
   });
 });
 
+test.describe('splitter cut markers', () => {
+  test('seeds markers from the settings and draws them', async ({ page }) => {
+    await page.goto('/audio-splitter');
+    await dropGeneratedAudio(page, { seconds: 24 });
+    await waitForWorkspace(page);
+
+    // Four equal parts means three interior cuts.
+    await expect(page.locator('.stage__marker')).toHaveCount(3);
+    await expect(page.locator('[data-plan-text]')).toContainText('4 parts');
+    await expect(page.locator('.stage__marker-tip').first()).toHaveText('0:06.00');
+  });
+
+  test('a marker can be dragged and the plan follows', async ({ page }) => {
+    await page.goto('/audio-splitter');
+    await dropGeneratedAudio(page, { seconds: 24 });
+    await waitForWorkspace(page);
+
+    const first = page.locator('.stage__marker').first();
+    const before = await first.evaluate((el) => (el as HTMLElement).style.left);
+
+    const box = await first.boundingBox();
+    const canvas = await page.locator('[data-canvas-wrap]').boundingBox();
+    if (!box || !canvas) throw new Error('no geometry');
+
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(canvas.x + canvas.width * 0.4, box.y + box.height / 2, {
+      steps: 8,
+    });
+    await page.mouse.up();
+
+    const after = await first.evaluate((el) => (el as HTMLElement).style.left);
+    expect(after).not.toBe(before);
+    // Parts are no longer equal, so the plan must report a range.
+    await expect(page.locator('[data-plan-text]')).toContainText(' to ');
+  });
+
+  test('double-clicking the waveform adds a cut', async ({ page }) => {
+    await page.goto('/audio-splitter');
+    await dropGeneratedAudio(page, { seconds: 24 });
+    await waitForWorkspace(page);
+
+    const canvas = await page.locator('[data-canvas-wrap]').boundingBox();
+    if (!canvas) throw new Error('no canvas');
+
+    // 0.85 sits between the seeded cuts; 0.75 is exactly on one, and a
+    // duplicate is deduped away by design.
+    await page.mouse.dblclick(canvas.x + canvas.width * 0.85, canvas.y + canvas.height * 0.7);
+    await expect(page.locator('.stage__marker')).toHaveCount(4);
+    await expect(page.locator('[data-plan-text]')).toContainText('5 parts');
+  });
+
+  test('a marker can be removed', async ({ page }) => {
+    await page.goto('/audio-splitter');
+    await dropGeneratedAudio(page, { seconds: 24 });
+    await waitForWorkspace(page);
+
+    await page.locator('.stage__marker').first().hover();
+    await page.locator('.stage__marker-x').first().click();
+
+    await expect(page.locator('.stage__marker')).toHaveCount(2);
+    await expect(page.locator('[data-plan-text]')).toContainText('3 parts');
+  });
+
+  test('keyboard nudges and deletes a marker', async ({ page }) => {
+    await page.goto('/audio-splitter');
+    await dropGeneratedAudio(page, { seconds: 24 });
+    await waitForWorkspace(page);
+
+    const first = page.locator('.stage__marker').first();
+    await first.focus();
+    await first.press('ArrowRight');
+    await expect(page.locator('.stage__marker-tip').first()).toHaveText('0:06.05');
+
+    await page.locator('.stage__marker').first().press('Delete');
+    await expect(page.locator('.stage__marker')).toHaveCount(2);
+  });
+
+  test('hand-placed cuts are what actually get exported', async ({ page }) => {
+    await page.goto('/audio-splitter');
+    await dropGeneratedAudio(page, { seconds: 24 });
+    await waitForWorkspace(page);
+
+    // Reduce to a single cut, so two parts must come out — not the four the
+    // settings would have produced.
+    await page.locator('.stage__marker').first().hover();
+    await page.locator('.stage__marker-x').first().click();
+    await page.locator('.stage__marker').first().hover();
+    await page.locator('.stage__marker-x').first().click();
+    await expect(page.locator('.stage__marker')).toHaveCount(1);
+
+    await page.click('[data-download]');
+    await expect
+      .poll(async () => page.locator('[data-results] .result').count(), {
+        timeout: 60_000,
+      })
+      .toBe(2);
+  });
+});
+
+test.describe('silence remover shows what it will cut', () => {
+  test('highlights the detected gaps on the waveform', async ({ page }) => {
+    await page.goto('/silence-remover');
+    await dropGeneratedAudio(page, { seconds: 12, gap: [4, 7] });
+    await waitForWorkspace(page);
+    await page.waitForTimeout(500);
+
+    await expect(page.locator('[data-report]')).toContainText(/gap/i);
+
+    // The highlight is canvas-painted, so assert on the pixels: the flagged
+    // band must differ from the untouched background beside it.
+    const differs = await page.evaluate(() => {
+      const canvas = document.querySelector<HTMLCanvasElement>('[data-canvas]');
+      const ctx = canvas?.getContext('2d');
+      if (!canvas || !ctx) return false;
+
+      const y = 6;
+      const inGap = ctx.getImageData(Math.floor(canvas.width * 0.45), y, 1, 1).data;
+      const outside = ctx.getImageData(Math.floor(canvas.width * 0.08), y, 1, 1).data;
+      return (
+        Math.abs(inGap[0] - outside[0]) +
+          Math.abs(inGap[1] - outside[1]) +
+          Math.abs(inGap[2] - outside[2]) >
+        12
+      );
+    });
+
+    expect(differs, 'the silent span should be visibly flagged').toBe(true);
+  });
+});
+
 test.describe('DSP tools produce output', () => {
   const cases: { slug: string; suffix: string }[] = [
     { slug: 'volume-booster', suffix: 'louder' },

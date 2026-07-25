@@ -231,12 +231,24 @@ const faq = [
         const regions = findSilence(ctx.buffer, threshold, minSec);
 
         if (regions.length === 0) {
+          runtime.setHighlights([]);
           reportText.textContent =
             `No stretch is both quieter than ${threshold} dB and longer than ${minSec.toFixed(2)} s. ` +
             'Move the threshold up toward -20 dB, or shorten the minimum gap.';
           report.hidden = false;
           return;
         }
+
+        // Show the exact spans on the waveform, inset by the padding that is
+        // kept, so the slider stops being a guess — you can see what goes.
+        runtime.setHighlights(
+          regions
+            .map((region) => ({
+              start: Math.max(0, region.start + padSec),
+              end: Math.min(total, region.end - padSec),
+            }))
+            .filter((region) => region.end > region.start)
+        );
 
         let removed = 0;
         let cut = 0;
@@ -260,7 +272,7 @@ const faq = [
 
         const share = Math.round((removed / total) * 100);
         reportText.textContent =
-          `${regions.length} gap${regions.length === 1 ? '' : 's'} found. ` +
+          `Highlighted on the waveform: ${regions.length} gap${regions.length === 1 ? '' : 's'} found. ` +
           `About ${fmtDuration(removed)} comes out — ${share}% of the file — ` +
           `leaving ${fmtDuration(total - removed)} of ${fmtDuration(total)}.`;
         report.hidden = false;

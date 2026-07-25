@@ -45,7 +45,7 @@ const faq = [
 ---
 
 <ToolPage slug={tool.slug} steps={steps} faq={faq}>
-  <ToolShell tool={tool} results action="Split file">
+  <ToolShell tool={tool} markers results action="Split file">
     <div class="controls">
       <div class="controls__head">
         <span class="controls__title">How to split</span>
@@ -296,16 +296,25 @@ const faq = [
   const tool = createTool({
     suffix: 'part',
     defaultFormat: 'mp3',
+    markers: true,
 
     onReady(ctx, runtime) {
       const root = runtime.root;
       const plan = root.querySelector<HTMLElement>('[data-plan]');
       const planText = root.querySelector<HTMLElement>('[data-plan-text]');
 
+      // Settings seed the markers; from then on the waveform is authoritative,
+      // because a marker the user dragged must survive a slider repaint.
+      const seed = (): void => {
+        const points = boundaries(ctx.buffer);
+        runtime.setMarkers(points.slice(1, -1), { silent: true });
+        describe();
+      };
+
       const describe = (): void => {
         if (!plan || !planText) return;
-        const points = boundaries(ctx.buffer);
-        const count = Math.max(0, points.length - 1);
+        const segments = runtime.getSegments();
+        const count = segments.length;
 
         if (count < 1) {
           planText.textContent = 'Nothing to split with these settings.';
@@ -313,7 +322,7 @@ const faq = [
           return;
         }
 
-        const spans = points.slice(0, -1).map((start, i) => points[i + 1] - start);
+        const spans = segments.map((seg) => seg.end - seg.start);
         const shortest = Math.min(...spans);
         const longest = Math.max(...spans);
         const sizes =
@@ -325,9 +334,9 @@ const faq = [
           count > 20 ? ' That is a lot of separate downloads — your browser may ask permission part way through.' : '';
 
         planText.textContent =
-          mode === 'silence'
-            ? `${count - 1} gap${count - 1 === 1 ? '' : 's'} found, giving ${count} part${count === 1 ? '' : 's'}, ${sizes}.${crowded}`
-            : `${count} part${count === 1 ? '' : 's'}, ${sizes}.${crowded}`;
+          `${count} part${count === 1 ? '' : 's'}, ${sizes}. ` +
+          'Drag a cut point to move it, double-click the waveform to add one, ' +
+          `or press \u00d7 to remove one.${crowded}`;
         plan.hidden = false;
       };
 
@@ -335,7 +344,7 @@ const faq = [
       let timer = 0;
       const scheduleDescribe = (): void => {
         window.clearTimeout(timer);
-        timer = window.setTimeout(describe, 140);
+        timer = window.setTimeout(seed, 140);
       };
 
       const bindSlider = (name: string, format: (value: number) => string): void => {
@@ -389,24 +398,28 @@ const faq = [
           root.querySelectorAll<HTMLElement>('[data-when]').forEach((field) => {
             field.hidden = field.dataset.when !== mode;
           });
-          describe();
+          seed();
         });
       });
 
-      describe();
+      // Editing markers directly updates the plan text.
+      root.addEventListener('markerschange', describe);
+
+      seed();
     },
 
     process(ctx) {
       const { buffer } = ctx;
-      const points = boundaries(buffer);
+      // Whatever is on the waveform is what gets exported — including any
+      // hand-placed cuts, which is the whole point of making it editable.
+      const segments = tool?.getSegments() ?? [{ start: 0, end: buffer.duration }];
       // A dot in the stem would read as an extension and swallow the real one.
       const stem = (baseName(ctx.files[0]?.name ?? 'audio') || 'audio').replace(/\./g, '-');
-      const count = points.length - 1;
-      const width = count >= 10 ? String(count).length : 1;
+      const width = segments.length >= 10 ? String(segments.length).length : 1;
 
-      return points.slice(0, -1).map((start, index) => ({
+      return segments.map((seg, index) => ({
         name: `${stem}-part-${String(index + 1).padStart(width, '0')}`,
-        buffer: slice(buffer, start, points[index + 1]),
+        buffer: slice(buffer, seg.start, seg.end),
       }));
     },
   });

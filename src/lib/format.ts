@@ -8,10 +8,20 @@
  */
 export function timecode(seconds: number, showHours?: boolean): string {
   if (!Number.isFinite(seconds) || seconds < 0) seconds = 0;
-  const hrs = Math.floor(seconds / 3600);
-  const mins = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-  const cs = Math.floor((seconds % 1) * 100);
+
+  // Quantise to centiseconds up front, then decompose from that integer.
+  // Flooring the fractional part directly displays 6.05 as "6.04", because
+  // 6 + 0.05 lands an epsilon below 6.05 in binary floating point — and that
+  // shows up the moment anyone nudges a marker or handle by a hundredth.
+  let remaining = Math.round(seconds * 100);
+
+  const hrs = Math.floor(remaining / 360_000);
+  remaining -= hrs * 360_000;
+  const mins = Math.floor(remaining / 6000);
+  remaining -= mins * 6000;
+  const secs = Math.floor(remaining / 100);
+  const cs = remaining - secs * 100;
+
   const cc = String(cs).padStart(2, '0');
   if (hrs > 0 || showHours) {
     return `${hrs}:${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}.${cc}`;

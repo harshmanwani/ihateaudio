@@ -12,6 +12,8 @@ interface Props {
   tool: Tool;
   /** Show draggable selection handles over the waveform. */
   selection?: boolean;
+  /** Render the draggable cut-marker layer over the waveform. */
+  markers?: boolean;
   /** Hide the waveform for tools that only report numbers. */
   stage?: boolean;
   /** Show the format/quality export bar. */
@@ -30,6 +32,7 @@ interface Props {
 const {
   tool,
   selection = false,
+  markers = false,
   stage = true,
   exportBar = true,
   action = 'Download',
@@ -145,6 +148,15 @@ const formats = video
                   <span class="stage__handle-tip" data-tip>0:00.00</span>
                 </div>
               </>
+            )}
+
+            {markers && (
+              <div
+                class="stage__markers"
+                data-markers
+                aria-label="Cut points"
+                role="group"
+              />
             )}
 
             <div class="stage__playhead" data-playhead />

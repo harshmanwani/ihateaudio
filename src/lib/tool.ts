@@ -67,6 +67,8 @@ export interface ToolConfig {
   multiple?: boolean;
   /** Show draggable selection handles over the waveform. */
   selection?: boolean;
+  /** Enable draggable cut markers over the waveform. */
+  markers?: boolean;
   /** Hide the waveform entirely (for tools that only report numbers). */
   stage?: boolean;
   /** Accept video files too, for audio extraction. */
@@ -95,6 +97,7 @@ export class ToolRuntime {
   private waveform: Waveform | null = null;
   private player: Player | null = null;
   private selection: Selection = { start: 0, end: 0 };
+  private markers: number[] = [];
   private controller: AbortController | null = null;
   private detachDrop: (() => void) | null = null;
   private previewBuffer: AudioBuffer | null = null;
@@ -114,6 +117,7 @@ export class ToolRuntime {
     handleEnd: HTMLElement | null;
     maskLeft: HTMLElement | null;
     maskRight: HTMLElement | null;
+    markers: HTMLElement | null;
     play: HTMLButtonElement | null;
     loopBtn: HTMLButtonElement | null;
     time: HTMLElement | null;
@@ -146,6 +150,7 @@ export class ToolRuntime {
       handleEnd: $(root, '[data-handle="end"]'),
       maskLeft: $(root, '[data-mask="left"]'),
       maskRight: $(root, '[data-mask="right"]'),
+      markers: $(root, '[data-markers]'),
       play: $<HTMLButtonElement>(root, '[data-play]'),
       loopBtn: $<HTMLButtonElement>(root, '[data-loop]'),
       time: $(root, '[data-time]'),
@@ -185,6 +190,7 @@ export class ToolRuntime {
     this.buildFormatOptions();
     this.setupTransport();
     this.setupKeyboard();
+    this.setupMarkers();
 
     // A file handed over by the previous tool loads with no upload step.
     const handed = claimHandoff();
@@ -299,6 +305,7 @@ export class ToolRuntime {
       this.files = files;
       this.buffers = decoded;
       this.selection = { start: 0, end: decoded[0].duration };
+      this.markers = [];
       this.lastOutput = null;
 
       this.setBusy(false);
@@ -554,6 +561,188 @@ export class ToolRuntime {
 
   getSelection(): Selection {
     return { ...this.selection };
+  }
+
+  // ---------- markers ----------
+
+  /**
+   * Draggable cut points over the waveform, in seconds.
+   *
+   * A splitter that only takes a part count is a calculator, not an editor —
+   * you cannot put a boundary between two songs or after an intro. Markers make
+   * the waveform the control surface: the settings seed them, and dragging one
+   * or clicking a new one takes over from there.
+   */
+  setMarkers(times: number[], options: { silent?: boolean } = {}): void {
+    const total = this.buffers[0]?.duration ?? 0;
+    // Snap out interior duplicates and anything sitting on the two ends: those
+    // are implied by the file itself and would export a zero-length part.
+    const cleaned = [...new Set(times.map((t) => Math.round(t * 1000) / 1000))]
+      .filter((t) => t > 0.05 && t < total - 0.05)
+      .sort((a, b) => a - b);
+
+    this.markers = cleaned;
+    this.waveform?.setMarkers(cleaned);
+    this.renderMarkers();
+
+    if (!options.silent) {
+      this.root.dispatchEvent(
+        new CustomEvent('markerschange', { detail: [...cleaned] })
+      );
+    }
+  }
+
+  getMarkers(): number[] {
+    return [...this.markers];
+  }
+
+  /** Calls out spans on the waveform that the tool is about to act on. */
+  setHighlights(regions: { start: number; end: number }[]): void {
+    this.waveform?.setHighlights(regions);
+  }
+
+  /** Segment boundaries including the file's own start and end. */
+  getSegments(): { start: number; end: number }[] {
+    const total = this.buffers[0]?.duration ?? 0;
+    const edges = [0, ...this.markers, total];
+    const out: { start: number; end: number }[] = [];
+    for (let i = 0; i < edges.length - 1; i += 1) {
+      if (edges[i + 1] - edges[i] > 0.01) {
+        out.push({ start: edges[i], end: edges[i + 1] });
+      }
+    }
+    return out;
+  }
+
+  private renderMarkers(): void {
+    const layer = this.el.markers;
+    if (!layer || !this.waveform) return;
+
+    layer.innerHTML = '';
+
+    this.markers.forEach((time, index) => {
+      const handle = document.createElement('div');
+      handle.className = 'stage__marker';
+      handle.style.left = `${this.waveform?.positionOf(time) ?? 0}%`;
+      handle.tabIndex = 0;
+      handle.setAttribute('role', 'slider');
+      handle.setAttribute('aria-label', `Cut point ${index + 1}`);
+      handle.setAttribute('aria-valuenow', time.toFixed(2));
+      handle.dataset.index = String(index);
+
+      const tip = document.createElement('span');
+      tip.className = 'stage__marker-tip';
+      tip.textContent = timecode(time);
+      handle.append(tip);
+
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.className = 'stage__marker-x';
+      remove.setAttribute('aria-label', `Remove cut point ${index + 1}`);
+      remove.textContent = '×';
+      handle.append(remove);
+
+      layer.append(handle);
+    });
+  }
+
+  /** Pointer, keyboard and click-to-add behaviour for the marker layer. */
+  private setupMarkers(): void {
+    const layer = this.el.markers;
+    const wrap = this.el.canvasWrap;
+    if (!layer || !wrap) return;
+
+    layer.addEventListener('pointerdown', (event) => {
+      const target = event.target as HTMLElement;
+
+      if (target.classList.contains('stage__marker-x')) {
+        const index = Number(target.parentElement?.dataset.index);
+        if (Number.isFinite(index)) {
+          const next = this.getMarkers();
+          next.splice(index, 1);
+          this.setMarkers(next);
+        }
+        event.stopPropagation();
+        return;
+      }
+
+      const handle = target.closest<HTMLElement>('.stage__marker');
+      if (!handle) return;
+
+      event.preventDefault();
+      event.stopPropagation();
+      const index = Number(handle.dataset.index);
+      handle.setPointerCapture(event.pointerId);
+      handle.dataset.grabbed = 'true';
+
+      const move = (moveEvent: PointerEvent): void => {
+        if (!this.waveform) return;
+        const next = this.getMarkers();
+        next[index] = this.waveform.timeAt(moveEvent.clientX);
+        // Re-sorting mid-drag would swap the handle out from under the pointer,
+        // so the visual updates now and the sort lands on release.
+        this.markers = next;
+        this.waveform.setMarkers(next);
+        handle.style.left = `${this.waveform.positionOf(next[index])}%`;
+        const tip = handle.querySelector('.stage__marker-tip');
+        if (tip) tip.textContent = timecode(next[index]);
+      };
+
+      const up = (): void => {
+        handle.dataset.grabbed = 'false';
+        handle.removeEventListener('pointermove', move);
+        handle.removeEventListener('pointerup', up);
+        handle.removeEventListener('pointercancel', up);
+        this.setMarkers(this.getMarkers());
+      };
+
+      handle.addEventListener('pointermove', move);
+      handle.addEventListener('pointerup', up);
+      handle.addEventListener('pointercancel', up);
+    });
+
+    layer.addEventListener('keydown', (event) => {
+      const handle = (event.target as HTMLElement).closest<HTMLElement>(
+        '.stage__marker'
+      );
+      if (!handle) return;
+      const index = Number(handle.dataset.index);
+      const step = event.shiftKey ? 1 : 0.05;
+
+      if (event.key === 'Delete' || event.key === 'Backspace') {
+        event.preventDefault();
+        const next = this.getMarkers();
+        next.splice(index, 1);
+        this.setMarkers(next);
+        return;
+      }
+
+      let delta = 0;
+      if (event.key === 'ArrowLeft') delta = -step;
+      else if (event.key === 'ArrowRight') delta = step;
+      else return;
+
+      event.preventDefault();
+      const next = this.getMarkers();
+      next[index] += delta;
+      this.setMarkers(next);
+      // Keep focus on the marker the user is nudging, even if it re-sorted.
+      const moved = this.getMarkers().indexOf(
+        Math.round(next[index] * 1000) / 1000
+      );
+      const layerEl = this.el.markers;
+      if (moved >= 0 && layerEl) {
+        layerEl.querySelectorAll<HTMLElement>('.stage__marker')[moved]?.focus();
+      }
+    });
+
+    // Clicking empty waveform adds a cut there — the whole point of making the
+    // waveform the control surface.
+    wrap.addEventListener('dblclick', (event) => {
+      if (!this.config.markers || !this.waveform) return;
+      if ((event.target as HTMLElement).closest('.stage__marker')) return;
+      this.setMarkers([...this.getMarkers(), this.waveform.timeAt(event.clientX)]);
+    });
   }
 
   private renderSelection(): void {
@@ -904,6 +1093,7 @@ export class ToolRuntime {
     this.waveform = null;
     this.buffers = [];
     this.files = [];
+    this.markers = [];
     this.previewBuffer = null;
     this.lastOutput = null;
 

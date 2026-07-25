@@ -26,6 +26,18 @@ describe('timecode', () => {
     expect(timecode(59, true)).toBe('0:00:59.00');
   });
 
+  it('rounds centiseconds instead of truncating a float artefact', () => {
+    // 6 + 0.05 is 6.04999… in binary floating point, so flooring the
+    // fractional part renders "0:06.04". Anyone nudging a marker by a
+    // hundredth sees the wrong number.
+    expect(timecode(6 + 0.05)).toBe('0:06.05');
+    expect(timecode(0.1 + 0.2)).toBe('0:00.30');
+    // Rounding must carry rather than emit a 100 in the centiseconds slot.
+    expect(timecode(5.999)).toBe('0:06.00');
+    expect(timecode(59.999)).toBe('1:00.00');
+    expect(timecode(3599.999)).toBe('1:00:00.00');
+  });
+
   it('clamps nonsense rather than rendering NaN into the UI', () => {
     expect(timecode(-5)).toBe('0:00.00');
     expect(timecode(NaN)).toBe('0:00.00');
