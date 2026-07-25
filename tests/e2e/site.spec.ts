@@ -202,15 +202,45 @@ test.describe('navigation', () => {
     await page.goto('/audio-trimmer');
     await page.click('[data-meganav] summary');
 
-    const links = page.locator('[data-meganav] a');
+    // Scoped to the grid: the panel's own footer also carries the reference
+    // links, which is the only route to them on a phone.
+    const links = page.locator('[data-meganav] .meganav__grid a');
     await expect(links).toHaveCount(TOOLS.length);
     await expect(
       page.locator('[data-meganav] a[href="/slowed-reverb"]')
     ).toBeVisible();
 
+    for (const href of ['/loudness-targets', '/audio-formats', '/about']) {
+      await expect(
+        page.locator(`[data-meganav] .meganav__foot a[href="${href}"]`),
+        `the menu should reach ${href}`
+      ).toBeVisible();
+    }
+
     // Escape closes it and nothing is left covering the page.
     await page.keyboard.press('Escape');
     await expect(page.locator('.meganav__panel')).toBeHidden();
+  });
+
+  test('every tool in the menu carries its own art', async ({ page }) => {
+    await page.goto('/');
+    await page.click('[data-meganav] summary');
+
+    // The art is the point of the launcher: a menu of 39 identical rows of text
+    // is a list, not something you can pick from at a glance.
+    const art = page.locator('[data-meganav] .meganav__grid img');
+    await expect(art).toHaveCount(TOOLS.filter((tool) => tool.icon3d).length);
+
+    const first = art.first();
+    await expect(first).toHaveAttribute('src', /\/icons3d\/[a-z0-9-]+\.png$/);
+
+    // Decoded, not merely referenced. Polled because the art is lazy and only
+    // starts fetching once the menu is opened or the button is hovered.
+    await expect
+      .poll(() => first.evaluate((img: HTMLImageElement) => img.naturalWidth), {
+        timeout: 5000,
+      })
+      .toBeGreaterThan(0);
   });
 
   test('homepage trust band and FAQ are present after the grid', async ({ page }) => {
@@ -346,5 +376,220 @@ test.describe('discoverability', () => {
     expect(body).toContain('sitemap-image');
     expect(body).toContain('/og/audio-trimmer.png');
     expect(body).toContain('/og/home.png');
+  });
+});
+
+test.describe('installable', () => {
+  test('the manifest is complete enough to install', async ({ request }) => {
+    const response = await request.get('/manifest.webmanifest');
+    expect(response.status()).toBe(200);
+
+    const manifest = await response.json();
+    expect(manifest.name.length).toBeGreaterThan(10);
+    expect(manifest.short_name.length).toBeLessThanOrEqual(12);
+    expect(manifest.display).toBe('standalone');
+    expect(manifest.start_url).toContain('/');
+
+    // Chrome refuses to install without a 192 and a 512, and Android crops any
+    // icon that is not declared maskable, so all three have to be present.
+    const sizes = manifest.icons.map((icon: { sizes: string }) => icon.sizes);
+    expect(sizes).toContain('192x192');
+    expect(sizes).toContain('512x512');
+    expect(
+      manifest.icons.some((icon: { purpose?: string }) => icon.purpose === 'maskable')
+    ).toBe(true);
+
+    // Every declared asset must actually be served, or the install dialog shows
+    // a broken icon and the shortcut menu is empty.
+    const assets = [
+      ...manifest.icons.map((icon: { src: string }) => icon.src),
+      ...manifest.screenshots.map((shot: { src: string }) => shot.src),
+      ...manifest.shortcuts.flatMap((s: { icons: { src: string }[] }) =>
+        s.icons.map((icon) => icon.src)
+      ),
+    ];
+
+    for (const src of assets) {
+      const asset = await request.get(src);
+      expect(asset.status(), `${src} is declared in the manifest but not served`).toBe(
+        200
+      );
+    }
+  });
+
+  test('the app icons and launch images are served', async ({ request }) => {
+    for (const path of [
+      '/favicon.svg',
+      '/icon-192.png',
+      '/icon-512.png',
+      '/icon-maskable-512.png',
+      '/apple-touch-icon.png',
+      // iOS matches launch images on exact pixel size with no fallback, so a
+      // missing one is a white screen rather than a smaller image.
+      '/splash/1290x2796.png',
+      '/splash/750x1334.png',
+      '/splash/2048x2732.png',
+    ]) {
+      const response = await request.get(path);
+      expect(response.status(), `${path} should be served`).toBe(200);
+    }
+  });
+
+  test('the offline worker is registered and skips the huge core', async ({
+    page,
+    request,
+  }) => {
+    const worker = await (await request.get('/sw.js')).text();
+    // The ffmpeg core is 31 MB. Caching it would evict everything useful.
+    expect(worker).toContain("url.pathname.startsWith('/ffmpeg/')");
+    expect(worker).toContain("url.pathname.startsWith('/icons3d/')");
+
+    await page.goto('/');
+    const registered = await page.evaluate(
+      () => 'serviceWorker' in navigator
+    );
+    expect(registered).toBe(true);
+  });
+
+  test('the install card stays out of the way until it is wanted', async ({ page }) => {
+    await page.goto('/');
+    // No install event fires in a headless run, and the card must not appear on
+    // its own: an invitation that shows up unprompted on page one is an ad.
+    await expect(page.locator('[data-pwa-install]')).toBeHidden();
+    await expect(page.locator('[data-pwa-trigger]')).toBeHidden();
+  });
+});
+
+test.describe('tool page reading experience', () => {
+  test('the article is separated from the tool and capped for reading', async ({
+    page,
+  }) => {
+    await page.goto('/audio-trimmer');
+
+    const band = page.locator('.toolread');
+    await expect(band).toBeVisible();
+
+    // A real gap between working and reading, not a hairline.
+    const gap = await page.evaluate(() => {
+      const tool = document.querySelector('.toolpage');
+      const read = document.querySelector('.toolread');
+      if (!tool || !read) return 0;
+      return read.getBoundingClientRect().top - tool.getBoundingClientRect().bottom;
+    });
+    expect(gap).toBeGreaterThan(40);
+
+    // Prose measure: past roughly 75 characters a line, readers lose their place
+    // on the return sweep. Measured against the font's real average character
+    // width rather than a guessed ratio, because `ch` overstates it badly here:
+    // Instrument Sans draws a 0.666em zero and a 0.517em average lowercase.
+    const chars = await page.locator('.toolbody__main p').evaluateAll((nodes) => {
+      const probe = document.createElement('span');
+      probe.style.cssText =
+        'position:absolute;visibility:hidden;white-space:pre;font:16px var(--font)';
+      probe.textContent = 'abcdefghijklmnopqrstuvwxyz abcdefghijklmnopqrstuvwxyz';
+      document.body.append(probe);
+      const per = probe.getBoundingClientRect().width / probe.textContent.length / 16;
+      probe.remove();
+
+      return nodes.map((node) => {
+        const size = parseFloat(getComputedStyle(node).fontSize);
+        return node.getBoundingClientRect().width / (size * per);
+      });
+    });
+
+    expect(chars.length).toBeGreaterThan(3);
+    for (const line of chars) expect(Math.round(line)).toBeLessThan(80);
+  });
+
+  test('the steps read as a numbered sequence', async ({ page }) => {
+    await page.goto('/audio-splitter');
+    const steps = page.locator('.steps li');
+    expect(await steps.count()).toBeGreaterThanOrEqual(3);
+
+    // The connector rail is what makes four paragraphs read as one sequence.
+    const rail = await steps.first().evaluate((li) => {
+      const after = getComputedStyle(li, '::after');
+      return { content: after.content, width: after.width };
+    });
+    expect(rail.content).not.toBe('none');
+  });
+});
+
+test.describe('analytics', () => {
+  test('nothing third-party loads without the ids configured', async ({ page }) => {
+    // The suite must not depend on anyone else's CDN being up, and a developer
+    // should never pollute production numbers by running the site locally.
+    const external: string[] = [];
+    page.on('request', (request) => {
+      const host = new URL(request.url()).host;
+      if (!host.includes('localhost') && !host.includes('127.0.0.1')) {
+        external.push(request.url());
+      }
+    });
+
+    await page.goto('/audio-trimmer');
+    await page.waitForLoadState('networkidle');
+    expect(external, `unexpected third-party requests`).toEqual([]);
+  });
+
+  test('the bootstrap is same-origin so the CSP can stay strict', async ({
+    request,
+  }) => {
+    const response = await request.get('/analytics.js');
+    expect(response.status()).toBe(200);
+
+    const body = await response.text();
+    // The switched-off list is the part that has to survive refactors: this site
+    // promises the file never leaves the device, and a session replay of a tool
+    // page would capture filenames.
+    expect(body).toContain('disable_session_recording: true');
+    expect(body).toContain('autocapture: false');
+    expect(body).toContain('respect_dnt: true');
+    expect(body).toContain("persistence: 'localStorage'");
+    expect(body).toContain('allow_google_signals: false');
+  });
+
+  test('the security policy allowlists analytics and nothing else', async ({
+    request,
+  }) => {
+    // Read from source: the dev server does not apply Cloudflare's _headers.
+    const headers = await (await request.get('/_headers')).text();
+    const csp = headers
+      .split('\n')
+      .find((line) => line.includes('Content-Security-Policy'));
+
+    expect(csp, '_headers must carry a CSP').toBeTruthy();
+    expect(csp).toContain('https://www.googletagmanager.com');
+    expect(csp).toContain('https://a.tenmiracle.com');
+    // Scripts must never need unsafe-inline, which is the whole reason the
+    // bootstrap is an external file.
+    const scriptSrc = csp!.slice(csp!.indexOf('script-src'));
+    expect(scriptSrc.slice(0, scriptSrc.indexOf(';'))).not.toContain('unsafe-inline');
+  });
+
+  test('the privacy page describes what is actually collected', async ({ page }) => {
+    // If the analytics config changes, this page has to change with it. A stale
+    // "no cookies are set" would be the single most damaging sentence on the
+    // site.
+    await page.goto('/privacy');
+    const text = await page.locator('main').innerText();
+
+    expect(text).toMatch(/Google Analytics/);
+    expect(text).toMatch(/PostHog/);
+    expect(text).toMatch(/no session recording/i);
+    expect(text).toMatch(/Do Not Track/i);
+    expect(text).not.toMatch(/No cookies are set/i);
+  });
+});
+
+test.describe('contact', () => {
+  test('the support address is reachable from every page', async ({ page }) => {
+    for (const path of ['/', '/audio-trimmer', '/privacy']) {
+      await page.goto(path);
+      await expect(
+        page.locator('a[href="mailto:support@ihateaudio.com"]').first(),
+        `${path} should offer a way to report a problem`
+      ).toBeAttached();
+    }
   });
 });

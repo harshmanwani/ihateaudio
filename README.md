@@ -107,6 +107,70 @@ converter still involves no third-party request.
 - broken, empty and undecodable files each produce a specific message rather
   than a stuck spinner
 
+## Analytics and the PWA
+
+Both are configured to not contradict the promise on every other page.
+
+**Analytics** is off unless the ids are set, which keeps local dev and the test
+suite free of third-party requests. Set `PUBLIC_GA_ID` and
+`PUBLIC_POSTHOG_KEY` in the host's environment; see [DEPLOY.md](DEPLOY.md).
+
+The bootstrap lives in `public/analytics.js`, a same-origin file rather than an
+inline block, so `script-src` never needs `'unsafe-inline'` and the CSP stays
+strict. What is switched off matters more than what is on: no session replay (a
+replay of a tool page would capture filenames, and a filename is content), no
+autocapture of anything typed, Do Not Track honoured, no cookie of our own, and
+Google's advertising signals disabled. `src/lib/track.ts` sends three product
+events, and never a filename, a file size, or a raw duration. Change any of
+this and `/privacy` has to change with it; a test asserts that page still
+describes reality.
+
+**Installable.** `public/manifest.webmanifest` plus icons, a maskable icon, 11
+iOS launch images and 2 install-dialog screenshots, all rendered from
+`src/assets/logo.svg` by `scripts/generate-app-icons.mjs` as part of the build.
+The install card appears in the corner after twenty seconds, remembers being
+dismissed for a month, and never appears once installed. iOS gets different copy
+because Safari has no install event to hook, so the only route there is Share,
+then Add to Home Screen.
+
+Offline is a real capability rather than a token PWA gesture: every tool runs
+client-side, so once a page has been visited it works with no connection. Load a
+tool page, turn off the wifi, reload.
+
+## Generated assets
+
+Four scripts produce committed or built artifacts. Only the first two need
+network access or a running server.
+
+| Command | Produces | When to run |
+|---|---|---|
+| `FAL_KEY=... npm run icons` | The 39 3D tool icons in `public/icons3d` | When a tool is added or its art is wrong |
+| `npm run shots` | The 2 install-dialog screenshots (needs `npm run dev`) | When the tool UI changes shape |
+| `npm run appicons` | Favicon, app icons, 11 launch images, `splash-links.html` | Automatic, part of `npm run build` |
+| `node scripts/generate-og-images.mjs` | The 42 social cards | Automatic, part of `npm run build` |
+
+`scripts/shoot.mjs` is the visual check harness: it loads tool pages, feeds them
+generated audio, drives the waveform, and writes screenshots of states that need
+a real file in them.
+
+## Checking the tools against real files
+
+The Playwright suite generates synthetic WAV tones in-page, which exercises every
+code path but not the messy reality of a real MP3 with an ID3 header, a VBR
+bitrate and a duration that does not divide evenly.
+
+```bash
+npm run dev
+npm run verify -- ~/Desktop/track.mp3 ~/Desktop/second.mp3
+```
+
+That drives the real file input, presses each tool's own button, captures what
+the browser downloads, and then decodes the download back to confirm it is audio
+of a plausible length that is not silent. Analysis tools are checked for rendered
+measurements instead, the splitter for a list of real parts, and the waveform
+generator for actual PNG magic bytes. Pass `--only slug,slug` to narrow it while
+fixing something. The second file is what exercises the two joiners.
+
 ## Not here yet
 
 Vocal removal, stem separation and transcription need models measured in

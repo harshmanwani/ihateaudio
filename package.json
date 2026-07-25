@@ -10,7 +10,7 @@
     "postinstall": "node scripts/sync-ffmpeg-core.mjs",
     "dev": "astro dev",
     "prebuild": "node scripts/sync-ffmpeg-core.mjs",
-    "build": "astro check && astro build && node scripts/generate-og-images.mjs",
+    "build": "node scripts/generate-app-icons.mjs && astro check && astro build && node scripts/generate-og-images.mjs",
     "build:fast": "astro build",
     "preview": "astro preview",
     "test": "vitest run",
@@ -18,7 +18,10 @@
     "test:e2e": "playwright test",
     "check": "astro check",
     "seo": "node scripts/seo-audit.mjs",
-    "icons": "node scripts/generate-tool-icons.mjs && node scripts/normalize-tool-icons.mjs"
+    "icons": "node scripts/generate-tool-icons.mjs && node scripts/normalize-tool-icons.mjs",
+    "appicons": "node scripts/generate-app-icons.mjs",
+    "shots": "node scripts/generate-pwa-screenshots.mjs",
+    "verify": "node scripts/verify-tools.mjs"
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",

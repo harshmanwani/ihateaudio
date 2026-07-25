@@ -199,6 +199,80 @@ and error**. Focus is a 2px `--brand` ring at 2px offset, never removed.
 Phosphor, regular weight, 20px default, inlined from a single build-time SVG sprite so only
 the ~18 glyphs actually used ship. Stroke inherits `currentColor`.
 
+## The green
+
+Hue **156**, not 162. At 162 `--brand` resolved to `#005d3d`, a teal-leaning
+pine that read as dull and nearly black. 156 with more chroma lands on
+`#007038`: unmistakably green, still serious enough to carry body text at
+**6.24:1** on white.
+
+Every neutral is tinted 0.005 to 0.015 chroma toward the same hue, so the greys
+never fight the brand. The waveform is the exception to the restraint: `--wave`
+at `oklch(0.775 0.175 156)` is `#31d685`, **10:1** against the stage. It is the
+one element on the page whose entire job is to be looked at, and it can carry
+chroma no text could.
+
+Category `strong` tones sit at `oklch(0.47 0.125 <hue>)` across all six
+families, and every one of them clears 6:1 on white and 5.3:1 on its own soft
+fill. Holding L and C constant across families is what stops one shouting.
+
+## Measure
+
+`--prose: 56ch`, measured rather than assumed.
+
+`ch` is the advance width of `0`, and Instrument Sans draws an unusually wide
+zero at 0.666em while its average lowercase character is 0.517em. So the
+previous `68ch` was rendering about **88 characters a line**, well past the point
+where the eye loses its place on the return sweep. 56ch measures ~72. A test
+asserts it, measuring the font's real average character width instead of
+guessing a ratio.
+
+## The waveform
+
+Shared by most of the tools, so it gets the most attention.
+
+**Crisp hull, smooth body.** The outer hull is one integer-aligned rect per
+device pixel, collected into a single path and filled once: hard edges, one
+fill call. The RMS body over it is a continuous filled path. Accuracy from the
+first, shape from the second. Peak alone stretches a column to full height for
+one stray sample, which is why cheap waveforms look like solid blocks.
+
+**One backing pixel per device pixel.** The canvas is sized from
+`clientWidth`/`clientHeight`, never `getBoundingClientRect`, and its CSS size is
+written back in px. The rect is affected by transforms, and the canvas carries a
+`scaleY` entrance animation; measuring mid-animation sized the backing store to
+a twentieth of the real box and then wrote that size back, so the waveform was
+drawn into a sliver and stretched to fill. That was the blur.
+
+**A real viewport.** Zoom is not a visual trick over pre-computed data: all
+sampling and all coordinate maths go through `view`, so the samples are
+re-scanned for the visible range and zooming in genuinely resolves more detail.
+Past the point where a column covers less than two samples it switches to a
+polyline through the real samples with a dot and a stem on each, which is the
+view that makes a click or a DC offset visible.
+
+Each surface owns exactly one gesture, which is the only way a canvas with this
+many overlapping affordances stays predictable: the waveform draws selections and
+drops cut markers, the ruler seeks, the overview strip pans, modifier-scroll and
+pinch zoom. Plain vertical scroll still belongs to the page.
+
+## The mark
+
+Flat, one colour on one colour, five shapes, on integer positions in a 32 unit
+grid so every edge lands on a whole device pixel at 16, 32, 64 and 128.
+
+The one idea is that the middle bar runs almost the full height of the tile,
+overflowing where a stock five-bar audio glyph would tuck neatly inside. That is
+the whole distinguishing feature, and it survives being 16px wide, single
+colour, or engraved on something. `src/assets/logo.svg` is the only source: the
+favicon is a copy of it and every app icon and launch image is rendered from it
+at build time.
+
+**Not 3D.** The tool art is 3D because those icons are decision aids seen once
+at 56px on a launcher. A logo has the opposite job: it has to work at 16px, in
+one colour, on a dark background, in a favicon, and in five years. Every one of
+those is a place a 3D render fails.
+
 ## Bans specific to this project
 
 - No waveform on a light background. The stage is dark; that's the system.

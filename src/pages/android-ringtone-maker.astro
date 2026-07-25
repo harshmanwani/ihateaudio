@@ -260,7 +260,7 @@ const faq = [
     formats: ['mp3'],
     defaultFormat: 'mp3',
 
-    onReady(_ctx, runtime) {
+    onReady(ctx, runtime) {
       const root = runtime.root;
       const startInput = root.querySelector<HTMLInputElement>('[data-control="start"]');
       const endInput = root.querySelector<HTMLInputElement>('[data-control="end"]');
@@ -269,6 +269,14 @@ const faq = [
       const install = document.querySelector<HTMLElement>('[data-install]');
 
       if (install) install.hidden = true;
+
+      // Open on the first thirty seconds rather than the whole track. Android
+      // will take any length, and the note below says so, but a ringtone maker
+      // whose default output is a two minute song makes the default action the
+      // wrong one. A default, not a limit: drag the end handle anywhere.
+      if (ctx.buffer.duration > RING_SECONDS) {
+        runtime.setSelection({ start: 0, end: RING_SECONDS });
+      }
 
       const sync = (): void => {
         const selection = runtime.getSelection();
