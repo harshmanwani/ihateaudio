@@ -1,0 +1,300 @@
+---
+/**
+ * The multitrack panel that appears once separation finishes.
+ *
+ * The reason this exists rather than a list of download buttons: separation
+ * quality is a judgement, not a number, and the only way to make it is to hear the
+ * parts against each other. Solo the vocal, notice the cymbal that came with it,
+ * unmute the drums, decide whether it matters. Downloading four files and opening a
+ * DAW to find out the result was no good is a lot of work for a disappointment.
+ *
+ * The markup is empty on purpose — rows are built by src/lib/ai/stem-panel.ts once
+ * the stems exist, because how many there are is not known until then.
+ */
+import Icon from './Icon.astro';
+---
+
+{/* controls__full because this always sits inside the .controls grid, whose
+    columns are 236px minimums — without it the mixer is squeezed into one column
+    and the waveforms have no width to paint into. */}
+<div class="stems controls__full" data-stem-panel hidden>
+  <div class="stems__transport">
+    {/* Both glyphs ship and CSS picks one, so the button never re-renders and
+        therefore never loses focus in the middle of playback. */}
+    <button
+      type="button"
+      class="stems__play"
+      data-stem-play
+      data-playing="false"
+      aria-label="Play all stems"
+    >
+      <span class="stems__icon stems__icon--play" aria-hidden="true">
+        <Icon name="play" weight="fill" size={18} />
+      </span>
+      <span class="stems__icon stems__icon--pause" aria-hidden="true">
+        <Icon name="pause" weight="fill" size={18} />
+      </span>
+    </button>
+
+    <div class="stems__scrub" data-stem-scrub>
+      <div class="stems__scrub-track">
+        <div class="stems__scrub-fill" data-stem-scrub-fill></div>
+      </div>
+    </div>
+
+    <span class="stems__time tnum" data-stem-time>0:00 / 0:00</span>
+  </div>
+
+  <div class="stems__list" data-stem-list></div>
+
+  <div class="stems__foot">
+    <p class="stems__hint" data-stem-hint>
+      Solo a track to hear it alone. What you can hear is what gets mixed down.
+    </p>
+    <button type="button" class="btn btn--solid" data-stem-mix>
+      <Icon name="download-simple" size={17} />
+      Download the mix
+    </button>
+  </div>
+</div>
+
+<style>
+  .stems {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s4);
+    border-top: 1px solid var(--line);
+    padding-top: var(--s5);
+  }
+
+  /* ---------- transport ---------- */
+
+  .stems__transport {
+    display: flex;
+    align-items: center;
+    gap: var(--s3);
+  }
+
+  .stems__play {
+    display: grid;
+    place-items: center;
+    width: 40px;
+    height: 40px;
+    flex: none;
+    border: none;
+    border-radius: var(--r-full);
+    background: var(--ink);
+    color: var(--bg);
+    cursor: pointer;
+    transition: transform var(--dur-micro) var(--ease);
+  }
+
+  .stems__play:hover {
+    transform: scale(1.05);
+  }
+
+  .stems__play:focus-visible {
+    outline: 2px solid var(--cat-vivid, var(--brand));
+    outline-offset: 3px;
+  }
+
+  .stems__icon {
+    display: none;
+    line-height: 0;
+  }
+
+  .stems__play[data-playing='false'] .stems__icon--play,
+  .stems__play[data-playing='true'] .stems__icon--pause {
+    display: block;
+  }
+
+  /* The hit area, which is deliberately much taller than the bar it contains — a
+     6px pointer target is unusable, especially on a phone. */
+  .stems__scrub {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    height: 30px;
+    cursor: pointer;
+  }
+
+  /* The visible bar is its own element rather than the padded background of the
+     hit area. The background-clip trick that did that job rendered nothing, and a
+     real element is one line longer and cannot fail. */
+  .stems__scrub-track {
+    position: relative;
+    width: 100%;
+    height: 6px;
+    border-radius: var(--r-full);
+    background: var(--line-strong);
+    overflow: hidden;
+  }
+
+  .stems__scrub-fill {
+    position: absolute;
+    inset-block: 0;
+    left: 0;
+    width: 0%;
+    border-radius: var(--r-full);
+    background: var(--cat-vivid, var(--brand));
+    pointer-events: none;
+  }
+
+  .stems__time {
+    font-size: var(--t-small);
+    color: var(--ink-2);
+    flex: none;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* ---------- tracks ---------- */
+
+  .stems__list {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--line);
+    border-radius: var(--r-md);
+    overflow: hidden;
+  }
+
+  /* A track is a dark strip carrying its own waveform, the way a mixer looks.
+     Not a card: these are rows of one instrument, and boxing each one separately
+     would break the column alignment that makes them readable as a set. */
+  :global(.stem) {
+    display: grid;
+    grid-template-columns: 7.5rem auto 1fr;
+    align-items: center;
+    gap: var(--s3);
+    padding: var(--s3) var(--s4);
+    background: var(--stage-2, var(--surface));
+    transition: opacity var(--dur-micro) var(--ease);
+  }
+
+  :global(.stem + .stem) {
+    border-top: 1px solid color-mix(in oklch, var(--line) 60%, transparent);
+  }
+
+  /* Muted, or not-soloed, reads as dimmed rather than hidden — you still need to
+     see it to bring it back. */
+  :global(.stem[data-audible='false']) {
+    opacity: 0.42;
+  }
+
+  :global(.stem__name) {
+    font-size: var(--t-ui);
+    font-weight: 600;
+    color: var(--stage-ink, var(--ink));
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  :global(.stem__controls) {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+  }
+
+  :global(.stem__btn) {
+    display: grid;
+    place-items: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--r-sm);
+    border: 1px solid color-mix(in oklch, var(--stage-ink, #fff) 18%, transparent);
+    background: transparent;
+    color: var(--stage-ink-2, var(--ink-2));
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition:
+      background-color var(--dur-micro) var(--ease),
+      color var(--dur-micro) var(--ease),
+      border-color var(--dur-micro) var(--ease);
+  }
+
+  :global(.stem__btn:hover) {
+    border-color: color-mix(in oklch, var(--stage-ink, #fff) 40%, transparent);
+    color: var(--stage-ink, var(--ink));
+  }
+
+  :global(.stem__btn[aria-pressed='true']) {
+    background: var(--cat-vivid, var(--brand));
+    border-color: var(--cat-vivid, var(--brand));
+    color: #05130c;
+  }
+
+  :global(.stem__btn:focus-visible) {
+    outline: 2px solid var(--cat-vivid, var(--brand));
+    outline-offset: 2px;
+  }
+
+  :global(.stem__level) {
+    width: 74px;
+    accent-color: var(--cat-vivid, var(--brand));
+    cursor: pointer;
+  }
+
+  :global(.stem__wave) {
+    width: 100%;
+    height: 40px;
+    display: block;
+    border-radius: var(--r-sm);
+  }
+
+  :global(.stem__save) {
+    flex: none;
+  }
+
+  /* ---------- foot ---------- */
+
+  .stems__foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s4);
+    flex-wrap: wrap;
+  }
+
+  .stems__hint {
+    font-size: var(--t-small);
+    color: var(--ink-2);
+    max-width: 48ch;
+    margin: 0;
+  }
+
+  @media (max-width: 720px) {
+    :global(.stem) {
+      grid-template-columns: 1fr auto;
+      grid-template-areas:
+        'name controls'
+        'wave wave';
+      gap: var(--s2) var(--s3);
+    }
+
+    :global(.stem__name) {
+      grid-area: name;
+    }
+
+    :global(.stem__controls) {
+      grid-area: controls;
+    }
+
+    :global(.stem__wave) {
+      grid-area: wave;
+      height: 32px;
+    }
+
+    :global(.stem__level) {
+      width: 58px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .stems__play {
+      transition: none;
+    }
+  }
+</style>

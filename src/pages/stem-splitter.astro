@@ -2,6 +2,7 @@
 import ToolPage from '../layouts/ToolPage.astro';
 import ToolShell from '../components/ToolShell.astro';
 import AiSetup from '../components/AiSetup.astro';
+import StemPanel from '../components/StemPanel.astro';
 import { getTool } from '../data/tools';
 
 const tool = getTool('stem-splitter');
@@ -10,7 +11,7 @@ const steps = [
   'Drop the song in, then tick the stems you actually want. Each one is a separate 28 MB network and a separate pass over the audio, so asking for two instead of four halves both the download and the wait.',
   'Trim first if you only need part of the track. The tool works on whatever is loaded, and separating one chorus takes a fraction of the time of a whole song.',
   'Press Split. The stems are produced one after another and the progress counter tells you which one is running.',
-  'Each finished stem appears in its own row with its own download button. WAV is the sensible choice — these are going into a DAW, not into a playlist.',
+  'When it finishes you get a mixer: play everything together, mute a part, or solo one to hear it alone. Judge the split by ear before you download anything, then take individual stems, or a mix of whatever balance you set.',
 ];
 
 const faq = [
@@ -53,7 +54,7 @@ const faq = [
       </div>
 
       <div class="field controls__full">
-        <div class="stems">
+        <div class="stem-picks">
           <label class="switch">
             <input type="checkbox" data-control="vocals" checked />
             Vocals
@@ -79,6 +80,8 @@ const faq = [
         what="Each stem is its own 28 MB network. Only the ones you tick are fetched, and they are kept afterwards."
         speed="Expect roughly the length of the track per stem."
       />
+
+      <StemPanel />
     </div>
   </ToolShell>
 
@@ -135,7 +138,7 @@ const faq = [
 </ToolPage>
 
 <style>
-  .stems {
+  .stem-picks {
     display: flex;
     flex-wrap: wrap;
     gap: var(--s3) var(--s5);
@@ -149,7 +152,8 @@ const faq = [
   import { separate } from '../lib/ai/separate';
   import { KUIELAB } from '../lib/ai/models';
   import type { MdxModel } from '../lib/ai/models';
-  import { duration as fmtDuration, filesize } from '../lib/format';
+  import { duration as fmtDuration, filesize, baseName } from '../lib/format';
+  import { mountStemPanel } from '../lib/ai/stem-panel';
   import { outstandingBytes } from '../lib/ai/store';
 
   /** Display order, which is the order people think about a band in. */
@@ -230,7 +234,7 @@ const faq = [
       const panel = panels.get(runtime);
       await panel?.ensure(ctx.signal);
 
-      const outputs: { name: string; buffer: AudioBuffer }[] = [];
+      const outputs: { id: string; name: string; buffer: AudioBuffer }[] = [];
 
       for (let i = 0; i < chosen.length; i += 1) {
         const stem = chosen[i]!;
@@ -258,12 +262,24 @@ const faq = [
           }
         );
 
-        if (result.primary) outputs.push({ name: stem.name, buffer: result.primary });
+        if (result.primary) {
+          outputs.push({ id: stem.key, name: stem.name, buffer: result.primary });
+        }
       }
 
       panel?.finish();
       if (outputs.length === 0) throw new Error('separation produced nothing');
-      return outputs;
+
+      // The panel is the point of this tool. Four separate downloads tell you
+      // nothing about whether the split worked; soloing the bass and hearing
+      // whether the kick came with it tells you immediately.
+      mountStemPanel(runtime.root.querySelector<HTMLElement>('[data-stem-panel]'), outputs, {
+        baseName: baseName(ctx.files[0]?.name ?? 'track'),
+        format: () => runtime.getFormat(),
+        onError: (message) => runtime.showNote(message, 'warn'),
+      });
+
+      return outputs.map((output) => ({ name: output.name, buffer: output.buffer }));
     },
   });
 </script>

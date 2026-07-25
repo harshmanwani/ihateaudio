@@ -2,6 +2,7 @@
 import ToolPage from '../layouts/ToolPage.astro';
 import ToolShell from '../components/ToolShell.astro';
 import AiSetup from '../components/AiSetup.astro';
+import StemPanel from '../components/StemPanel.astro';
 import { getTool } from '../data/tools';
 
 const tool = getTool('vocal-remover');
@@ -9,7 +10,7 @@ const tool = getTool('vocal-remover');
 const steps = [
   'Drop the song onto the page. The first time you use this it fetches a 64 MB model, once, and keeps it — after that the tool works with the wifi off.',
   'Press Separate. A neural network goes through the track in chunks and the progress bar counts them, so you can see how long is left rather than guessing.',
-  'Listen to the result before you commit. The transport plays the instrumental, so you can hear whether the vocal is properly gone or just quieter.',
+  'Listen before you commit. You get both halves as a small mixer: play them together, mute the vocal to check it is properly gone rather than merely quieter, or solo it to hear exactly what was taken out.',
   'Pick a format and download. Choose WAV if this is going into an editor; MP3 is fine if it is going straight into a video or a karaoke night.',
 ];
 
@@ -60,22 +61,17 @@ const faq = [
         </span>
       </div>
 
-      <div class="field controls__full">
-        <label class="switch">
-          <input type="checkbox" data-control="keepvocals" />
-          Also give me the vocal track
-        </label>
-        <p class="hint">
-          Off by default because it doubles what has to be encoded. The separation
-          itself costs nothing extra — the vocal is what is left over.
-        </p>
-      </div>
-
       <AiSetup
         bytes={tool.modelBytes ?? 0}
         what="It is the separation network itself, and it is served from this domain rather than a third party."
         speed="Separation then runs at roughly real time, so a four-minute song takes a few minutes."
       />
+
+      {/* Both halves come out of the one pass, so the panel below always shows
+          both. There is no option to skip the vocal because there is nothing to
+          save by skipping it — and hearing the two against each other is how you
+          judge whether the separation actually worked. */}
+      <StemPanel />
     </div>
   </ToolShell>
 
@@ -156,7 +152,8 @@ const faq = [
   import { createAiPanel } from '../lib/ai/panel';
   import { separate } from '../lib/ai/separate';
   import { INST_HQ3 } from '../lib/ai/models';
-  import { duration as fmtDuration } from '../lib/format';
+  import { duration as fmtDuration, baseName } from '../lib/format';
+  import { mountStemPanel } from '../lib/ai/stem-panel';
   import type { ToolRuntime } from '../lib/tool';
 
   /**
@@ -203,14 +200,12 @@ const faq = [
       if (!runtime) throw new Error('tool not ready');
       const panel = panels.get(runtime);
 
-      const wantVocals = runtime.flag('keepvocals');
-
       await panel?.ensure(ctx.signal);
 
       const result = await separate(
         ctx.buffer,
         INST_HQ3,
-        { primary: true, complement: wantVocals },
+        { primary: true, complement: true },
         {
           signal: ctx.signal,
           onStage: (stage) => {
@@ -228,16 +223,29 @@ const faq = [
 
       panel?.finish();
 
-      if (!result.primary) throw new Error('separation produced nothing');
-
-      // One output goes through the ordinary export bar; two become a result list,
-      // because the shared bar has one format picker and one button.
-      if (wantVocals && result.complement) {
-        return [
-          { name: 'Instrumental', buffer: result.primary },
-          { name: 'Vocals', buffer: result.complement },
-        ];
+      if (!result.primary || !result.complement) {
+        throw new Error('separation produced nothing');
       }
+
+      // The panel is the real result. It lets both halves be heard against each
+      // other, soloed, balanced and downloaded — which is the only way to judge
+      // whether the separation worked, and is far more use than two files landing
+      // in the downloads folder.
+      mountStemPanel(
+        runtime.root.querySelector<HTMLElement>('[data-stem-panel]'),
+        [
+          { id: 'instrumental', name: 'Music', buffer: result.primary },
+          { id: 'vocals', name: 'Vocal', buffer: result.complement },
+        ],
+        {
+          baseName: baseName(ctx.files[0]?.name ?? 'track'),
+          format: () => runtime.getFormat(),
+          onError: (message) => runtime.showNote(message, 'warn'),
+        }
+      );
+
+      // The export bar still delivers the instrumental, since that is what the
+      // button says and what most people came for.
       return result.primary;
     },
   });

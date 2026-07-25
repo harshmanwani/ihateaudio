@@ -2,6 +2,7 @@
 import ToolPage from '../layouts/ToolPage.astro';
 import ToolShell from '../components/ToolShell.astro';
 import AiSetup from '../components/AiSetup.astro';
+import StemPanel from '../components/StemPanel.astro';
 import { getTool } from '../data/tools';
 
 const tool = getTool('acapella-extractor');
@@ -9,7 +10,7 @@ const tool = getTool('acapella-extractor');
 const steps = [
   'Drop the song in. If you have already used the vocal remover on this device there is nothing to download — the two tools share one model, and it is already here.',
   'Press Extract. The network reads the whole track in chunks, working out which part of every moment is voice, and the counter tells you how far along it is.',
-  'Play it back before downloading. An isolated vocal is the hardest thing to get right, so listen for bleed from cymbals and reverb rather than assuming.',
+  'Play it back before downloading. Solo the vocal to hear it alone — an isolated vocal is the hardest thing to get right, so listen for cymbal bleed and reverb tails rather than assuming.',
   'Download as WAV if this is going into a DAW. It is the format that will not add a second layer of artefacts on top of the separation.',
 ];
 
@@ -52,22 +53,13 @@ const faq = [
         </span>
       </div>
 
-      <div class="field controls__full">
-        <label class="switch">
-          <input type="checkbox" data-control="keepinst" />
-          Also give me the instrumental
-        </label>
-        <p class="hint">
-          Both halves come out of the one pass, so this only costs the extra
-          encoding time.
-        </p>
-      </div>
-
       <AiSetup
         bytes={tool.modelBytes ?? 0}
         what="It is the separation network, shared with the vocal remover and served from this domain rather than a third party."
         speed="Extraction then runs at roughly real time, so a four-minute song takes a few minutes."
       />
+
+      <StemPanel />
     </div>
   </ToolShell>
 
@@ -120,7 +112,8 @@ const faq = [
   import { createAiPanel } from '../lib/ai/panel';
   import { separate } from '../lib/ai/separate';
   import { INST_HQ3 } from '../lib/ai/models';
-  import { duration as fmtDuration } from '../lib/format';
+  import { duration as fmtDuration, baseName } from '../lib/format';
+  import { mountStemPanel } from '../lib/ai/stem-panel';
 
   const panels = new WeakMap<ToolRuntime, ReturnType<typeof createAiPanel>>();
 
@@ -152,7 +145,6 @@ const faq = [
       const runtime = tool;
       if (!runtime) throw new Error('tool not ready');
       const panel = panels.get(runtime);
-      const wantInstrumental = runtime.flag('keepinst');
 
       await panel?.ensure(ctx.signal);
 
@@ -161,7 +153,7 @@ const faq = [
       const result = await separate(
         ctx.buffer,
         INST_HQ3,
-        { primary: wantInstrumental, complement: true },
+        { primary: true, complement: true },
         {
           signal: ctx.signal,
           onStage: (stage) => {
@@ -178,14 +170,26 @@ const faq = [
       );
 
       panel?.finish();
-      if (!result.complement) throw new Error('extraction produced nothing');
-
-      if (wantInstrumental && result.primary) {
-        return [
-          { name: 'Vocals', buffer: result.complement },
-          { name: 'Instrumental', buffer: result.primary },
-        ];
+      if (!result.complement || !result.primary) {
+        throw new Error('extraction produced nothing');
       }
+
+      // Vocal first here, because that is what this tool is for — but both are
+      // present, because judging an isolated vocal means hearing what was taken
+      // away from it.
+      mountStemPanel(
+        runtime.root.querySelector<HTMLElement>('[data-stem-panel]'),
+        [
+          { id: 'vocals', name: 'Vocal', buffer: result.complement },
+          { id: 'instrumental', name: 'Music', buffer: result.primary },
+        ],
+        {
+          baseName: baseName(ctx.files[0]?.name ?? 'track'),
+          format: () => runtime.getFormat(),
+          onError: (message) => runtime.showNote(message, 'warn'),
+        }
+      );
+
       return result.complement;
     },
   });
