@@ -12,7 +12,8 @@ export type ToolCategory =
   | 'volume'
   | 'speed'
   | 'effects'
-  | 'utility';
+  | 'utility'
+  | 'ai';
 
 export interface CategoryMeta {
   id: ToolCategory;
@@ -57,6 +58,12 @@ export const CATEGORIES: CategoryMeta[] = [
     blurb:
       "Ringtones, recording straight off your mic, and finding out what's actually in a file.",
   },
+  {
+    id: 'ai',
+    name: 'AI studio',
+    blurb:
+      "Pull the vocals out of a song, split it into stems, or turn speech into text. The models download once and then run on your machine, which is why these are free and why nothing you feed them is uploaded.",
+  },
 ];
 
 export interface Tool {
@@ -92,6 +99,17 @@ export interface Tool {
   instant: boolean;
   /** Hidden from the grid, e.g. deep format variants. */
   secondary?: boolean;
+  /**
+   * Runs a neural network locally, which earns the AI badge and a warning about
+   * the one-time download.
+   */
+  ai?: boolean;
+  /**
+   * Bytes of model weights the tool needs before it can run, for the badge and
+   * the setup panel. Zero-download AI tools exist — the denoiser's network is
+   * small enough to ship with the site — so this is not implied by `ai`.
+   */
+  modelBytes?: number;
 }
 
 export const TOOLS: Tool[] = [
@@ -690,6 +708,129 @@ export const TOOLS: Tool[] = [
     keywords: ['waveform image png picture visualizer soundwave art poster'],
     related: ['audio-trimmer', 'bpm-detector', 'loudness-meter'],
     instant: true,
+  },
+
+  // ---------------- AI studio ----------------
+  // These run real neural networks in the browser. The weights are fetched once
+  // and kept, which is why `instant` is false and why every one of them carries a
+  // download figure the setup panel can quote before asking anyone to wait.
+  {
+    slug: 'vocal-remover',
+    name: 'Vocal Remover',
+    title: 'Vocal Remover: Remove Vocals From a Song Free',
+    description:
+      'Remove the vocals from any song and keep the backing track. Runs an AI model in your browser, so nothing is uploaded and there is no queue. Free, no account.',
+    tagline: "Take the singer out and keep the band.",
+    short: "Strip the vocals off a track and keep the instrumental.",
+    category: 'ai',
+    icon: 'microphone-slash',
+    icon3d: true,
+    keywords: [
+      'vocal remover remove vocals karaoke instrumental backing track minus one strip singer ai vocal removal',
+    ],
+    related: ['acapella-extractor', 'stem-splitter', 'audio-trimmer', 'noise-remover'],
+    instant: false,
+    ai: true,
+    modelBytes: 66_759_214,
+  },
+  {
+    slug: 'acapella-extractor',
+    name: 'Acapella Extractor',
+    title: 'Acapella Extractor: Isolate Vocals From a Song Free',
+    description:
+      'Pull the vocals out of a song on their own. The same AI model that makes instrumentals, pointed the other way. Runs in your browser with nothing uploaded.',
+    tagline: "Just the voice, with the band taken away.",
+    short: "Get the vocal on its own, with the music removed.",
+    category: 'ai',
+    icon: 'microphone-stage',
+    icon3d: true,
+    keywords: [
+      'acapella extractor isolate vocals extract vocal only voice separator vocal isolation get vocals from song ai',
+    ],
+    related: ['vocal-remover', 'stem-splitter', 'audio-transcriber', 'noise-remover'],
+    instant: false,
+    ai: true,
+    modelBytes: 66_759_214,
+  },
+  {
+    slug: 'stem-splitter',
+    name: 'Stem Splitter',
+    title: 'Stem Splitter: Split a Song Into Stems Online Free',
+    description:
+      'Split a song into vocals, drums, bass and everything else. Pick only the stems you want. AI models run in your browser, so nothing is uploaded.',
+    tagline: "Pull a song apart into the parts it was built from.",
+    short: "Break a song into vocals, drums, bass and the rest.",
+    category: 'ai',
+    icon: 'cards-three',
+    icon3d: true,
+    keywords: [
+      'stem splitter stem separation split song into stems drums bass vocals separator multitrack demix ai',
+    ],
+    related: ['vocal-remover', 'acapella-extractor', 'bpm-detector', 'audio-splitter'],
+    instant: false,
+    ai: true,
+    // One 28 MB network per stem. The tool only fetches the ones asked for, so
+    // this is the all-four figure rather than a fixed cost.
+    modelBytes: 118_812_816,
+  },
+  {
+    slug: 'audio-transcriber',
+    name: 'Audio Transcriber',
+    title: 'Audio to Text: Transcribe Audio Online Free',
+    description:
+      'Turn speech in an audio file into text you can copy or download. Whisper runs in your browser, so recordings are never uploaded. Free, no length limit.',
+    tagline: "Speech in, text out, nothing uploaded.",
+    short: "Turn a recording of someone talking into text.",
+    category: 'ai',
+    icon: 'text-t',
+    icon3d: true,
+    keywords: [
+      'audio to text transcribe transcription speech to text whisper convert voice to text dictation interview transcript free',
+    ],
+    related: ['subtitle-generator', 'noise-remover', 'silence-remover', 'voice-recorder'],
+    instant: false,
+    ai: true,
+    modelBytes: 40_843_851,
+  },
+  {
+    slug: 'subtitle-generator',
+    name: 'Subtitle Generator',
+    title: 'Subtitle Generator: Make SRT Subtitles Free',
+    description:
+      'Generate timed SRT or VTT subtitles from audio or video. Whisper runs in your browser, so your file is never uploaded. Free, and it handles long recordings.',
+    tagline: "Timed captions, written by listening to the file.",
+    short: "Make an SRT or VTT subtitle file from speech.",
+    category: 'ai',
+    icon: 'closed-captioning',
+    icon3d: true,
+    keywords: [
+      'subtitle generator srt vtt captions auto subtitles caption maker video subtitles timed transcript free',
+    ],
+    related: ['audio-transcriber', 'video-to-audio', 'noise-remover', 'silence-remover'],
+    instant: false,
+    ai: true,
+    modelBytes: 40_843_851,
+  },
+  {
+    slug: 'noise-remover',
+    name: 'Background Noise Remover',
+    title: 'Remove Background Noise From Audio Free',
+    description:
+      'Clean hiss, hum, fans and room noise out of a recording with a neural denoiser. No download to wait for, nothing uploaded, and it runs in seconds.',
+    tagline: "Take the room out and leave the voice.",
+    short: "Clean hiss, hum and room noise off a recording.",
+    category: 'ai',
+    icon: 'wind',
+    icon3d: true,
+    keywords: [
+      'noise remover remove background noise denoise clean audio hiss hum fan reduce noise voice cleanup ai denoiser',
+    ],
+    related: ['audio-transcriber', 'silence-remover', 'volume-booster', 'equalizer'],
+    // The denoising network is small enough to ship with the site, so this one
+    // needs no download at all and behaves like the instant tools.
+    instant: true,
+    ai: true,
+    modelBytes: 0,
   },
 ];
 

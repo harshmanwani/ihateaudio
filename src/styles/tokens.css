@@ -65,6 +65,16 @@
   --cat-utility: oklch(0.47 0.125 210);
   --cat-utility-vivid: oklch(0.6 0.145 210);
   --cat-utility-soft: oklch(0.945 0.04 210);
+  /* The AI family sits at hue 26, chosen by arithmetic rather than taste. The six
+     existing families are at 62, 156, 210, 245, 300 and 350, and the widest gap on
+     the wheel is the 72 degrees from 350 round through 0 to 62 — so 26 is the one
+     hue that cannot be mistaken for a variant of an existing family. It also puts
+     a warm coral against the green brand, which suits the newest and most
+     ambitious tools carrying a badge. L and C are held at the family values so the
+     contrast ratio matches everything else by construction. */
+  --cat-ai: oklch(0.47 0.125 26);
+  --cat-ai-vivid: oklch(0.62 0.185 26);
+  --cat-ai-soft: oklch(0.95 0.038 26);
 
   /* Stage — the dark workspace */
   --stage: oklch(0.168 0.015 156);

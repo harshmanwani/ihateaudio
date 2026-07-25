@@ -8,6 +8,11 @@ dist/
 # under a version subdirectory. Served from R2 in production, see worker/.
 public/ffmpeg/
 
+# Regenerated from node_modules by scripts/sync-onnx-runtime.mjs (13 MB). Unlike
+# the ffmpeg core this is under Cloudflare's 25 MiB asset cap, so it ships with
+# the site rather than from R2.
+public/ort/
+
 # Playwright
 test-results/
 playwright-report/

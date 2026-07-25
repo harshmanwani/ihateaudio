@@ -1074,6 +1074,11 @@
   --cat-vivid: var(--cat-utility-vivid);
   --cat-soft: var(--cat-utility-soft);
 }
+[data-cat='ai'] {
+  --cat: var(--cat-ai);
+  --cat-vivid: var(--cat-ai-vivid);
+  --cat-soft: var(--cat-ai-soft);
+}
 
 .tile {
   display: flex;

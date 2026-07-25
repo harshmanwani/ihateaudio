@@ -21,10 +21,10 @@
     // junk indexed.
     "not_found_handling": "404-page",
 
-    // Only the ffmpeg core goes through the Worker. Every one of the other 250
+    // Only the large binaries go through the Worker. Every one of the other 250
     // files is served directly by the asset layer with no Worker invocation,
     // which is both faster and free.
-    "run_worker_first": ["/ffmpeg/*"]
+    "run_worker_first": ["/ffmpeg/*", "/models/*"]
   },
 
   "r2_buckets": [
@@ -34,6 +34,14 @@
       // this many people is the whole reason to be on Cloudflare at all.
       "binding": "FFMPEG",
       "bucket_name": "ihateaudio-ffmpeg"
+    },
+    {
+      // The AI models: 64 MB for the separation network and 43 MB for Whisper.
+      // Kept in their own bucket rather than alongside the core because they have
+      // a different lifecycle — the core changes when @ffmpeg/core is upgraded,
+      // the models only when a better one is worth a fresh download.
+      "binding": "MODELS",
+      "bucket_name": "ihateaudio-models"
     }
   ],
 
