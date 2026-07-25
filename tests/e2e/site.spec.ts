@@ -242,3 +242,109 @@ test.describe('navigation', () => {
     expect(body).toContain('Disallow: /ffmpeg/');
   });
 });
+
+test.describe('discoverability', () => {
+  test('every page has its own social card, not one shared image', async ({
+    page,
+    request,
+  }) => {
+    const seen = new Map<string, string>();
+
+    for (const path of ALL_PATHS) {
+      await page.goto(path);
+      const image = await page
+        .locator('meta[property="og:image"]')
+        .getAttribute('content');
+
+      expect(image, `${path} has no og:image`).toBeTruthy();
+      const clash = seen.get(image!);
+      expect(clash, `${path} reuses ${clash}'s card`).toBeUndefined();
+      seen.set(image!, path);
+
+      // Dimensions and alt text, so previews reserve space and stay accessible.
+      await expect(page.locator('meta[property="og:image:width"]')).toHaveAttribute(
+        'content',
+        '1200'
+      );
+      await expect(page.locator('meta[property="og:image:alt"]')).toHaveCount(1);
+    }
+
+    // Spot-check that a card is actually served rather than just referenced.
+    const card = await request.get('/og/audio-trimmer.png');
+    expect(card.status()).toBe(200);
+    expect(Number(card.headers()['content-length'] ?? 0)).toBeGreaterThan(10_000);
+  });
+
+  test('llms.txt describes the site for assistants', async ({ request }) => {
+    const response = await request.get('/llms.txt');
+    expect(response.status()).toBe(200);
+
+    const body = await response.text();
+    // The facts an assistant is most likely to get wrong.
+    expect(body).toMatch(/no upload/i);
+    expect(body).toMatch(/BS\.1770/);
+    expect(body).toMatch(/device memory/i);
+    expect(body).toContain('/tools.json');
+    // Every tool should be listed, or an assistant will recommend a subset.
+    for (const tool of TOOLS) {
+      expect(body, `llms.txt omits ${tool.slug}`).toContain(`/${tool.slug})`);
+    }
+  });
+
+  test('tools.json is a valid machine-readable index', async ({ request }) => {
+    const response = await request.get('/tools.json');
+    expect(response.status()).toBe(200);
+
+    const body = await response.json();
+    expect(body.tools).toHaveLength(TOOLS.length);
+    expect(body.categories.length).toBeGreaterThan(0);
+
+    for (const entry of body.tools) {
+      expect(entry.url).toMatch(/^https:\/\/ihateaudio\.com\//);
+      expect(entry.name.length).toBeGreaterThan(3);
+      expect(entry.keywords.length).toBeGreaterThan(3);
+      expect(entry.price).toBe(0);
+    }
+  });
+
+  test('AI crawlers are explicitly allowed', async ({ request }) => {
+    const body = await (await request.get('/robots.txt')).text();
+    // Being citable by assistants is a distribution channel for a free tool,
+    // so these are allowed on purpose rather than left to the wildcard.
+    for (const bot of [
+      'GPTBot',
+      'ClaudeBot',
+      'PerplexityBot',
+      'Google-Extended',
+      'OAI-SearchBot',
+      'CCBot',
+    ]) {
+      expect(body, `${bot} has no explicit policy`).toContain(bot);
+    }
+    expect(body).toContain('/llms.txt');
+  });
+
+  test('sitewide Organization and SearchAction schema is present', async ({
+    page,
+  }) => {
+    await page.goto('/audio-trimmer');
+    const blocks = await page
+      .locator('script[type="application/ld+json"]')
+      .allTextContents();
+    const parsed = blocks.map((b) => JSON.parse(b));
+    const types = parsed.map((p) => p['@type']);
+
+    expect(types).toContain('Organization');
+    expect(types).toContain('WebSite');
+
+    const site = parsed.find((p) => p['@type'] === 'WebSite');
+    expect(site.potentialAction['@type']).toBe('SearchAction');
+  });
+
+  test('sitemap carries a card per URL', async ({ request }) => {
+    const body = await (await request.get('/sitemap.xml')).text();
+    expect(body).toContain('sitemap-image');
+    expect(body).toContain('/og/audio-trimmer.png');
+    expect(body).toContain('/og/home.png');
+  });
+});

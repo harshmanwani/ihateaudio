@@ -32,18 +32,25 @@ export const GET: APIRoute = () => {
   const lastmod = new Date().toISOString().slice(0, 10);
 
   const urls = entries
-    .map(
-      (entry) => `  <url>
+    .map((entry) => {
+      const slug =
+        entry.path === '/' ? 'home' : entry.path.replace(/^\//, '');
+      const card = new URL(`/og/${slug}.png`, SITE.url).href;
+      return `  <url>
     <loc>${new URL(entry.path, SITE.url).href}</loc>
     <lastmod>${lastmod}</lastmod>
     <changefreq>${entry.changefreq}</changefreq>
     <priority>${entry.priority}</priority>
-  </url>`
-    )
+    <image:image>
+      <image:loc>${card}</image:loc>
+    </image:image>
+  </url>`;
+    })
     .join('\n');
 
   const body = `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
+        xmlns:image="http://www.google.com/schemas/sitemap-image/1.1">
 ${urls}
 </urlset>
 `;

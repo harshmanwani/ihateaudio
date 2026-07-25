@@ -84,14 +84,27 @@ const schema = [
     description:
       'MP3, AAC, Opus, FLAC, WAV and the rest compared by size, quality, compatibility and what each is actually for.',
     author: { '@type': 'Organization', name: SITE.name },
-    publisher: { '@type': 'Organization', name: SITE.name },
+    publisher: { '@id': `${SITE.url}/#organization` },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'All tools', item: SITE.url },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: 'Audio format guide',
+        item: new URL('/audio-formats', SITE.url).href,
+      },
+    ],
   },
 ];
 ---
 
 <Base
   title="Audio Format Guide: MP3 vs AAC vs FLAC vs WAV vs Opus"
-  description="A plain comparison of every common audio format: file size per minute, quality, device support, and what each one is genuinely best at. Plus what bitrate to actually use."
+  description="Every common audio format compared: size per minute, quality, device support, and what each is genuinely best at. Plus what bitrate is actually enough."
   path="/audio-formats"
   schema={schema}
 >

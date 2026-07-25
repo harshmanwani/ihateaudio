@@ -3,7 +3,7 @@ export const SITE = {
   url: 'https://ihateaudio.com',
   tagline: 'Audio tools that just work',
   description:
-    "39 free audio tools that run right in your browser. Trim, convert, merge, boost, whatever you need. Nothing gets uploaded, nothing to install, and there's no signup.",
+    "39 free audio tools that run right in your browser. Trim, convert, merge, boost, whatever you need. Nothing is uploaded and there is no signup.",
   locale: 'en',
 } as const;
 

@@ -21,7 +21,51 @@ interface Props {
 const { title, description, path, schema = [], noindex = false } = Astro.props;
 
 const canonical = new URL(path, SITE.url).href;
-const ogImage = new URL('/og.png', SITE.url).href;
+
+/**
+ * Each page gets its own social card from /og, named after its slug, with the
+ * shared card as a fallback. A link to the ringtone maker should look like the
+ * ringtone maker; one identical image across 44 pages wastes the most visible
+ * surface a shared link has.
+ */
+const ogSlug = path === '/' ? 'home' : path.replace(/^\//, '').replace(/\/$/, '');
+const ogImage = new URL(`/og/${ogSlug}.png`, SITE.url).href;
+
+/**
+ * Emitted on every page.
+ *
+ * Organization gives search engines and assistants one canonical entity to
+ * attach facts to. WebSite carries the SearchAction, which is what lets a
+ * results page offer a search box straight into our own search.
+ */
+const siteSchema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    '@id': `${SITE.url}/#organization`,
+    name: SITE.name,
+    url: SITE.url,
+    logo: new URL('/icon-512.png', SITE.url).href,
+    description: SITE.description,
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    '@id': `${SITE.url}/#website`,
+    name: SITE.name,
+    url: SITE.url,
+    publisher: { '@id': `${SITE.url}/#organization` },
+    inLanguage: SITE.locale,
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: `${SITE.url}/?q={search_term_string}`,
+      },
+      'query-input': 'required name=search_term_string',
+    },
+  },
+];
 ---
 
 <!doctype html>
@@ -58,13 +102,28 @@ const ogImage = new URL('/og.png', SITE.url).href;
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
     <meta property="og:image" content={ogImage} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:alt" content={title} />
+    <meta property="og:locale" content="en_US" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
     <meta name="twitter:image" content={ogImage} />
+    <meta name="twitter:image:alt" content={title} />
+
+    <!-- Points assistants and agents at the plain-language brief. -->
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM brief" />
+    <link
+      rel="alternate"
+      type="application/json"
+      href="/tools.json"
+      title="Machine-readable tool index"
+    />
 
     {
-      schema.map((item) => (
+      [...siteSchema, ...schema].map((item) => (
         <script
           type="application/ld+json"
           is:inline
