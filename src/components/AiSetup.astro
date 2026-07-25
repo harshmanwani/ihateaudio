@@ -1,0 +1,238 @@
+---
+/**
+ * The one-time setup panel for a tool that runs a neural network locally.
+ *
+ * Three states, and which one shows is decided at runtime because it depends on
+ * what is already in Cache Storage:
+ *
+ *   - Never fetched: explain the download honestly, with its real size, and wait
+ *     for a deliberate click. Starting a 64 MB download because somebody landed on
+ *     a page from a search result would be indefensible on a metered connection.
+ *   - Fetching: real byte progress. A minute of waiting with a number is patience;
+ *     a minute of waiting with a spinner is a closed tab.
+ *   - Ready: say so quietly and get out of the way, because from then on this is
+ *     just a tool that works offline.
+ *
+ * Deliberately not a modal. The page below it explains what the tool does and
+ * that is exactly what someone deciding whether to spend 64 MB wants to read.
+ */
+import Icon from './Icon.astro';
+
+interface Props {
+  /** Bytes of weights, for the honest up-front figure. */
+  bytes: number;
+  /** What the models are, in the visitor's terms rather than ours. */
+  what: string;
+  /** Rough speed expectation, since these are not instant. */
+  speed?: string;
+}
+
+const { bytes, what, speed } = Astro.props;
+
+const megabytes = bytes >= 1024 * 1024 ? Math.round(bytes / (1024 * 1024)) : 0;
+---
+
+<div class="setup" data-ai-setup hidden>
+  {/* Offer state: nothing fetched yet. */}
+  <div class="setup__offer" data-ai-offer hidden>
+    <span class="setup__mark" aria-hidden="true">
+      <Icon name="sparkle" weight="fill" size={20} />
+    </span>
+    <div class="setup__text">
+      <p class="setup__title">
+        {megabytes > 0
+          ? `This tool needs a ${megabytes} MB download, once`
+          : 'This tool runs a neural network on your machine'}
+      </p>
+      <p class="setup__body">
+        {what}
+        {
+          megabytes > 0 && (
+            <>
+              {' '}
+              It is kept on your device afterwards, so this happens once and then the
+              tool works offline forever.
+            </>
+          )
+        }
+        {speed && <> {speed}</>}
+      </p>
+    </div>
+    <button type="button" class="btn btn--solid setup__go" data-ai-start>
+      <Icon name="download-simple" size={17} />
+      {megabytes > 0 ? `Set up (${megabytes} MB)` : 'Set up'}
+    </button>
+  </div>
+
+  {/* Fetching state. */}
+  <div class="setup__loading" data-ai-loading hidden>
+    <div class="setup__row">
+      <span class="setup__title" data-ai-phase>Setting up AI audio studio</span>
+      <span class="setup__count tnum" data-ai-count></span>
+    </div>
+    <div
+      class="setup__track"
+      role="progressbar"
+      aria-valuemin="0"
+      aria-valuemax="100"
+      data-ai-bar-track
+    >
+      <div class="setup__bar" data-ai-bar></div>
+    </div>
+    <p class="setup__body setup__note" data-ai-hint>
+      One time only. Nothing is uploaded — this is the model coming down to you.
+    </p>
+  </div>
+
+  {/* Ready state. */}
+  <p class="setup__ready" data-ai-ready hidden>
+    <Icon name="check-circle" weight="fill" size={16} />
+    <span
+      >Model ready on this device. Works offline, and nothing you load here leaves the
+      browser.</span
+    >
+  </p>
+</div>
+
+<style>
+  /* No card. The instrument above already carries the surface, and a second
+     bordered box under it was the exact thing that made these pages look
+     assembled rather than designed. This is a bordered band that belongs to the
+     tool's own colour. */
+  .setup {
+    border-top: 1px solid var(--line);
+    padding-top: var(--s5);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s3);
+  }
+
+  .setup__offer {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    gap: var(--s3) var(--s4);
+    align-items: start;
+  }
+
+  .setup__mark {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border-radius: var(--r-md);
+    /* The category hue, so the AI tools read as their own family without a
+       second accent colour entering the system. */
+    background: var(--cat-soft, var(--surface));
+    color: var(--cat-vivid, var(--brand));
+  }
+
+  .setup__text {
+    min-width: 0;
+  }
+
+  .setup__title {
+    font-weight: 600;
+    font-size: var(--t-ui);
+    letter-spacing: -0.005em;
+  }
+
+  .setup__body {
+    margin-top: 2px;
+    font-size: var(--t-small);
+    line-height: 1.6;
+    color: var(--ink-2);
+    max-width: 62ch;
+    text-wrap: pretty;
+  }
+
+  .setup__go {
+    grid-row: 1;
+    grid-column: 3;
+    white-space: nowrap;
+  }
+
+  .setup__row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s3);
+  }
+
+  .setup__count {
+    font-size: var(--t-small);
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .setup__track {
+    height: 6px;
+    border-radius: var(--r-full);
+    background: var(--surface-2);
+    overflow: hidden;
+  }
+
+  .setup__bar {
+    height: 100%;
+    width: 0%;
+    border-radius: inherit;
+    background: var(--cat-vivid, var(--brand));
+    transition: width 220ms var(--ease);
+  }
+
+  /* An indeterminate phase (starting the runtime, resampling) has nothing
+     truthful to report as a percentage, so it sweeps instead of pretending. */
+  .setup__track[data-indeterminate='true'] .setup__bar {
+    width: 35%;
+    animation: setup-sweep 1.1s var(--ease) infinite;
+  }
+
+  @keyframes setup-sweep {
+    0% {
+      transform: translateX(-100%);
+    }
+    100% {
+      transform: translateX(340%);
+    }
+  }
+
+  .setup__note {
+    margin-top: 0;
+  }
+
+  .setup__ready {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    font-size: var(--t-small);
+    color: var(--ink-2);
+  }
+
+  .setup__ready :global(svg) {
+    color: var(--cat-vivid, var(--brand));
+    flex: none;
+  }
+
+  @media (max-width: 560px) {
+    .setup__offer {
+      grid-template-columns: auto 1fr;
+    }
+
+    .setup__go {
+      grid-row: 2;
+      grid-column: 1 / -1;
+      justify-content: center;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .setup__bar {
+      transition: none;
+    }
+
+    .setup__track[data-indeterminate='true'] .setup__bar {
+      animation: none;
+      width: 100%;
+      opacity: 0.4;
+    }
+  }
+</style>

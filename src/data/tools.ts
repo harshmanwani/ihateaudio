@@ -58,6 +58,12 @@ export const CATEGORIES: CategoryMeta[] = [
     blurb:
       "Ringtones, recording straight off your mic, and finding out what's actually in a file.",
   },
+  {
+    id: 'ai',
+    name: 'AI studio',
+    blurb:
+      "Pull the vocals out of a song, split it into stems, or turn speech into text. The models download once and then run on your machine, which is why these are free and why nothing you feed them is uploaded.",
+  },
 ];
 
 export interface Tool {
@@ -704,6 +710,28 @@ export const TOOLS: Tool[] = [
     instant: true,
   },
 
+  // ---------------- AI studio ----------------
+  // These run real neural networks in the browser. The weights are fetched once
+  // and kept, which is why `instant` is false and why each carries a download
+  // figure the setup panel can quote before asking anyone to wait.
+  {
+    slug: 'vocal-remover',
+    name: 'Vocal Remover',
+    title: 'Vocal Remover: Remove Vocals From a Song Free',
+    description:
+      'Remove the vocals from any song and keep the backing track. Runs an AI model in your browser, so nothing is uploaded and there is no queue. Free, no account.',
+    tagline: "Take the singer out and keep the band.",
+    short: "Strip the vocals off a track and keep the instrumental.",
+    category: 'ai',
+    icon: 'microphone-slash',
+    keywords: [
+      'vocal remover remove vocals karaoke instrumental backing track minus one strip singer ai vocal removal',
+    ],
+    related: ['audio-trimmer', 'volume-booster', 'audio-converter', 'silence-remover'],
+    instant: false,
+    ai: true,
+    modelBytes: 66_759_214,
+  },
 ];
 
 export const TOOLS_BY_SLUG = new Map(TOOLS.map((tool) => [tool.slug, tool]));

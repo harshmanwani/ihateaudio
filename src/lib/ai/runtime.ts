@@ -27,7 +27,17 @@ export function configureRuntime(): void {
   // relative resolution looks for /_astro/ort-wasm-simd-threaded.wasm and finds
   // nothing. Naming the real path is the only reliable fix, and the default it
   // replaces is a jsDelivr URL — a third-party request this site should never make.
-  ort.env.wasm.wasmPaths = `/ort/${ORT_VERSION}/`;
+  //
+  // Naming the .wasm specifically rather than giving a directory prefix, which is
+  // not a nicety. A prefix makes the runtime fetch its emscripten glue as a
+  // separate .mjs too, and this build already has that glue inlined, so the extra
+  // request is both unnecessary and actively broken: Vite's dev server sees a
+  // request for a .mjs under its own origin, tries to transform it as source, and
+  // answers 500. The tool then failed with "something went wrong processing that
+  // file", which points nowhere near the cause.
+  ort.env.wasm.wasmPaths = {
+    wasm: `/ort/${ORT_VERSION}/ort-wasm-simd-threaded.wasm`,
+  };
 
   /**
    * Threads need SharedArrayBuffer, which needs the page to be cross-origin

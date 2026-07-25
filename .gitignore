@@ -25,3 +25,12 @@ public/splash/
 .env
 .env.local
 .env.*.local
+
+# Local copies of the AI models for dev and verification. Served from R2 in
+# production, see worker/ and scripts/upload-models.mjs.
+public/models/
+
+# Verification fixtures for the AI tools: a controlled mix of a known
+# instrumental plus known speech, so separation quality can be measured rather
+# than eyeballed. Regenerate with scripts/make-ai-fixtures.sh if lost.
+tests/fixtures/

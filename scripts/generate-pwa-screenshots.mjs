@@ -52,8 +52,16 @@ function wav(seconds) {
 const audio = wav(21);
 const browser = await chromium.launch();
 
+/**
+ * Order matters here. Chrome shows the first screenshot most prominently in the
+ * install dialog, and that dialog is where somebody decides whether a whole app is
+ * worth installing. It used to lead with the audio trimmer, which showed one tool
+ * to someone weighing up forty — so the launcher goes first now, and the trimmer
+ * second to show what the tools themselves are like.
+ */
 for (const shot of [
-  { file: 'desktop.png', width: 1280, height: 800, zoom: 3 },
+  { file: 'desktop.png', width: 1280, height: 800, page: 'launcher' },
+  { file: 'desktop-tool.png', width: 1280, height: 800, zoom: 3 },
   { file: 'mobile.png', width: 390, height: 844, zoom: 0, mobile: true },
 ]) {
   const page = await browser.newPage({
@@ -61,6 +69,19 @@ for (const shot of [
     isMobile: Boolean(shot.mobile),
     hasTouch: Boolean(shot.mobile),
   });
+
+  if (shot.page === 'launcher') {
+    await page.goto(base);
+    await page.addStyleTag({ content: 'astro-dev-toolbar{display:none!important}' });
+    // Let the tile art load, or the grid photographs as a wall of empty chips.
+    await page.waitForLoadState('networkidle');
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: join(out, shot.file) });
+    console.log(`${shot.file} ${shot.width}x${shot.height} (launcher)`);
+    await page.close();
+    continue;
+  }
+
   await page.goto(`${base}/audio-trimmer`);
   await page.addStyleTag({ content: 'astro-dev-toolbar{display:none!important}' });
   await page.evaluate((b64) => {

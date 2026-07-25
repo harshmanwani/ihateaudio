@@ -1,0 +1,244 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import AiSetup from '../components/AiSetup.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('vocal-remover');
+
+const steps = [
+  'Drop the song onto the page. The first time you use this it fetches a 64 MB model, once, and keeps it — after that the tool works with the wifi off.',
+  'Press Separate. A neural network goes through the track in chunks and the progress bar counts them, so you can see how long is left rather than guessing.',
+  'Listen to the result before you commit. The transport plays the instrumental, so you can hear whether the vocal is properly gone or just quieter.',
+  'Pick a format and download. Choose WAV if this is going into an editor; MP3 is fine if it is going straight into a video or a karaoke night.',
+];
+
+const faq = [
+  {
+    q: 'How good is this compared with the paid sites?',
+    a: 'It uses the same class of model. This is UVR-MDX-NET-Inst_HQ_3, one of the best openly available separation networks, and it is the model a lot of the paid services are quietly running too. On a controlled test — a known instrumental with a known voice mixed over it — it recovered the backing at about 14 dB signal-to-distortion, which is the range where a listener stops noticing the vocal is missing rather than noticing it was removed. What you do not get here is a server farm, so it takes minutes rather than seconds.',
+  },
+  {
+    q: 'Why does it take a few minutes?',
+    a: 'Because it runs on your computer instead of ours. The network does roughly one second of arithmetic per second of audio per processor core, so a four-minute song is a few minutes of work. A paid service feels faster because it is running on a machine with a large GPU and charging you for the privilege. The trade here is time for money and privacy, and on a laptop plugged in it is a reasonable trade.',
+  },
+  {
+    q: 'Is my music uploaded anywhere?',
+    a: 'No. The only thing that crosses the network is the model itself, coming down to you, and that is served from our own domain rather than a third party. The audio is decoded, separated and encoded inside the browser tab. You can prove it: run the tool once so the model is stored, then turn off your wifi and run it again on a different song. It still works.',
+  },
+  {
+    q: 'There is still a bit of vocal left in quiet parts.',
+    a: 'That is the normal failure mode and it is worth knowing why. The model works on the spectrogram, deciding for each moment and each frequency how much belongs to the voice. Where a vocal sits alone over a sparse arrangement there is little to mask it and separation is clean. Where it is buried under a dense mix at the same frequencies — a loud chorus with layered guitars — the model has to guess, and what it leaves behind is usually a faint ghost rather than an audible line. Reverb tails are the hardest case of all, because the room the voice was recorded in is smeared across the whole mix.',
+  },
+  {
+    q: 'Can I get the vocals instead?',
+    a: 'Yes, and it needs no second download. The acapella extractor uses this same model and keeps the other half. Because the model predicts the instrumental directly, the vocal comes out as the difference between the original and the instrumental, which is slightly rougher than a directly-predicted vocal but perfectly usable for a reference track or a remix.',
+  },
+  {
+    q: 'What about the high frequencies?',
+    a: 'This particular model is full-band, which is why it is 64 MB rather than 28. Many separation models only look at frequencies below about 15 kHz and simply discard everything above, which gives instrumentals a dull, blanketed top end. This one keeps every frequency band up to the limit of the file, so cymbals and air survive.',
+  },
+  {
+    q: 'It says it ran out of memory.',
+    a: 'A long track needs a lot of room: the audio is held as 32-bit floats at 44.1 kHz, and separation needs the original, the output and the working spectrograms all at once. An hour-long file can want a couple of gigabytes. Close other tabs, or trim the section you actually need first — separating a three-minute excerpt is both faster and far lighter than separating a DJ set.',
+  },
+  {
+    q: 'Why is the file bigger than the one I put in?',
+    a: 'If you exported WAV, because WAV is uncompressed. There is also a real reason not to re-encode to MP3 here if you can avoid it: separation output already carries small artefacts, and lossy compression is worst at exactly the kind of smeared, noise-like content those artefacts are made of. Keep WAV while you are still working, and compress once at the end.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} results action="Download instrumental">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Separation</span>
+        <span class="hint">
+          Runs on your machine. Expect roughly the length of the track, less if you
+          have cores to spare.
+        </span>
+      </div>
+
+      <div class="field controls__full">
+        <label class="switch">
+          <input type="checkbox" data-control="keepvocals" />
+          Also give me the vocal track
+        </label>
+        <p class="hint">
+          Off by default because it doubles what has to be encoded. The separation
+          itself costs nothing extra — the vocal is what is left over.
+        </p>
+      </div>
+
+      <AiSetup
+        bytes={tool.modelBytes ?? 0}
+        what="It is the separation network itself, and it is served from this domain rather than a third party."
+        speed="Separation then runs at roughly real time, so a four-minute song takes a few minutes."
+      />
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>What it is actually doing</h2>
+    <p>
+      A mix is a sum. Once a voice and a guitar have been added together into one
+      waveform, no amount of arithmetic recovers the originals, because an infinite
+      number of pairs add up to the same total. So separation is not undoing the
+      mix — it is a guess, made by a network that has been shown several thousand
+      songs where both the mix and the separate parts were known, and has learned
+      what a voice tends to look like when it is drawn as a picture of frequency
+      against time.
+    </p>
+    <p>
+      That picture is the key to the whole thing. The track is chopped into short
+      overlapping windows, each window is turned into a spectrum, and the result is
+      an image: time along one axis, pitch up the other, brightness for energy. In
+      that image a sung note is a stack of horizontal lines that wobble together,
+      a drum is a vertical smear, a bass note is a thick band near the bottom. The
+      network's whole job is to look at that image and decide, for every point in
+      it, what fraction belongs to the voice. Then the picture is turned back into
+      sound.
+    </p>
+    <p>
+      This is why separation quality depends so much on the song rather than on the
+      tool. A voice alone over a piano is two things that barely overlap in the
+      picture, and any decent model will pull them apart cleanly. A shouted chorus
+      over distorted guitars is two things occupying the same pixels, and the model
+      has to apportion energy that genuinely could have come from either. Where it
+      guesses wrong you hear it as a faint watery quality, because the error is
+      spread thinly across many frequencies rather than concentrated anywhere.
+    </p>
+
+    <h2>Why the old phase-cancellation trick is not this</h2>
+    <p>
+      There is a much older method that people still recommend: invert one channel,
+      add it to the other, and anything sitting exactly in the middle of the stereo
+      image cancels out. Vocals are usually centred, so vocals mostly vanish. It
+      costs nothing and takes no time.
+    </p>
+    <p>
+      It also takes the bass, the kick drum and the snare with it, because those are
+      centred too. What survives is the reverb and the guitars, in mono, sounding
+      like a rehearsal heard through a wall. The trick is not separating anything;
+      it is deleting the middle of the stereo field and hoping the vocal was the
+      only thing there. A model that has learned what a voice looks like can remove
+      a centred vocal while leaving the centred kick drum exactly where it was, and
+      that difference is the entire point.
+    </p>
+
+    <h2>The honest limitations</h2>
+    <p>
+      Reverb and delay are the hardest problem. When a voice is recorded in a room,
+      or has a reverb added, its energy is smeared across time and mixed into the
+      whole track. The model can identify the direct voice cleanly and still leave
+      its tail behind, which is why a heavily-produced pop vocal can disappear while
+      a faint halo of itself remains.
+    </p>
+    <p>
+      Backing vocals are a genuine ambiguity rather than a failure. A model asked to
+      remove the voice will usually remove the harmonies too, since they are voices.
+      If you wanted the harmonies kept, there is no setting for that, because the
+      question you are asking is one the model was never trained to distinguish.
+    </p>
+    <p>
+      Anything already heavily compressed will separate worse. A low-bitrate MP3 has
+      had its quiet detail thrown away by the encoder, and some of that discarded
+      detail is exactly what the model uses to tell a voice from an instrument. Start
+      from the best copy you have; separating a 96 kbps file gives a noticeably
+      rougher result than separating the same song at 320.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { createAiPanel } from '../lib/ai/panel';
+  import { separate } from '../lib/ai/separate';
+  import { INST_HQ3 } from '../lib/ai/models';
+  import { duration as fmtDuration } from '../lib/format';
+  import type { ToolRuntime } from '../lib/tool';
+
+  /**
+   * Declared before createTool rather than after it: onReady only runs once a file
+   * is dropped, so a declaration below would happen to work, but relying on that
+   * ordering is the kind of thing that breaks the moment anything is refactored.
+   *
+   * Keyed by runtime rather than being a single value because onReady runs again
+   * after a reset, and a stale panel would be driving markup that is no longer on
+   * the page.
+   */
+  const panels = new WeakMap<ToolRuntime, ReturnType<typeof createAiPanel>>();
+
+  const tool = createTool({
+    suffix: 'instrumental',
+    defaultFormat: 'wav',
+
+    onReady(ctx, runtime) {
+      const panel = createAiPanel(
+        runtime.root.querySelector<HTMLElement>('[data-ai-setup]'),
+        [INST_HQ3],
+        {
+          download: 'Setting up AI audio studio',
+          start: 'Starting the engine',
+          work: 'Separating',
+        }
+      );
+      panels.set(runtime, panel);
+
+      // Long tracks are the main way this goes wrong, so say so before the click
+      // rather than after four minutes of waiting.
+      if (ctx.buffer.duration > 480) {
+        runtime.showNote(
+          `This is ${fmtDuration(ctx.buffer.duration)} long, so separation will take a ` +
+            'while and needs a lot of memory. Trimming to the part you actually need ' +
+            'first is usually the better move.',
+          'warn'
+        );
+      }
+    },
+
+    async process(ctx) {
+      const runtime = tool;
+      if (!runtime) throw new Error('tool not ready');
+      const panel = panels.get(runtime);
+
+      const wantVocals = runtime.flag('keepvocals');
+
+      await panel?.ensure(ctx.signal);
+
+      const result = await separate(
+        ctx.buffer,
+        INST_HQ3,
+        { primary: true, complement: wantVocals },
+        {
+          signal: ctx.signal,
+          onStage: (stage) => {
+            if (stage.phase === 'separating') {
+              panel?.setPhase('Separating', stage.ratio);
+              if (stage.ratio !== null) ctx.progress(stage.ratio);
+            } else if (stage.phase === 'starting') {
+              panel?.setPhase('Starting the engine', null);
+            } else if (stage.phase === 'finishing') {
+              panel?.setPhase('Writing the audio', null);
+            }
+          },
+        }
+      );
+
+      panel?.finish();
+
+      if (!result.primary) throw new Error('separation produced nothing');
+
+      // One output goes through the ordinary export bar; two become a result list,
+      // because the shared bar has one format picker and one button.
+      if (wantVocals && result.complement) {
+        return [
+          { name: 'Instrumental', buffer: result.primary },
+          { name: 'Vocals', buffer: result.complement },
+        ];
+      }
+      return result.primary;
+    },
+  });
+</script>

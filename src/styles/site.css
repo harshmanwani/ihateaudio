@@ -983,6 +983,144 @@
   background: var(--bg);
 }
 
+/* ---------- The AI pill ----------
+   One pill in the row is allowed to move, because one group in the row is doing
+   something the others are not: running a neural network on your machine rather
+   than a bit of arithmetic. Two signals, both cheap.
+
+   The wave is five bars on staggered loops, animating scaleY only, so it is a
+   compositor job and costs nothing on a phone. The border shimmer is a single
+   conic gradient rotating behind a masked ring, which is one animated property on
+   one element rather than a keyframed border. */
+.pill--ai {
+  position: relative;
+  isolation: isolate;
+}
+
+.pill--ai::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: conic-gradient(
+    from var(--shimmer-angle, 0deg),
+    transparent 0deg,
+    transparent 250deg,
+    var(--cat-ai-vivid) 310deg,
+    color-mix(in oklch, var(--cat-ai-vivid) 55%, white) 340deg,
+    var(--cat-ai-vivid) 350deg,
+    transparent 360deg
+  );
+  /* Mask to a ring so the gradient paints only the border, not the fill. Without
+     this the pill becomes a rotating coloured disc. */
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: pill-shimmer 4s linear infinite;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Registering the angle as a real property is what makes the conic gradient
+   animatable at all; a plain custom property is not interpolated. */
+@property --shimmer-angle {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes pill-shimmer {
+  to {
+    --shimmer-angle: 360deg;
+  }
+}
+
+.pill__wave {
+  display: flex;
+  align-items: center;
+  gap: 1.5px;
+  height: 12px;
+  flex: none;
+}
+
+.pill__wave i {
+  display: block;
+  width: 2px;
+  height: 100%;
+  border-radius: 1px;
+  background: var(--cat-vivid, var(--ink-3));
+  transform-origin: center;
+  animation: pill-wave 1.15s var(--ease) infinite;
+}
+
+/* Heights and delays are uneven on purpose. Five bars on the same timing read as
+   a loading spinner; staggered, with a taller middle, they read as sound. */
+.pill__wave i:nth-child(1) {
+  animation-delay: -0.9s;
+}
+.pill__wave i:nth-child(2) {
+  animation-delay: -0.55s;
+}
+.pill__wave i:nth-child(3) {
+  animation-delay: -0.15s;
+}
+.pill__wave i:nth-child(4) {
+  animation-delay: -0.7s;
+}
+.pill__wave i:nth-child(5) {
+  animation-delay: -0.35s;
+}
+
+@keyframes pill-wave {
+  0%,
+  100% {
+    transform: scaleY(0.3);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.pill[aria-pressed='true'] .pill__wave i {
+  background: var(--bg);
+}
+
+/* Selected state already inverts to solid ink, so the shimmer would fight it. */
+.pill--ai[aria-pressed='true']::before {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pill--ai::before {
+    animation: none;
+    /* Keep the coloured ring, lose the rotation. */
+    background: var(--cat-ai-vivid);
+    opacity: 0.5;
+  }
+
+  .pill__wave i {
+    animation: none;
+  }
+
+  /* Without motion the bars still need to look like a waveform rather than a
+     flat row, so the shape is baked in instead of animated. */
+  .pill__wave i:nth-child(1),
+  .pill__wave i:nth-child(5) {
+    transform: scaleY(0.4);
+  }
+
+  .pill__wave i:nth-child(2),
+  .pill__wave i:nth-child(4) {
+    transform: scaleY(0.7);
+  }
+}
+
 @media (pointer: coarse) {
   .pill {
     height: 42px;

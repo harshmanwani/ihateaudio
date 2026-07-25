@@ -28,7 +28,8 @@
     "dev:worker": "npm run build && wrangler dev",
     "csp": "node scripts/check-csp.mjs",
     "ffmpeg:upload": "node scripts/upload-ffmpeg-core.mjs",
-    "registry": "node scripts/check-registry.mjs"
+    "registry": "node scripts/check-registry.mjs",
+    "verify:ai": "node scripts/verify-ai.mjs"
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",

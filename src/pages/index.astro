@@ -103,12 +103,25 @@ const schema = [
         CATEGORIES.map((category) => (
           <button
             type="button"
-            class="pill"
+            class:list={['pill', category.id === 'ai' && 'pill--ai']}
             data-filter={category.id}
             data-cat={category.id}
             aria-pressed="false"
           >
-            <span class="pill__dot" aria-hidden="true" />
+            {
+              /* The AI family gets a moving wave rather than a static dot. It is
+                 the one group here that does something categorically different
+                 from the rest, and five bars that actually move say that faster
+                 than any label. Every other family keeps the quiet dot, which is
+                 what stops this reading as decoration. */
+              category.id === 'ai' ? (
+                <span class="pill__wave" aria-hidden="true">
+                  <i /><i /><i /><i /><i />
+                </span>
+              ) : (
+                <span class="pill__dot" aria-hidden="true" />
+              )
+            }
             {category.name}
           </button>
         ))
