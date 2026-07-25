@@ -28,47 +28,51 @@ dependency; if a build ever fails on a missing browser, add
 
 ### 2. Domain
 
-Add `ihateaudio.com` and `www.ihateaudio.com` in Pages, then pick one as
-canonical. Everything in the code assumes the apex (`https://ihateaudio.com`),
+The domain is on Cloudflare already. In the Pages project, add `ihateaudio.com`
+and `www.ihateaudio.com`, then pick one as canonical. Everything in the code assumes the apex (`https://ihateaudio.com`),
 which is what `src/consts.ts` sets and what the sitemap and every canonical tag
 emit. Redirect www to apex with a Bulk Redirect or a Page Rule.
 
 ### 3. Environment variables
 
-Set these in Pages under Settings, Environment variables, for **Production**.
-The `PUBLIC_` prefix is what makes Astro inline them at build time, so a change
-needs a redeploy to take effect.
+**Already done.** `.env.production` in the repo carries them, and `astro build`
+applies it:
 
-| Variable | Where it comes from | If unset |
-|---|---|---|
-| `PUBLIC_GA_ID` | GA4 Admin, Data streams, your web stream. Looks like `G-XXXXXXXXXX` | No GA at all |
-| `PUBLIC_POSTHOG_KEY` | PostHog project settings, Project API key. Looks like `phc_...` | No PostHog at all |
-| `PUBLIC_POSTHOG_HOST` | `https://a.tenmiracle.com` | Defaults to that anyway |
-| `PUBLIC_GOOGLE_VERIFICATION` | Search Console, HTML tag method, the `content` value only | No verification tag |
+| Variable | Value |
+|---|---|
+| `PUBLIC_GA_ID` | `G-1S7X0WG2YT` |
+| `PUBLIC_POSTHOG_KEY` | `phc_sx8LvUW69VfSwPoNwo8UbG2paXmsCWmVhFLmTuGHYdib` |
+| `PUBLIC_POSTHOG_HOST` | `https://a.tenmiracle.com` |
+| `PUBLIC_GOOGLE_VERIFICATION` | empty, see below |
 
-Nothing is emitted when a value is missing. That is deliberate: local dev and
-the test suite make zero third-party requests, so the suite cannot go flaky
-because someone else's CDN had a bad minute.
+Both ids are public by design. A GA4 measurement id and a PostHog project key
+appear in the page source of every site that uses them, so they belong in the
+repo where a change is visible in a diff, rather than in a dashboard where it is
+not. Anything genuinely secret would go in Cloudflare's environment variables,
+which override the file if you ever set the same name there.
 
-### 4. PostHog project
+The file is `.env.production`, not `.env`, on purpose: `astro dev` and the
+Playwright suite never load it, so neither makes a single third-party request. A
+test asserts that, which is also what stops local development polluting the
+production numbers.
 
-**Do not reuse the CapCut GPT key.** That project's key is what the MCP
-connector is pointed at, and sending this site's events there would mix two
-products' funnels together permanently.
+**The one still to fill in** is `PUBLIC_GOOGLE_VERIFICATION`, from Search
+Console's HTML-tag method. Paste just the `content` value. Until it is set, no
+verification tag is emitted at all rather than an empty broken one.
 
-1. Create a new project in the Ten Miracle org, named `ihateaudio`.
-2. Copy its `phc_...` Project API key into `PUBLIC_POSTHOG_KEY`.
-3. Confirm `a.tenmiracle.com` resolves for the new project. A PostHog managed
-   reverse proxy is configured per organisation, so if it is already serving
-   CapCut GPT it should serve this too. Check by loading
-   `https://a.tenmiracle.com/static/array.js` in a browser: a JavaScript file
-   means it works, a 404 or an error page means the proxy needs adding for this
-   project.
+### 4. PostHog proxy
 
-If the proxy is not available, set `PUBLIC_POSTHOG_HOST` to
-`https://us.i.posthog.com` to ship, and fix the proxy afterwards. It will cost
-you maybe a third of your events to blockers, which is worth knowing rather than
-guessing about.
+The key is a separate project from CapCut GPT, so the two products' funnels stay
+apart. One thing to confirm on the first deploy: load
+`https://a.tenmiracle.com/static/array.js` in a browser. A JavaScript file means
+the proxy serves this project; a 404 or an error page means it needs adding for
+it, because a PostHog managed reverse proxy is configured per project rather than
+per organisation.
+
+If it turns out not to be available, set `PUBLIC_POSTHOG_HOST` to
+`https://us.i.posthog.com` to ship, and fix the proxy afterwards. Going direct
+costs you roughly a third of your events to blockers, which is worth knowing
+rather than guessing about.
 
 ### 5. Google, beyond Analytics
 
@@ -120,8 +124,18 @@ Expect **44 pages, 0 errors, 0 warnings**. Then:
 npm test && npx playwright test
 ```
 
-Expect **125 unit** and **275 end-to-end**. After the first production deploy,
-check by hand:
+Expect **125 unit** and **285 end-to-end**. There is also a run against real
+files, which is the one that catches what synthetic tones cannot:
+
+```bash
+npm run dev
+npm run verify -- ~/path/track.mp3 ~/path/second.mp3
+```
+
+Expect **38 passed, 1 skipped**. The skip is the voice recorder, which needs a
+live microphone.
+
+After the first production deploy, check by hand:
 
 1. `curl -sI https://ihateaudio.com | grep -i content-security` returns the
    policy. If it does not, `_headers` did not ship, and the analytics scripts
