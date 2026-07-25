@@ -5,10 +5,13 @@
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: DENY
   Permissions-Policy: geolocation=(), camera=(), payment=(), interest-cohort=()
-  # Everything is same-origin and self-hosted, so the policy can be strict.
-  # 'unsafe-inline' on styles covers Astro's scoped style blocks; 'wasm-unsafe-eval'
-  # is required for the ffmpeg core to instantiate.
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self'; media-src 'self' blob:; connect-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
+  # Strict on purpose, and it stays strict with analytics on: the GA and PostHog
+  # bootstrap lives in same-origin /analytics.js rather than an inline block, so
+  # script-src never needs 'unsafe-inline'. 'unsafe-inline' on styles covers
+  # Astro's scoped style blocks; 'wasm-unsafe-eval' is required for the ffmpeg
+  # core to instantiate. PostHog is proxied through a.tenmiracle.com so a
+  # privacy-minded audience's blockers do not eat every event.
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://www.googletagmanager.com https://a.tenmiracle.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.google-analytics.com https://*.googletagmanager.com; font-src 'self'; media-src 'self' blob:; connect-src 'self' blob: https://a.tenmiracle.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
 
 # Content-hashed, so they can never go stale.
 /_astro/*
@@ -17,14 +20,43 @@
 /fonts/*
   Cache-Control: public, max-age=31536000, immutable
 
+# Generated art and social cards. Named by slug rather than content hash, so a
+# week, not a year.
+/icons3d/*
+  Cache-Control: public, max-age=604800
+
+/og/*
+  Cache-Control: public, max-age=604800
+
+/splash/*
+  Cache-Control: public, max-age=604800
+
+/screenshots/*
+  Cache-Control: public, max-age=604800
+
 # The core is versioned by the package, not by filename, so revalidate daily.
 /ffmpeg/*
   Cache-Control: public, max-age=86400
   Cross-Origin-Resource-Policy: same-origin
 
+# Must never be cached, or a stale worker pins an old build for repeat visitors.
 /sw.js
   Cache-Control: public, max-age=0, must-revalidate
 
+/analytics.js
+  Cache-Control: public, max-age=3600
+
 /manifest.webmanifest
   Content-Type: application/manifest+json
+  Cache-Control: public, max-age=3600
+
+# Advertised to assistants and agents, so they need to be readable cross-origin.
+/llms.txt
+  Content-Type: text/plain; charset=utf-8
+  Access-Control-Allow-Origin: *
+  Cache-Control: public, max-age=3600
+
+/tools.json
+  Content-Type: application/json; charset=utf-8
+  Access-Control-Allow-Origin: *
   Cache-Control: public, max-age=3600

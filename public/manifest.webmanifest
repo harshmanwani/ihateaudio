@@ -1,17 +1,70 @@
 {
+  "id": "/",
   "name": "ihateaudio — free browser audio tools",
   "short_name": "ihateaudio",
-  "description": "Trim, convert, merge and normalize audio entirely in your browser. Nothing is uploaded.",
-  "start_url": "/",
+  "description": "Trim, convert, merge and normalize audio entirely in your browser. Nothing is uploaded, and it keeps working with no internet.",
+  "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "orientation": "any",
   "background_color": "#ffffff",
   "theme_color": "#ffffff",
+  "lang": "en",
+  "dir": "ltr",
   "categories": ["utilities", "music", "productivity"],
+  "launch_handler": { "client_mode": "navigate-existing" },
   "icons": [
     { "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/desktop.png",
+      "sizes": "1280x800",
+      "type": "image/png",
+      "form_factor": "wide",
+      "label": "Trimming a track, with the waveform zoomed in"
+    },
+    {
+      "src": "/screenshots/mobile.png",
+      "sizes": "390x844",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "The audio trimmer on a phone"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Trim audio",
+      "short_name": "Trim",
+      "url": "/audio-trimmer",
+      "icons": [{ "src": "/icons3d/audio-trimmer.png", "sizes": "256x256" }]
+    },
+    {
+      "name": "Convert audio",
+      "short_name": "Convert",
+      "url": "/audio-converter",
+      "icons": [{ "src": "/icons3d/audio-converter.png", "sizes": "256x256" }]
+    },
+    {
+      "name": "Merge audio",
+      "short_name": "Merge",
+      "url": "/audio-joiner",
+      "icons": [{ "src": "/icons3d/audio-joiner.png", "sizes": "256x256" }]
+    },
+    {
+      "name": "Record your voice",
+      "short_name": "Record",
+      "url": "/voice-recorder",
+      "icons": [{ "src": "/icons3d/voice-recorder.png", "sizes": "256x256" }]
+    }
   ]
 }

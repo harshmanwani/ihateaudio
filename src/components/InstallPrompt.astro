@@ -1,0 +1,155 @@
+---
+/**
+ * Install invitation.
+ *
+ * Deliberately not a page-top banner: those get dismissed on reflex and shove
+ * the actual tool down the page. This waits until someone has been on the site
+ * for a moment, appears in the corner, remembers being dismissed, and never
+ * shows again once installed.
+ *
+ * iOS gets its own copy because Safari has no install event to hook: there the
+ * only route is Share, then Add to Home Screen, so the card says that instead of
+ * offering a button that cannot work.
+ */
+import Logo from './Logo.astro';
+import Icon from './Icon.astro';
+---
+
+<aside class="install" data-pwa-install hidden aria-live="polite">
+  <Logo size={34} class="install__mark" />
+
+  <div class="install__body">
+    <p class="install__title">Keep it on your home screen</p>
+    <p class="install__text" data-pwa-text>
+      Opens like a real app, and every tool still works with no internet.
+    </p>
+  </div>
+
+  <div class="install__actions">
+    <button type="button" class="btn btn--solid btn--sm" data-pwa-go>Install</button>
+    <button
+      type="button"
+      class="install__close"
+      data-pwa-close
+      aria-label="Not now"
+    >
+      <Icon name="x" size={15} />
+    </button>
+  </div>
+</aside>
+
+<script>
+  const card = document.querySelector<HTMLElement>('[data-pwa-install]');
+  const go = document.querySelector<HTMLButtonElement>('[data-pwa-go]');
+  const close = document.querySelector<HTMLElement>('[data-pwa-close]');
+  const text = document.querySelector<HTMLElement>('[data-pwa-text]');
+
+  const KEY = 'ihateaudio:install-dismissed';
+  /** Asking again a month later is a reminder; asking tomorrow is nagging. */
+  const QUIET_DAYS = 30;
+
+  function dismissedRecently(): boolean {
+    try {
+      const at = Number(localStorage.getItem(KEY));
+      if (!at) return false;
+      return Date.now() - at < QUIET_DAYS * 24 * 60 * 60 * 1000;
+    } catch {
+      // Private mode with storage blocked: treat as never asked.
+      return false;
+    }
+  }
+
+  function remember(): void {
+    try {
+      localStorage.setItem(KEY, String(Date.now()));
+    } catch {
+      /* Nothing to do; the card simply reappears next visit. */
+    }
+  }
+
+  const standalone =
+    window.matchMedia('(display-mode: standalone)').matches ||
+    // Safari's own flag, which is the only reliable signal on iOS.
+    (navigator as { standalone?: boolean }).standalone === true;
+
+  const isIos =
+    /iphone|ipad|ipod/i.test(navigator.userAgent) ||
+    // iPadOS reports as a Mac, so touch points are the distinguishing signal.
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+  let deferred: (Event & { prompt: () => Promise<void> }) | null = null;
+
+  function show(): void {
+    if (!card || standalone || dismissedRecently()) return;
+    card.hidden = false;
+    // Animate in on the next frame, so the transition has a start state.
+    requestAnimationFrame(() => card.setAttribute('data-in', 'true'));
+  }
+
+  function hide(): void {
+    if (!card) return;
+    card.removeAttribute('data-in');
+    setTimeout(() => {
+      card.hidden = true;
+    }, 220);
+  }
+
+  // Chrome, Edge and Android: the browser tells us it is installable.
+  window.addEventListener('beforeinstallprompt', (event) => {
+    event.preventDefault();
+    deferred = event as Event & { prompt: () => Promise<void> };
+    // Not immediately. Someone who has just landed has no idea yet whether they
+    // want this on their home screen.
+    setTimeout(show, 20_000);
+  });
+
+  // iOS Safari never fires that event, so the card explains the manual route.
+  if (isIos && !standalone) {
+    if (go) go.hidden = true;
+    if (text) {
+      text.textContent =
+        'Tap Share, then Add to Home Screen. Every tool keeps working with no internet.';
+    }
+    setTimeout(show, 25_000);
+  }
+
+  go?.addEventListener('click', () => {
+    hide();
+    remember();
+    void deferred?.prompt();
+    deferred = null;
+  });
+
+  close?.addEventListener('click', () => {
+    hide();
+    remember();
+  });
+
+  // Installed by any route, including the browser menu: stop asking.
+  window.addEventListener('appinstalled', () => {
+    hide();
+    remember();
+  });
+
+  // The header button is the way back to this if the card was dismissed.
+  document.querySelector('[data-pwa-trigger]')?.addEventListener('click', () => {
+    if (deferred) {
+      void deferred.prompt();
+      deferred = null;
+      return;
+    }
+    if (card) {
+      card.hidden = false;
+      requestAnimationFrame(() => card.setAttribute('data-in', 'true'));
+    }
+  });
+
+  // The trigger only makes sense where installing is actually possible.
+  const trigger = document.querySelector<HTMLElement>('[data-pwa-trigger]');
+  if (trigger && !standalone) {
+    if (isIos) trigger.hidden = false;
+    window.addEventListener('beforeinstallprompt', () => {
+      trigger.hidden = false;
+    });
+  }
+</script>

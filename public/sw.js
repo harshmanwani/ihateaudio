@@ -7,7 +7,7 @@
  * touched by it.
  */
 
-const VERSION = 'v1';
+const VERSION = 'v2';
 const PAGES = `pages-${VERSION}`;
 const ASSETS = `assets-${VERSION}`;
 
@@ -60,12 +60,20 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // Hashed build assets and fonts: cache first, since their URL changes when
-  // their content does.
+  // Launch images are shown by the OS before the app starts, so the browser
+  // cache is the only one that matters for them. Keeping eleven full-resolution
+  // PNGs in here would spend the quota on something we can never serve.
+  if (url.pathname.startsWith('/splash/')) return;
+
+  // Hashed build assets, fonts, and the tool art: cache first. The 3D icons are
+  // part of how a tool page reads, so an offline visit that lost them would look
+  // broken rather than degraded.
   if (
     url.pathname.startsWith('/_astro/') ||
     url.pathname.startsWith('/fonts/') ||
-    url.pathname.endsWith('.svg')
+    url.pathname.startsWith('/icons3d/') ||
+    url.pathname.endsWith('.svg') ||
+    /^\/(icon-\d+|icon-maskable-\d+|apple-touch-icon)\.png$/.test(url.pathname)
   ) {
     event.respondWith(
       (async () => {

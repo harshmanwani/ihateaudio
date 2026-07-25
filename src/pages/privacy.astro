@@ -75,11 +75,25 @@ const schema = [
 
     <h2>What we do collect</h2>
     <p>
-      Aggregate, anonymous page analytics: which pages were viewed, roughly
-      where in the world from, and which site sent you. No cookies are set for
-      this, no cross-site identifier is created, and no individual visitor is
-      tracked from one page to another. It exists so we know which tools to
-      build next.
+      Page analytics, through Google Analytics and PostHog: which pages were
+      viewed, roughly which country from, and which site sent you. On a tool
+      page we also record three things about what happened, and only these
+      three: that a file was accepted, which output format you chose, and the
+      error code if something failed. It exists so we know which tools are worth
+      more work and which ones are quietly broken.
+    </p>
+    <p>
+      What is deliberately switched off is worth more than what is on. There is
+      no session recording, because a replay of a tool page would capture your
+      filenames, and a filename is content. Nothing you type is captured. No
+      file name, no file size and no audio ever reaches either service. We set
+      no cookie of our own; Google Analytics sets its own, which is the honest
+      cost of using it. Advertising and remarketing signals are turned off.
+    </p>
+    <p>
+      If your browser sends Do Not Track, PostHog collects nothing at all. Any
+      blocker will stop both, and every tool keeps working exactly the same,
+      because none of this is load bearing.
     </p>
     <p>
       There are no accounts, so there is no email address, password, or profile

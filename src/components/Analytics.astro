@@ -1,0 +1,39 @@
+---
+/**
+ * Analytics, configured to not contradict the promise on every other page.
+ *
+ * This site's whole pitch is that your file never leaves your device, so the
+ * measurement has to be visibly consistent with that. The switched-off list
+ * matters more than the switched-on one, and it lives in /analytics.js next to
+ * the code that applies it: no session replay, no autocapture of anything
+ * typed, Do Not Track honoured, no cookie of our own.
+ *
+ * One same-origin script rather than two inline blocks, so the Content Security
+ * Policy never needs 'unsafe-inline' for scripts. Config rides on data
+ * attributes. Nothing is emitted at all unless the ids are set, which is what
+ * keeps local dev and the test suite free of third-party requests.
+ */
+import { ANALYTICS } from '../consts';
+
+const { ga, posthogKey, posthogHost } = ANALYTICS;
+const enabled = Boolean(ga || posthogKey);
+---
+
+{
+  enabled && (
+    <Fragment>
+      {ga && (
+        <link rel="preconnect" href="https://www.googletagmanager.com" crossorigin />
+      )}
+      {posthogKey && <link rel="preconnect" href={posthogHost} crossorigin />}
+      <script
+        is:inline
+        defer
+        src="/analytics.js"
+        data-ga={ga}
+        data-ph-key={posthogKey}
+        data-ph-host={posthogHost}
+      />
+    </Fragment>
+  )
+}

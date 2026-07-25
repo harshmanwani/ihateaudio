@@ -1,7 +1,10 @@
 ---
-import { SITE } from '../consts';
+import { SITE, ANALYTICS } from '../consts';
+import Analytics from '../components/Analytics.astro';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
+import InstallPrompt from '../components/InstallPrompt.astro';
+import splashLinks from '../assets/splash-links.html?raw';
 import '../styles/tokens.css';
 import '../styles/base.css';
 import '../styles/app.css';
@@ -79,6 +82,15 @@ const siteSchema = [
 
     {noindex && <meta name="robots" content="noindex, follow" />}
 
+    {
+      ANALYTICS.googleVerification && (
+        <meta
+          name="google-site-verification"
+          content={ANALYTICS.googleVerification}
+        />
+      )
+    }
+
     <!--
       The font is the only render-blocking asset on the page, so it is
       preloaded. Everything else is inlined or deferred.
@@ -92,9 +104,25 @@ const siteSchema = [
     />
 
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/icon-192.png" sizes="192x192" type="image/png" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#ffffff" />
+
+    <!-- Installed on iOS, these are what make it open as an app rather than a
+         Safari window with the chrome hidden. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="ihateaudio" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="ihateaudio" />
+
+    <!--
+      Launch images, generated with the icons by scripts/generate-app-icons.mjs.
+      iOS matches these on exact pixel size with no fallback, so the list is
+      built from the same table the images are, never typed by hand.
+    -->
+    <Fragment set:html={splashLinks} />
 
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={SITE.name} />
@@ -122,6 +150,8 @@ const siteSchema = [
       title="Machine-readable tool index"
     />
 
+    <Analytics />
+
     {
       [...siteSchema, ...schema].map((item) => (
         <script
@@ -140,6 +170,7 @@ const siteSchema = [
       <slot />
     </main>
     <Footer />
+    <InstallPrompt />
 
     <script>
       // Registers the offline cache. Because every tool runs client-side, the
