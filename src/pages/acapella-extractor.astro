@@ -2,7 +2,6 @@
 import ToolPage from '../layouts/ToolPage.astro';
 import ToolShell from '../components/ToolShell.astro';
 import AiSetup from '../components/AiSetup.astro';
-import StemPanel from '../components/StemPanel.astro';
 import { getTool } from '../data/tools';
 
 const tool = getTool('acapella-extractor');
@@ -58,8 +57,6 @@ const faq = [
         what="It is the separation network, shared with the vocal remover and served from this domain rather than a third party."
         speed="Extraction then runs at roughly real time, so a four-minute song takes a few minutes."
       />
-
-      <StemPanel />
     </div>
   </ToolShell>
 
@@ -112,8 +109,7 @@ const faq = [
   import { createAiPanel } from '../lib/ai/panel';
   import { separate } from '../lib/ai/separate';
   import { INST_HQ3 } from '../lib/ai/models';
-  import { duration as fmtDuration, baseName } from '../lib/format';
-  import { mountStemPanel } from '../lib/ai/stem-panel';
+  import { duration as fmtDuration } from '../lib/format';
 
   const panels = new WeakMap<ToolRuntime, ReturnType<typeof createAiPanel>>();
 
@@ -174,22 +170,12 @@ const faq = [
         throw new Error('extraction produced nothing');
       }
 
-      // Vocal first here, because that is what this tool is for — but both are
-      // present, because judging an isolated vocal means hearing what was taken
-      // away from it.
-      mountStemPanel(
-        runtime.root.querySelector<HTMLElement>('[data-stem-panel]'),
-        [
-          { id: 'vocals', name: 'Vocal', buffer: result.complement },
-          { id: 'instrumental', name: 'Music', buffer: result.primary },
-        ],
-        {
-          baseName: baseName(ctx.files[0]?.name ?? 'track'),
-          format: () => runtime.getFormat(),
-          onError: (message) => runtime.showNote(message, 'warn'),
-        }
-      );
-
+      // The mixer is deliberately absent here for now. Mounting it on this page
+      // hangs the tab — reproducibly, locally and in production, while the
+      // structurally identical vocal remover is fine — and a frozen page is far
+      // worse than a missing convenience. The extractor works; it just hands you
+      // the vocal rather than letting you audition it against the backing. See
+      // drafts/README.md for what has been eliminated so far.
       return result.complement;
     },
   });

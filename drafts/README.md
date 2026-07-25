@@ -60,3 +60,23 @@ The R2 layout and upload, the worker route, the model files already sitting in
 the bucket, the SRT and VTT writers with their timestamp handling, the paragraph
 splitter, the setup panel integration, and both pages including their SEO copy.
 Only the call into transformers.js is broken.
+
+---
+
+## The mixer on the acapella extractor
+
+`src/lib/ai/stem-panel.ts` and `StemPanel.astro` are live on the vocal remover and
+the song splitter, both verified. Mounting the same panel on the acapella
+extractor freezes the tab — no error, no console output, the page simply stops
+responding, reproducibly and in production as well as locally.
+
+What makes it strange is that the two pages are structurally identical: same
+ToolShell props, same `results`, same `defaultFormat`, same single-buffer return,
+one `<StemPanel />` each, one `mountStemPanel` call each. The only difference is
+which of the two stems is listed first and which is returned to the export bar.
+Reverting the mount restores the tool to +18.55 dB and a clean pass, which
+confirms the panel is the cause without explaining it.
+
+Worth trying: mounting the panel with the stems in the same order as the vocal
+remover (instrumental first), which would isolate whether ordering matters at all;
+and moving the mount after the return value is handed back rather than before it.
