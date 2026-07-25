@@ -4,6 +4,33 @@ import Icon from '../components/Icon.astro';
 import { SITE } from '../consts';
 import { CATEGORIES, TOOLS, toolsIn } from '../data/tools';
 
+const homeFaq = [
+  {
+    q: 'Is it actually free? What’s the catch?',
+    a: 'Free, no catch. Because every tool runs in your browser, there are no processing servers to pay for — static pages cost almost nothing to serve. There is no premium tier, no watermark, no daily limit, and no account to make.',
+  },
+  {
+    q: 'Are my files uploaded anywhere?',
+    a: 'No. Your file is read directly by your browser and processed on your own machine. You can verify this: open your browser’s network tab while using any tool, or switch to airplane mode after the page loads — everything keeps working.',
+  },
+  {
+    q: 'Is there a file size limit?',
+    a: 'No imposed limit — there is no upload, so there is nothing to cap. The practical limit is your device’s memory: roughly 40 minutes of audio at once on a phone, several hours on a desktop. If a file is too large, the tool tells you before trying.',
+  },
+  {
+    q: 'What formats can I use?',
+    a: 'MP3, WAV, M4A, AAC, OGG, Opus, FLAC and WebM open directly. WMA, AIFF and other unusual formats work through the converter, which loads a fuller decoder on demand. Video files (MP4, MOV, MKV) work in the video-to-audio tool.',
+  },
+  {
+    q: 'Do the tools work offline?',
+    a: 'Yes. Once you’ve visited, the site works with no connection — you can install it like an app from your browser’s menu. Only the rarely-needed format converter requires one download the first time you use it.',
+  },
+  {
+    q: 'Why should I trust the “nothing is uploaded” claim?',
+    a: 'Because you don’t have to take our word for it. The claim is checkable in under a minute with your browser’s own developer tools, and the site keeps working with the internet disconnected — something no upload-based service can do.',
+  },
+];
+
 const schema = [
   {
     '@context': 'https://schema.org',
@@ -24,6 +51,15 @@ const schema = [
       url: new URL(`/${tool.slug}`, SITE.url).href,
     })),
   },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: homeFaq.map((item) => ({
+      '@type': 'Question',
+      name: item.q,
+      acceptedAnswer: { '@type': 'Answer', text: item.a },
+    })),
+  },
 ];
 ---
 
@@ -35,11 +71,13 @@ const schema = [
 >
   <div class="wrap">
     <section class="hero">
-      <h1>Audio editing is miserable. These make it less so.</h1>
-      <p class="hero__sub">
-        {TOOLS.length} free tools that run entirely in your browser — nothing is
-        uploaded, nothing to install, nothing to sign up for.
-      </p>
+      <div>
+        <h1>Audio editing is miserable. These make it less so.</h1>
+        <p class="hero__sub">
+          {TOOLS.length} free tools that run entirely in your browser — nothing is
+          uploaded, nothing to install, nothing to sign up for.
+        </p>
+      </div>
       <div class="toolsearch">
         <Icon name="magnifying-glass" size={18} />
         <input
@@ -53,13 +91,33 @@ const schema = [
       </div>
     </section>
 
+    <div class="filters" role="group" aria-label="Filter tools by category">
+      <button type="button" class="pill" data-filter="all" aria-pressed="true">
+        All
+      </button>
+      {
+        CATEGORIES.map((category) => (
+          <button
+            type="button"
+            class="pill"
+            data-filter={category.id}
+            data-cat={category.id}
+            aria-pressed="false"
+          >
+            <span class="pill__dot" aria-hidden="true" />
+            {category.name}
+          </button>
+        ))
+      }
+    </div>
+
     <p class="searchempty" data-search-empty hidden>
-      Nothing matched that. Try “trim”, “convert”, “louder” or “ringtone”.
+      Nothing matched that. Try “trim”, “mp4 to mp3”, “louder” or “ringtone”.
     </p>
 
     {
       CATEGORIES.map((category) => (
-        <section class="cat" data-category>
+        <section class="cat" data-category={category.id}>
           <div class="cat__head">
             <h2>{category.name}</h2>
             <span class="cat__count">{toolsIn(category.id).length} tools</span>
@@ -72,10 +130,10 @@ const schema = [
                 href={`/${tool.slug}`}
                 data-tile
                 data-cat={tool.category}
-                data-search={`${tool.name} ${tool.short} ${tool.slug}`.toLowerCase()}
+                data-search={`${tool.name} ${tool.short} ${tool.slug.replace(/-/g, ' ')} ${tool.keywords.join(' ')}`.toLowerCase()}
               >
                 <span class="tile__chip" aria-hidden="true">
-                  <Icon name={tool.icon} size={20} />
+                  <Icon name={tool.icon} weight="duotone" size={24} />
                 </span>
                 <span class="tile__text">
                   <span class="tile__name">{tool.name}</span>
@@ -88,30 +146,155 @@ const schema = [
       ))
     }
   </div>
+
+  <!-- The tone change: launcher above, trust below. -->
+  <section class="trust" aria-labelledby="trust-heading">
+    <div class="wrap">
+      <h2 id="trust-heading">
+        No upload. No account. Check for yourself.
+      </h2>
+      <p class="trust__lede">
+        Every tool on this site does its work inside your browser, on your own
+        machine. That is not a promise you have to take on faith — it is
+        something you can verify in under a minute.
+      </p>
+
+      <div class="trust__steps">
+        <div class="trust__step">
+          <div class="trust__glyph">
+            <Icon name="upload-simple" weight="duotone" size={24} />
+          </div>
+          <h3>Drop a file</h3>
+          <p>
+            It is read straight off your disk into the page. No transfer, no
+            queue, no size cap — a two-hour recording opens as fast as your
+            machine can decode it.
+          </p>
+        </div>
+        <div class="trust__step">
+          <div class="trust__glyph">
+            <Icon name="sliders-horizontal" weight="duotone" size={24} />
+          </div>
+          <h3>Edit it here</h3>
+          <p>
+            The processing uses the audio engine built into your browser — the
+            same one behind web games and video calls. Your machine does the
+            work, so nothing waits on a server.
+          </p>
+        </div>
+        <div class="trust__step">
+          <div class="trust__glyph">
+            <Icon name="download-simple" weight="duotone" size={24} />
+          </div>
+          <h3>Download the result</h3>
+          <p>
+            The finished file is written by the same page and saved straight to
+            your downloads. Close the tab and every trace of your audio is
+            gone.
+          </p>
+        </div>
+      </div>
+
+      <div class="trust__facts">
+        <div class="trust__fact">
+          <strong>Zero uploads</strong>
+          <span>
+            Open your browser's network tab while you edit — no request ever
+            carries your file.
+          </span>
+        </div>
+        <div class="trust__fact">
+          <strong>Works in airplane mode</strong>
+          <span>
+            Load a tool, disconnect, keep working. No upload service can do
+            that.
+          </span>
+        </div>
+        <div class="trust__fact">
+          <strong>Nothing to sign into</strong>
+          <span>
+            No accounts exist here, so there is no password, profile or email
+            list to leak.
+          </span>
+        </div>
+        <div class="trust__fact">
+          <strong>Free because it's cheap</strong>
+          <span>
+            No processing servers means almost no running costs — read{' '}
+            <a href="/about">how it works</a>{' '}and{' '}
+            <a href="/privacy">the privacy details</a>.
+          </span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap homefaq">
+    <h2>Common questions</h2>
+    <div class="faq">
+      {
+        homeFaq.map((item) => (
+          <details>
+            <summary>{item.q}</summary>
+            <div>{item.a}</div>
+          </details>
+        ))
+      }
+    </div>
+  </div>
 </Base>
 
 <script>
   const search = document.querySelector<HTMLInputElement>('#tool-search');
   const tiles = Array.from(document.querySelectorAll<HTMLElement>('[data-tile]'));
-  const sections = Array.from(document.querySelectorAll<HTMLElement>('[data-category]'));
+  const sections = Array.from(
+    document.querySelectorAll<HTMLElement>('[data-category]')
+  );
+  const pills = Array.from(document.querySelectorAll<HTMLElement>('[data-filter]'));
   const empty = document.querySelector<HTMLElement>('[data-search-empty]');
 
-  search?.addEventListener('input', () => {
-    const query = search.value.trim().toLowerCase();
-    let matches = 0;
+  let activeCategory = 'all';
+
+  // Token match: every word the user typed must appear somewhere in the
+  // tile's haystack (name, description, slug, synonyms). This is what makes
+  // "mp4 to mp3" or "remove background noise" land on the right tool.
+  const matches = (haystack: string, query: string): boolean => {
+    if (query === '') return true;
+    return query
+      .split(/\s+/)
+      .filter(Boolean)
+      .every((word) => haystack.includes(word));
+  };
+
+  const apply = (): void => {
+    const query = (search?.value ?? '').trim().toLowerCase();
+    let visible = 0;
 
     for (const tile of tiles) {
-      const hit = query === '' || (tile.dataset.search ?? '').includes(query);
+      const inCategory =
+        activeCategory === 'all' || tile.dataset.cat === activeCategory;
+      const hit = inCategory && matches(tile.dataset.search ?? '', query);
       tile.hidden = !hit;
-      if (hit) matches += 1;
+      if (hit) visible += 1;
     }
 
-    // Hide a category heading once every tool under it is filtered out.
     for (const section of sections) {
-      const visible = section.querySelectorAll('[data-tile]:not([hidden])').length;
-      section.hidden = visible === 0;
+      const any = section.querySelectorAll('[data-tile]:not([hidden])').length;
+      section.hidden = any === 0;
     }
 
-    if (empty) empty.hidden = matches > 0;
-  });
+    if (empty) empty.hidden = visible > 0;
+  };
+
+  search?.addEventListener('input', apply);
+
+  for (const pill of pills) {
+    pill.addEventListener('click', () => {
+      activeCategory = pill.dataset.filter ?? 'all';
+      for (const other of pills) {
+        other.setAttribute('aria-pressed', String(other === pill));
+      }
+      apply();
+    });
+  }
 </script>

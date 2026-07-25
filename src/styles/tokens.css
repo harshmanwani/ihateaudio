@@ -36,21 +36,29 @@
   --danger-soft: oklch(0.968 0.022 27);
   --danger-ink: oklch(0.38 0.14 27);
 
-  /* Category accents — one hue per tool family. The strong value carries
-     icons and hovers; the soft value is the icon chip fill. Lightness and
-     chroma are held constant across the six so no family shouts. */
+  /* Category accents — one hue per tool family, three tones each.
+     `strong` is text-safe (borders, hovers, links); `vivid` is the icon
+     colour — brighter and more chromatic, because a glyph can carry far more
+     saturation than text without breaking anything; `soft` fills the chip.
+     Lightness and chroma are held constant across families so none shouts. */
   --cat-cut: oklch(0.44 0.1 162);
-  --cat-cut-soft: oklch(0.955 0.024 162);
+  --cat-cut-vivid: oklch(0.56 0.14 162);
+  --cat-cut-soft: oklch(0.945 0.038 162);
   --cat-convert: oklch(0.44 0.1 245);
-  --cat-convert-soft: oklch(0.955 0.024 245);
+  --cat-convert-vivid: oklch(0.56 0.16 245);
+  --cat-convert-soft: oklch(0.945 0.032 245);
   --cat-volume: oklch(0.44 0.1 62);
-  --cat-volume-soft: oklch(0.955 0.03 62);
+  --cat-volume-vivid: oklch(0.6 0.14 62);
+  --cat-volume-soft: oklch(0.95 0.05 80);
   --cat-speed: oklch(0.44 0.1 300);
-  --cat-speed-soft: oklch(0.955 0.024 300);
+  --cat-speed-vivid: oklch(0.56 0.17 300);
+  --cat-speed-soft: oklch(0.945 0.035 300);
   --cat-effects: oklch(0.44 0.1 350);
-  --cat-effects-soft: oklch(0.955 0.024 350);
+  --cat-effects-vivid: oklch(0.58 0.18 350);
+  --cat-effects-soft: oklch(0.95 0.03 350);
   --cat-utility: oklch(0.44 0.1 210);
-  --cat-utility-soft: oklch(0.955 0.024 210);
+  --cat-utility-vivid: oklch(0.56 0.13 210);
+  --cat-utility-soft: oklch(0.945 0.035 210);
 
   /* Stage — the dark workspace */
   --stage: oklch(0.168 0.014 162);

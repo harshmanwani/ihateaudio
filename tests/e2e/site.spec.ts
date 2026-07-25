@@ -140,6 +140,70 @@ test.describe('navigation', () => {
     await expect(page.locator('[data-search-empty]')).toBeVisible();
   });
 
+  test('search understands synonyms, not just tool names', async ({ page }) => {
+    await page.goto('/');
+    const cases: [string, string][] = [
+      ['mp4 to mp3', '/video-to-audio'],
+      ['louder', '/volume-booster'],
+      ['sped up', '/speed-changer'],
+      ['lufs', '/audio-normalizer'],
+      ['combine', '/audio-joiner'],
+    ];
+
+    for (const [query, slug] of cases) {
+      await page.fill('#tool-search', query);
+      await expect(
+        page.locator(`[data-tile][href="${slug}"]`),
+        `"${query}" should surface ${slug}`
+      ).toBeVisible();
+    }
+  });
+
+  test('category pills filter the grid', async ({ page }) => {
+    await page.goto('/');
+    await page.click('[data-filter="effects"]');
+
+    // Only the effects section remains.
+    await expect(page.locator('[data-category]:not([hidden])')).toHaveCount(1);
+    await expect(page.locator('[data-tile]:not([hidden])')).toHaveCount(5);
+    await expect(page.locator('[data-filter="effects"]')).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+
+    await page.click('[data-filter="all"]');
+    await expect(page.locator('[data-category]:not([hidden])')).toHaveCount(6);
+  });
+
+  test('the all-tools menu lists every tool from any page', async ({ page }) => {
+    await page.goto('/audio-trimmer');
+    await page.click('[data-meganav] summary');
+
+    const links = page.locator('[data-meganav] a');
+    await expect(links).toHaveCount(TOOLS.length);
+    await expect(
+      page.locator('[data-meganav] a[href="/slowed-reverb"]')
+    ).toBeVisible();
+
+    // Escape closes it and nothing is left covering the page.
+    await page.keyboard.press('Escape');
+    await expect(page.locator('.meganav__panel')).toBeHidden();
+  });
+
+  test('homepage trust band and FAQ are present after the grid', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.locator('.trust h2')).toContainText(/check for yourself/i);
+    await expect(page.locator('.trust__fact')).toHaveCount(4);
+    await expect(page.locator('.homefaq details')).toHaveCount(6);
+
+    // The homepage FAQ must also be in the structured data.
+    const blocks = await page
+      .locator('script[type="application/ld+json"]')
+      .allTextContents();
+    const types = blocks.map((b) => JSON.parse(b)['@type']);
+    expect(types).toContain('FAQPage');
+  });
+
   test('sitemap lists every tool', async ({ request }) => {
     const response = await request.get('/sitemap.xml');
     expect(response.status()).toBe(200);

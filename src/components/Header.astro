@@ -1,8 +1,8 @@
 ---
 import Icon from './Icon.astro';
+import { CATEGORIES, toolsIn } from '../data/tools';
 
 const path = Astro.url.pathname;
-const isHome = path === '/';
 ---
 
 <header class="hdr">
@@ -13,11 +13,38 @@ const isHome = path === '/';
     </a>
 
     <nav class="hdr__nav" aria-label="Main">
-      <a
-        class="hdr__link"
-        href="/"
-        aria-current={isHome ? 'page' : undefined}>All tools</a
-      >
+      <!-- The launcher, reachable from any page: every tool, grouped and
+           glyphed, one click away. -->
+      <details class="meganav" data-meganav>
+        <summary class="hdr__link" aria-label="All tools menu">
+          All tools
+          <Icon name="caret-right" size={12} style="transform: rotate(90deg)" />
+        </summary>
+        <div class="meganav__panel">
+          <div class="wrap meganav__inner">
+            {
+              CATEGORIES.map((category) => (
+                <div class="meganav__group">
+                  <div class="meganav__cat">{category.name}</div>
+                  <ul>
+                    {toolsIn(category.id).map((tool) => (
+                      <li>
+                        <a href={`/${tool.slug}`} data-cat={tool.category}>
+                          <span class="meganav__glyph" aria-hidden="true">
+                            <Icon name={tool.icon} weight="duotone" size={18} />
+                          </span>
+                          {tool.name}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))
+            }
+          </div>
+        </div>
+      </details>
+
       <a
         class="hdr__link hdr__link--wide"
         href="/loudness-targets"
@@ -33,3 +60,28 @@ const isHome = path === '/';
     </nav>
   </div>
 </header>
+
+<script>
+  // <details> keeps the menu working without JS; this closes it the way a
+  // menu is expected to close — outside click, Escape, or following a link.
+  const nav = document.querySelector<HTMLDetailsElement>('[data-meganav]');
+
+  if (nav) {
+    document.addEventListener('click', (event) => {
+      if (nav.open && !nav.contains(event.target as Node)) nav.open = false;
+    });
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && nav.open) {
+        nav.open = false;
+        nav.querySelector('summary')?.focus();
+      }
+    });
+
+    nav.querySelectorAll('a').forEach((link) => {
+      link.addEventListener('click', () => {
+        nav.open = false;
+      });
+    });
+  }
+</script>

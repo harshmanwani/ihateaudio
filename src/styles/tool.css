@@ -579,7 +579,7 @@ body[data-dragging='true'] .drop-overlay {
 .chain__icon {
   display: flex;
   flex: none;
-  color: var(--cat, var(--brand));
+  color: var(--cat-vivid, var(--brand));
 }
 
 /* ---------- Multi-file list (merger, batch convert) ---------- */
