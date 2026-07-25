@@ -1,0 +1,269 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import AiSetup from '../components/AiSetup.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('stem-splitter');
+
+const steps = [
+  'Drop the song in, then tick the stems you actually want. Each one is a separate 28 MB network and a separate pass over the audio, so asking for two instead of four halves both the download and the wait.',
+  'Trim first if you only need part of the track. The tool works on whatever is loaded, and separating one chorus takes a fraction of the time of a whole song.',
+  'Press Split. The stems are produced one after another and the progress counter tells you which one is running.',
+  'Each finished stem appears in its own row with its own download button. WAV is the sensible choice — these are going into a DAW, not into a playlist.',
+];
+
+const faq = [
+  {
+    q: 'How long does this actually take?',
+    a: 'Roughly the length of the track for each stem you ask for, on one processor core. Four stems from a four-minute song is therefore something like a quarter of an hour on a laptop, and less if your browser can use several cores. This is the honest cost of it running on your machine rather than on a rented GPU, and it is why the stems are individually selectable — most people want the drums or the bass, not all four.',
+  },
+  {
+    q: 'Why do the four stems not add back up to the original?',
+    a: 'Two reasons, and the first is intentional. Each of these networks reads only part of the frequency range: the bass model looks below about 5.5 kHz, because that is where bass lives and the resolution is better spent there, and the "other" model stops around 11 kHz. Anything above those limits is not in any stem. The second reason is that the four models were trained separately and never had to agree with each other, so they overlap and disagree at the edges. Summing them gets you close to the original, not exactly to it.',
+  },
+  {
+    q: 'Which stems are worth it for what?',
+    a: 'Drums and bass are the most reliable, because both are rhythmically and spectrally distinctive and the models find them easily. Vocals are good. "Other" is the weakest, and unavoidably so: it is defined as everything that is not the first three, which means guitars, keys, strings, horns and synths all at once, identified by exclusion rather than by what they are. If your goal is a backing track without the singer, the vocal remover does a better job than taking three stems and adding them together.',
+  },
+  {
+    q: 'Can I get the guitar on its own?',
+    a: 'Not with these models. Four-stem separation is a standard from a research benchmark, and "other" is the bucket everything else falls into. Networks that isolate a specific instrument exist but are trained per instrument and would be another download each, for a result that is markedly less reliable than the four here.',
+  },
+  {
+    q: 'It ran out of memory partway through.',
+    a: 'Four stems means holding four full-length results plus the original plus the working spectrograms. On a long track that adds up fast, and the bass model is the hungriest of the four because its transform is the largest. Ask for fewer stems at a time — they are cached individually, so you can do drums now and bass later without re-downloading anything — or trim the track first.',
+  },
+  {
+    q: 'Are these the same models the research papers use?',
+    a: 'Yes. This is the KUIELab four-stem set from the Music Demixing Challenge, and each stem uses the transform size it was trained with, which differs per stem: 6144 for vocals, 4096 for drums, 16384 for bass and 8192 for "other". Those were confirmed here by measurement rather than assumed, because a wrong transform size does not fail — it just quietly separates worse.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} results action="Split into stems">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Stems</span>
+        <span class="hint">
+          One network and one pass per stem. Pick only what you need — it is the
+          difference between minutes and a quarter of an hour.
+        </span>
+      </div>
+
+      <div class="field controls__full">
+        <div class="stems">
+          <label class="switch">
+            <input type="checkbox" data-control="vocals" checked />
+            Vocals
+          </label>
+          <label class="switch">
+            <input type="checkbox" data-control="drums" checked />
+            Drums
+          </label>
+          <label class="switch">
+            <input type="checkbox" data-control="bass" />
+            Bass
+          </label>
+          <label class="switch">
+            <input type="checkbox" data-control="other" />
+            Other
+          </label>
+        </div>
+        <p class="hint" data-stem-cost></p>
+      </div>
+
+      <AiSetup
+        bytes={0}
+        what="Each stem is its own 28 MB network. Only the ones you tick are fetched, and they are kept afterwards."
+        speed="Expect roughly the length of the track per stem."
+      />
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>What a stem is, and what these are not</h2>
+    <p>
+      In a studio, stems are the real thing: the actual separate recordings, bounced
+      out of the session before anyone mixed them together. They are perfect because
+      they were never combined in the first place.
+    </p>
+    <p>
+      What this produces is an estimate of those recordings, reconstructed from the
+      finished mix by a network that has learned what drums and bass and voices tend
+      to look like. It is genuinely useful and it is not the same object. If you are
+      remixing something officially, ask for the real stems. If you are learning a
+      bassline, building a mashup, practising along, or working out what a
+      producer did, an estimate is entirely sufficient.
+    </p>
+
+    <h2>Why the frequency limits matter more here than elsewhere</h2>
+    <p>
+      Each of these networks reads a fixed number of frequency bands, and because
+      the transform size differs per stem, so does the ceiling. Bass is analysed
+      with a very long window, which buys excellent frequency resolution down low —
+      exactly what you need to tell a bass note from a kick drum — at the cost of
+      only covering the bottom quarter of the spectrum. Nothing above roughly
+      5.5 kHz appears in the bass stem, which is fine, because nothing you want
+      from a bass lives up there.
+    </p>
+    <p>
+      It becomes visible when you add the stems back together and find the top end
+      missing. That is not a bug to work around; it is what these models are. If you
+      need a complete complement to one stem, subtract that stem from the original
+      yourself rather than summing the other three.
+    </p>
+
+    <h2>Getting a better result</h2>
+    <p>
+      Start from the best source you have. A 320 kbps MP3 or a lossless file gives
+      the models detail that a 128 kbps file has already thrown away, and some of
+      that detail is what distinguishes a hi-hat from a sibilant.
+    </p>
+    <p>
+      Separate a section rather than a whole track when you can. It is not only
+      faster — the result is identical, because the models work in short chunks and
+      have no memory of the wider song, so there is nothing to lose by cutting first.
+    </p>
+    <p>
+      Expect the drums to be the most convincing thing you get, and judge the tool
+      on the stem you actually need rather than on the weakest one. "Other" being
+      mediocre says very little about whether the drums are good.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<style>
+  .stems {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s3) var(--s5);
+  }
+</style>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import type { ToolRuntime } from '../lib/tool';
+  import { createAiPanel } from '../lib/ai/panel';
+  import { separate } from '../lib/ai/separate';
+  import { KUIELAB } from '../lib/ai/models';
+  import type { MdxModel } from '../lib/ai/models';
+  import { duration as fmtDuration, filesize } from '../lib/format';
+  import { outstandingBytes } from '../lib/ai/store';
+
+  /** Display order, which is the order people think about a band in. */
+  const STEMS: { key: 'vocals' | 'drums' | 'bass' | 'other'; name: string }[] = [
+    { key: 'vocals', name: 'Vocals' },
+    { key: 'drums', name: 'Drums' },
+    { key: 'bass', name: 'Bass' },
+    { key: 'other', name: 'Other' },
+  ];
+
+  const panels = new WeakMap<ToolRuntime, ReturnType<typeof createAiPanel>>();
+
+  const tool = createTool({
+    suffix: 'stem',
+    defaultFormat: 'wav',
+
+    onReady(ctx, runtime) {
+      const root = runtime.root;
+      const cost = root.querySelector<HTMLElement>('[data-stem-cost]');
+
+      /**
+       * The panel has to be rebuilt whenever the selection changes, because which
+       * models it is responsible for is the selection.
+       */
+      const rebuild = (): void => {
+        const chosen = STEMS.filter((stem) => runtime.flag(stem.key));
+        panels.set(
+          runtime,
+          createAiPanel(
+            root.querySelector<HTMLElement>('[data-ai-setup]'),
+            chosen.map((stem) => KUIELAB[stem.key]),
+            { download: 'Setting up AI audio studio', start: 'Starting the engine', work: 'Splitting' }
+          )
+        );
+        void describe(chosen);
+      };
+
+      /**
+       * Say what this selection will cost before it is paid, in both dimensions
+       * people care about: bytes to fetch and minutes to wait.
+       */
+      const describe = async (
+        chosen: { key: 'vocals' | 'drums' | 'bass' | 'other'; name: string }[]
+      ): Promise<void> => {
+        if (!cost) return;
+        if (chosen.length === 0) {
+          cost.textContent = 'Pick at least one stem.';
+          return;
+        }
+        const models = chosen.map((stem) => KUIELAB[stem.key]);
+        const pending = await outstandingBytes(models);
+        // One pass per stem at roughly real time, which is the figure that decides
+        // whether somebody starts this at all.
+        const estimate = ctx.buffer.duration * chosen.length;
+        cost.textContent =
+          `${chosen.length} stem${chosen.length === 1 ? '' : 's'}: ` +
+          (pending > 0 ? `${filesize(pending)} to download, then ` : 'nothing to download, ') +
+          `roughly ${fmtDuration(estimate)} of processing.`;
+      };
+
+      for (const stem of STEMS) {
+        root
+          .querySelector<HTMLInputElement>(`[data-control="${stem.key}"]`)
+          ?.addEventListener('change', rebuild);
+      }
+      rebuild();
+    },
+
+    async process(ctx) {
+      const runtime = tool;
+      if (!runtime) throw new Error('tool not ready');
+
+      const chosen = STEMS.filter((stem) => runtime.flag(stem.key));
+      if (chosen.length === 0) {
+        throw new Error('Pick at least one stem first.');
+      }
+
+      const panel = panels.get(runtime);
+      await panel?.ensure(ctx.signal);
+
+      const outputs: { name: string; buffer: AudioBuffer }[] = [];
+
+      for (let i = 0; i < chosen.length; i += 1) {
+        const stem = chosen[i]!;
+        const model: MdxModel = KUIELAB[stem.key];
+
+        const result = await separate(
+          ctx.buffer,
+          model,
+          { primary: true, complement: false },
+          {
+            signal: ctx.signal,
+            onStage: (stage) => {
+              const label = `${stem.name} (${i + 1} of ${chosen.length})`;
+              if (stage.phase === 'separating') {
+                panel?.setPhase(label, stage.ratio);
+                // Overall progress spans every stem, not just the current one, so
+                // the bar does not restart four times.
+                if (stage.ratio !== null) {
+                  ctx.progress((i + stage.ratio) / chosen.length);
+                }
+              } else if (stage.phase === 'starting') {
+                panel?.setPhase(`Loading the ${stem.name.toLowerCase()} model`, null);
+              }
+            },
+          }
+        );
+
+        if (result.primary) outputs.push({ name: stem.name, buffer: result.primary });
+      }
+
+      panel?.finish();
+      if (outputs.length === 0) throw new Error('separation produced nothing');
+      return outputs;
+    },
+  });
+</script>

@@ -1,0 +1,192 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import AiSetup from '../components/AiSetup.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('acapella-extractor');
+
+const steps = [
+  'Drop the song in. If you have already used the vocal remover on this device there is nothing to download — the two tools share one model, and it is already here.',
+  'Press Extract. The network reads the whole track in chunks, working out which part of every moment is voice, and the counter tells you how far along it is.',
+  'Play it back before downloading. An isolated vocal is the hardest thing to get right, so listen for bleed from cymbals and reverb rather than assuming.',
+  'Download as WAV if this is going into a DAW. It is the format that will not add a second layer of artefacts on top of the separation.',
+];
+
+const faq = [
+  {
+    q: 'Is this as clean as the instrumental?',
+    a: 'Usually slightly less clean, and it is worth knowing why. The model predicts the instrumental directly, so the vocal comes out as what is left when the instrumental is subtracted from the original. That means every small error in the instrumental estimate lands in the vocal. In practice it is fine for a reference track, a remix, a transcription or a practice guide, and it is not what you would master a release from.',
+  },
+  {
+    q: 'Why does it need no download when the vocal remover did?',
+    a: 'They are the same 64 MB model, stored once. Separation produces both halves in a single pass, so whichever of the two tools you use first pays the download and the other is free from then on. It also means the model is stored under one name, so clearing site data clears it once rather than twice.',
+  },
+  {
+    q: 'There is cymbal bleed all over the vocal.',
+    a: 'Cymbals are the classic hard case. A crash is broadband noise spread across exactly the frequencies a sibilant "s" occupies, and in the spectrogram the two genuinely look alike. Models trained on real music learn to favour keeping consonants intelligible, which means erring toward letting some cymbal through rather than lisping the vocal. If the bleed matters more than the sibilance, a gentle high shelf cut around 8 kHz on the result costs you very little of the voice.',
+  },
+  {
+    q: 'Can I get each backing vocal separately?',
+    a: 'No, and no tool can. The model separates voice from not-voice; it has no concept of which voice. Two singers, or a lead and its own doubled harmony, are a single object as far as it is concerned. What comes out is every voice in the track mixed together.',
+  },
+  {
+    q: 'The vocal sounds thin or watery.',
+    a: 'That is separation artefact and it has a specific cause. The model decides how much of each frequency at each moment belongs to the voice, and where it is uncertain it splits the difference. Those partial decisions, scattered across the spectrum and changing every few milliseconds, are what the ear hears as a watery, phasey quality. Denser mixes produce more of it. Starting from a higher-quality source file reduces it, because the model has more detail to work from.',
+  },
+  {
+    q: 'Will this work on speech rather than singing?',
+    a: 'Less well than you would hope. The model was trained on music, so it has learned what a sung voice over instruments looks like. A podcast with background music does get separated, but a purpose-built denoiser is better at that job — try the noise remover, which is built for pulling a voice out of a noisy room rather than out of an arrangement.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} results action="Download vocals">
+    <div class="controls">
+      <div class="controls__head">
+        <span class="controls__title">Extraction</span>
+        <span class="hint">
+          Same model as the vocal remover, keeping the other half. If you have used
+          that tool, this needs no download.
+        </span>
+      </div>
+
+      <div class="field controls__full">
+        <label class="switch">
+          <input type="checkbox" data-control="keepinst" />
+          Also give me the instrumental
+        </label>
+        <p class="hint">
+          Both halves come out of the one pass, so this only costs the extra
+          encoding time.
+        </p>
+      </div>
+
+      <AiSetup
+        bytes={tool.modelBytes ?? 0}
+        what="It is the separation network, shared with the vocal remover and served from this domain rather than a third party."
+        speed="Extraction then runs at roughly real time, so a four-minute song takes a few minutes."
+      />
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>Why an isolated vocal is harder than an instrumental</h2>
+    <p>
+      Both halves come from the same decision, so it seems as though they ought to
+      be equally good. They are not, and the asymmetry is worth understanding
+      because it tells you what to expect.
+    </p>
+    <p>
+      An instrumental is mostly a subtraction problem. There is a great deal of
+      music and comparatively little voice, so removing the voice leaves something
+      whose errors are buried under everything else still playing. A missed
+      fragment of vocal sits inside a full arrangement where you may not notice it.
+    </p>
+    <p>
+      An isolated vocal has nowhere to hide. Once the arrangement is gone, every
+      error is exposed against near-silence: a fragment of snare that was left
+      behind is obvious, a moment where the model removed too much is an audible
+      hole. The same separation, judged on the quieter half, sounds worse simply
+      because there is nothing left to mask it.
+    </p>
+
+    <h2>What to do with the result</h2>
+    <p>
+      For learning a part, this is close to ideal. Hearing exactly what a singer
+      does with timing and phrasing, with nothing else in the way, is worth more
+      than any transcription, and artefacts do not matter for that at all.
+    </p>
+    <p>
+      For a remix, treat it as a starting point that will need help. An isolated
+      vocal usually benefits from a high-pass filter around 80 Hz to remove
+      low-frequency mud the separation left behind, and from a new reverb, since
+      the original room is smeared and partially missing. Adding a deliberate space
+      to a dry-ish vocal sounds far better than trying to rescue a half-removed one.
+    </p>
+    <p>
+      For transcription, run it through the audio transcriber afterwards. Speech
+      recognition is markedly more accurate on a vocal with the band removed,
+      because the model doing the transcribing is no longer competing with
+      instruments occupying the same frequencies as the voice.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import type { ToolRuntime } from '../lib/tool';
+  import { createAiPanel } from '../lib/ai/panel';
+  import { separate } from '../lib/ai/separate';
+  import { INST_HQ3 } from '../lib/ai/models';
+  import { duration as fmtDuration } from '../lib/format';
+
+  const panels = new WeakMap<ToolRuntime, ReturnType<typeof createAiPanel>>();
+
+  const tool = createTool({
+    suffix: 'vocals',
+    defaultFormat: 'wav',
+
+    onReady(ctx, runtime) {
+      panels.set(
+        runtime,
+        createAiPanel(
+          runtime.root.querySelector<HTMLElement>('[data-ai-setup]'),
+          [INST_HQ3],
+          { download: 'Setting up AI audio studio', start: 'Starting the engine', work: 'Extracting' }
+        )
+      );
+
+      if (ctx.buffer.duration > 480) {
+        runtime.showNote(
+          `This is ${fmtDuration(ctx.buffer.duration)} long, so extraction will take a ` +
+            'while and needs a lot of memory. Trimming to the part you need first is ' +
+            'usually the better move.',
+          'warn'
+        );
+      }
+    },
+
+    async process(ctx) {
+      const runtime = tool;
+      if (!runtime) throw new Error('tool not ready');
+      const panel = panels.get(runtime);
+      const wantInstrumental = runtime.flag('keepinst');
+
+      await panel?.ensure(ctx.signal);
+
+      // The model predicts the instrumental, so the vocal is the complement. That
+      // is the only difference between this tool and the vocal remover.
+      const result = await separate(
+        ctx.buffer,
+        INST_HQ3,
+        { primary: wantInstrumental, complement: true },
+        {
+          signal: ctx.signal,
+          onStage: (stage) => {
+            if (stage.phase === 'separating') {
+              panel?.setPhase('Extracting the vocal', stage.ratio);
+              if (stage.ratio !== null) ctx.progress(stage.ratio);
+            } else if (stage.phase === 'starting') {
+              panel?.setPhase('Starting the engine', null);
+            } else if (stage.phase === 'finishing') {
+              panel?.setPhase('Writing the audio', null);
+            }
+          },
+        }
+      );
+
+      panel?.finish();
+      if (!result.complement) throw new Error('extraction produced nothing');
+
+      if (wantInstrumental && result.primary) {
+        return [
+          { name: 'Vocals', buffer: result.complement },
+          { name: 'Instrumental', buffer: result.primary },
+        ];
+      }
+      return result.complement;
+    },
+  });
+</script>

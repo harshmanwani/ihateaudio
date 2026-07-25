@@ -727,10 +727,49 @@ export const TOOLS: Tool[] = [
     keywords: [
       'vocal remover remove vocals karaoke instrumental backing track minus one strip singer ai vocal removal',
     ],
-    related: ['audio-trimmer', 'volume-booster', 'audio-converter', 'silence-remover'],
+    related: ['acapella-extractor', 'stem-splitter', 'audio-trimmer', 'volume-booster'],
     instant: false,
     ai: true,
     modelBytes: 66_759_214,
+  },
+  {
+    slug: 'acapella-extractor',
+    name: 'Acapella Extractor',
+    title: 'Acapella Extractor: Isolate Vocals From a Song Free',
+    description:
+      'Pull the vocals out of a song on their own. The same AI model that makes instrumentals, pointed the other way. Runs in your browser with nothing uploaded.',
+    tagline: "Just the voice, with the band taken away.",
+    short: "Get the vocal on its own, with the music removed.",
+    category: 'ai',
+    icon: 'microphone-stage',
+    keywords: [
+      'acapella extractor isolate vocals extract vocal only voice separator vocal isolation get vocals from song ai',
+    ],
+    related: ['vocal-remover', 'stem-splitter', 'audio-trimmer', 'silence-remover'],
+    instant: false,
+    // Shares the vocal remover's model, so whichever is used first pays for both.
+    ai: true,
+    modelBytes: 66_759_214,
+  },
+  {
+    slug: 'stem-splitter',
+    name: 'Stem Splitter',
+    title: 'Stem Splitter: Split a Song Into Stems Online Free',
+    description:
+      'Split a song into vocals, drums, bass and everything else. Pick only the stems you want. AI models run in your browser, so nothing is uploaded.',
+    tagline: "Pull a song apart into the parts it was built from.",
+    short: "Break a song into vocals, drums, bass and the rest.",
+    category: 'ai',
+    icon: 'cards-three',
+    keywords: [
+      'stem splitter stem separation split song into stems drums bass vocals separator multitrack demix ai',
+    ],
+    related: ['vocal-remover', 'acapella-extractor', 'bpm-detector', 'audio-splitter'],
+    instant: false,
+    ai: true,
+    // One 28 MB network per stem, fetched only when that stem is ticked. This is
+    // the all-four figure rather than a fixed cost.
+    modelBytes: 118_812_816,
   },
 ];
 

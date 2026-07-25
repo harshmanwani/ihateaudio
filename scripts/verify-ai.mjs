@@ -155,9 +155,34 @@ function rms(channels) {
  */
 const PLAN = {
   'vocal-remover': {
-    kind: 'separate',
     against: 'instrumental',
     gain: 6,
+    budget: 420_000,
+  },
+  /**
+   * The acapella extractor is measured against the speech, not the instrumental,
+   * and its bar is lower on purpose. It keeps the residual rather than the
+   * directly-predicted stem, so every error in the instrumental estimate lands in
+   * the vocal — the page says so, and the threshold should agree with the page
+   * rather than flatter it. Separating tiled speech from music is also a harder
+   * task than the reverse, because the fixture's "vocal" is read aloud rather than
+   * sung and the model was trained on singing.
+   */
+  'acapella-extractor': {
+    against: 'vocals',
+    gain: 3,
+    budget: 420_000,
+  },
+  /**
+   * Drums only. One stem is enough to prove the four-stem path — the model
+   * selection, the per-stem transform sizes, the results list — without spending
+   * four passes on it, and drums is the stem with no ground truth in this fixture,
+   * so it is checked for being real audio that is clearly not the input rather
+   * than for SDR against a reference that does not exist.
+   */
+  'stem-splitter': {
+    stems: { drums: true, vocals: false },
+    differsFrom: 'mix',
     budget: 420_000,
   },
 };
@@ -165,10 +190,23 @@ const PLAN = {
 const browser = await chromium.launch();
 const truth = readWav(TRUTH);
 const mix = readWav(MIX);
-const baseline = siSdr(mix.channels, truth.channels);
+
+/** The fixture was built as instrumental plus speech, so the speech is recoverable. */
+const speech = {
+  channels: truth.channels.map((channel, c) => {
+    const out = new Float64Array(Math.min(channel.length, mix.channels[c].length));
+    for (let i = 0; i < out.length; i += 1) out[i] = mix.channels[c][i] - channel[i];
+    return out;
+  }),
+};
+
+const REFERENCES = { instrumental: truth, vocals: speech, mix };
 
 say(`base   ${base}`);
-say(`mix vs truth: ${baseline.toFixed(2)} dB (the number separation must beat)\n`);
+say(
+  `mix vs instrumental ${siSdr(mix.channels, truth.channels).toFixed(2)} dB, ` +
+    `mix vs speech ${siSdr(mix.channels, speech.channels).toFixed(2)} dB\n`
+);
 
 const results = [];
 
@@ -209,10 +247,24 @@ for (const [slug, plan] of Object.entries(PLAN)) {
       throw new Error(`decode failed: ${(await decodeError.innerText()).slice(0, 160)}`);
     }
 
+    // Stem selection, where the tool has it.
+    for (const [key, on] of Object.entries(plan.stems ?? {})) {
+      const box = page.locator(`[data-control="${key}"]`);
+      if (await box.count()) await box.setChecked(on);
+    }
+
     // WAV out, so the measurement is of separation rather than of an MP3 encoder.
     await page.selectOption('[data-format]', 'wav').catch(() => {});
 
-    const wait = page.waitForEvent('download', { timeout: plan.budget });
+    /**
+     * Multi-output tools do not download anything when the export button is
+     * pressed. They encode each part into a results list with its own button, so
+     * waiting for a download event here waits forever — which is precisely how the
+     * stem splitter appeared to hang for seven minutes while working correctly.
+     */
+    const many = Boolean(plan.stems);
+
+    const wait = many ? null : page.waitForEvent('download', { timeout: plan.budget });
     await page.locator('[data-download]').first().click();
 
     // The model download and the inference both happen after this click, so the
@@ -232,7 +284,16 @@ for (const [slug, plan] of Object.entries(PLAN)) {
 
     let download;
     try {
-      download = await wait;
+      if (many) {
+        // Each finished part becomes a row with its own button. Wait for the first
+        // to exist, then take it.
+        await page.waitForSelector('.result', { timeout: plan.budget });
+        const rowDownload = page.waitForEvent('download', { timeout: 60_000 });
+        await page.locator('.result button').first().click();
+        download = await rowDownload;
+      } else {
+        download = await wait;
+      }
     } finally {
       clearInterval(ticker);
     }
@@ -250,25 +311,47 @@ for (const [slug, plan] of Object.entries(PLAN)) {
       throw new Error(`output is effectively silent (rms ${level.toExponential(2)})`);
     }
 
-    const score = siSdr(got.channels, truth.channels);
-    const gain = score - baseline;
+    let note;
 
-    if (gain < plan.gain) {
-      throw new Error(
-        `separation gained only ${gain.toFixed(2)} dB (${baseline.toFixed(2)} -> ` +
-          `${score.toFixed(2)}), needed ${plan.gain} dB. The pipeline produced audio ` +
-          'but did not separate it.'
-      );
+    if (plan.against) {
+      const reference = REFERENCES[plan.against];
+      const baseline = siSdr(mix.channels, reference.channels);
+      const score = siSdr(got.channels, reference.channels);
+      const gain = score - baseline;
+
+      if (gain < plan.gain) {
+        throw new Error(
+          `separation gained only ${gain.toFixed(2)} dB against the ${plan.against} ` +
+            `(${baseline.toFixed(2)} -> ${score.toFixed(2)}), needed ${plan.gain} dB. ` +
+            'The pipeline produced audio but did not separate it.'
+        );
+      }
+      note =
+        `vs ${plan.against}: ${baseline.toFixed(2)} -> ${score.toFixed(2)} dB ` +
+        `(+${gain.toFixed(2)})`;
+    } else {
+      /**
+       * No ground truth for this stem, so the check is that the output is real
+       * audio which is clearly not simply the input handed back. A pipeline that
+       * silently passes its input through is the failure this catches, and it
+       * would score enormously here while separating nothing.
+       */
+      const against = REFERENCES[plan.differsFrom ?? 'mix'];
+      const similarity = siSdr(got.channels, against.channels);
+      if (similarity > 12) {
+        throw new Error(
+          `output is ${similarity.toFixed(2)} dB similar to the ${plan.differsFrom}, ` +
+            'which means it was passed through rather than separated.'
+        );
+      }
+      note = `differs from ${plan.differsFrom} by design (similarity ${similarity.toFixed(2)} dB)`;
     }
 
     if (problems.length) throw new Error(`console: ${problems[0].slice(0, 160)}`);
 
     const ms = Date.now() - started;
-    results.push({ slug, ok: true, gain, ms });
-    say(
-      `ok  ${slug.padEnd(20)} ${baseline.toFixed(2)} -> ${score.toFixed(2)} dB ` +
-        `(+${gain.toFixed(2)}), rms ${level.toFixed(4)}, ${(ms / 1000).toFixed(0)}s`
-    );
+    results.push({ slug, ok: true, ms });
+    say(`ok  ${slug.padEnd(20)} ${note}, rms ${level.toFixed(4)}, ${(ms / 1000).toFixed(0)}s`);
   } catch (error) {
     results.push({ slug, ok: false, note: String(error.message ?? error) });
     say(`FAIL ${slug.padEnd(20)} ${String(error.message ?? error).slice(0, 300)}`);
