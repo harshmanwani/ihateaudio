@@ -239,9 +239,16 @@ const formats = video
           <span class="chain__label">Saved. Keep going?</span>
           <div class="chain__links">
             {chain.map((next) => (
-              <a class="btn btn--quiet btn--sm" href={`/${next.slug}`} data-chain-link>
+              <a
+                class="btn btn--quiet btn--sm"
+                href={`/${next.slug}`}
+                data-chain-link
+                data-cat={next.category}
+              >
+                <span class="chain__icon" aria-hidden="true">
+                  <Icon name={next.icon} size={15} />
+                </span>
                 {next.name}
-                <Icon name="arrow-right" size={14} />
               </a>
             ))}
           </div>

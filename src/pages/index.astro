@@ -71,10 +71,16 @@ const schema = [
                 class="tile"
                 href={`/${tool.slug}`}
                 data-tile
+                data-cat={tool.category}
                 data-search={`${tool.name} ${tool.short} ${tool.slug}`.toLowerCase()}
               >
-                <span class="tile__name">{tool.name}</span>
-                <span class="tile__desc">{tool.short}</span>
+                <span class="tile__chip" aria-hidden="true">
+                  <Icon name={tool.icon} size={20} />
+                </span>
+                <span class="tile__text">
+                  <span class="tile__name">{tool.name}</span>
+                  <span class="tile__desc">{tool.short}</span>
+                </span>
               </a>
             ))}
           </div>

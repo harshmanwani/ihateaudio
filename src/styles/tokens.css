@@ -36,6 +36,22 @@
   --danger-soft: oklch(0.968 0.022 27);
   --danger-ink: oklch(0.38 0.14 27);
 
+  /* Category accents — one hue per tool family. The strong value carries
+     icons and hovers; the soft value is the icon chip fill. Lightness and
+     chroma are held constant across the six so no family shouts. */
+  --cat-cut: oklch(0.44 0.1 162);
+  --cat-cut-soft: oklch(0.955 0.024 162);
+  --cat-convert: oklch(0.44 0.1 245);
+  --cat-convert-soft: oklch(0.955 0.024 245);
+  --cat-volume: oklch(0.44 0.1 62);
+  --cat-volume-soft: oklch(0.955 0.03 62);
+  --cat-speed: oklch(0.44 0.1 300);
+  --cat-speed-soft: oklch(0.955 0.024 300);
+  --cat-effects: oklch(0.44 0.1 350);
+  --cat-effects-soft: oklch(0.955 0.024 350);
+  --cat-utility: oklch(0.44 0.1 210);
+  --cat-utility-soft: oklch(0.955 0.024 210);
+
   /* Stage — the dark workspace */
   --stage: oklch(0.168 0.014 162);
   --stage-2: oklch(0.232 0.014 162);

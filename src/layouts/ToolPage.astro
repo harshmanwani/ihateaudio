@@ -95,7 +95,12 @@ const schema = [
         <Icon name="caret-right" size={12} />
         <span>{category?.name}</span>
       </nav>
-      <h1>{tool.name}</h1>
+      <div class="toolhead__title" data-cat={tool.category}>
+        <span class="toolhead__chip" aria-hidden="true">
+          <Icon name={tool.icon} size={26} />
+        </span>
+        <h1>{tool.name}</h1>
+      </div>
       <p class="toolhead__sub">{tool.tagline}</p>
     </div>
 
@@ -141,7 +146,12 @@ const schema = [
               <ul class="aside__list">
                 {related.map((item) => (
                   <li>
-                    <a href={`/${item.slug}`}>{item.name}</a>
+                    <a href={`/${item.slug}`} data-cat={item.category}>
+                      <span class="aside__icon" aria-hidden="true">
+                        <Icon name={item.icon} size={16} />
+                      </span>
+                      {item.name}
+                    </a>
                   </li>
                 ))}
               </ul>
@@ -156,7 +166,12 @@ const schema = [
               <ul class="aside__list">
                 {siblings.slice(0, 8).map((item) => (
                   <li>
-                    <a href={`/${item.slug}`}>{item.name}</a>
+                    <a href={`/${item.slug}`} data-cat={item.category}>
+                      <span class="aside__icon" aria-hidden="true">
+                        <Icon name={item.icon} size={16} />
+                      </span>
+                      {item.name}
+                    </a>
                   </li>
                 ))}
               </ul>

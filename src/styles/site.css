@@ -173,6 +173,25 @@
   color: var(--brand);
 }
 
+/* The same cue as the homepage tile, carried onto the page itself. */
+.toolhead__title {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+}
+
+.toolhead__chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  flex: none;
+  border-radius: var(--r-md);
+  background: var(--cat-soft, var(--brand-soft));
+  color: var(--cat, var(--brand));
+}
+
 .toolhead__sub {
   font-size: var(--t-lead);
   color: var(--ink-2);
@@ -299,7 +318,9 @@
 }
 
 .aside__list a {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
   padding: var(--s2) var(--s3);
   margin-inline: calc(var(--s3) * -1);
   border-radius: var(--r-md);
@@ -313,39 +334,61 @@
 
 .aside__list a:hover {
   background: var(--surface);
-  color: var(--brand);
+  color: var(--ink);
+}
+
+/* Each link carries its tool's glyph in its family colour — the cue that
+   makes "which tool next" a glance instead of a read. */
+.aside__icon {
+  display: flex;
+  flex: none;
+  color: var(--cat, var(--brand));
 }
 
 /* ---------- Homepage ---------- */
 
+/* Compact on purpose: the grid is the product, so tools must be visible in
+   the first viewport. The hero states the promise in two lines and gets out
+   of the way — iLovePDF's launcher shape, not a marketing hero. */
 .hero {
-  padding-block: var(--s16) var(--s12);
+  padding-block: var(--s10) var(--s8);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--s6) var(--s10);
+  flex-wrap: wrap;
 }
 
 .hero h1 {
-  font-size: var(--t-display);
-  line-height: 1.08;
-  letter-spacing: -0.025em;
+  /* Scales down on phones so the first tools stay near the fold — on a
+     launcher page the grid matters more than the headline. */
+  font-size: clamp(1.625rem, 1.06rem + 2.4vw, 2.125rem);
+  line-height: 1.15;
+  letter-spacing: -0.022em;
   font-weight: 700;
-  /* Sized in its own ch so the measure tracks the display size. */
-  max-width: 24ch;
+  max-width: 26ch;
 }
 
 .hero__sub {
-  margin-top: var(--s5);
-  font-size: var(--t-lead);
+  margin-top: var(--s2);
+  font-size: var(--t-body);
   color: var(--ink-2);
   max-width: 52ch;
   line-height: 1.55;
 }
 
 .hero .toolsearch {
-  margin-top: var(--s8);
+  flex: 0 1 320px;
+  margin-bottom: var(--s1);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 760px) {
   .hero {
-    padding-block: var(--s10) var(--s8);
+    padding-block: var(--s8) var(--s6);
+  }
+
+  .hero .toolsearch {
+    flex-basis: 100%;
   }
 }
 
@@ -370,7 +413,7 @@
 }
 
 .cat {
-  padding-block: var(--s10);
+  padding-block: var(--s8);
   border-top: 1px solid var(--line);
 }
 
@@ -378,12 +421,12 @@
   display: flex;
   align-items: baseline;
   gap: var(--s3);
-  margin-bottom: var(--s6);
+  margin-bottom: var(--s2);
   flex-wrap: wrap;
 }
 
 .cat__head h2 {
-  font-size: var(--t-h2);
+  font-size: var(--t-h3);
 }
 
 .cat__count {
@@ -394,55 +437,110 @@
 
 .cat__desc {
   color: var(--ink-2);
-  font-size: var(--t-ui);
+  font-size: var(--t-small);
   max-width: var(--prose);
-  margin-bottom: var(--s6);
-  margin-top: calc(var(--s6) * -1 + var(--s2));
+  margin-bottom: var(--s5);
 }
 
-/* An index, not a card wall: 39 near-identical bordered tiles read as
-   template output, and the chrome slows scanning. Typography does the work;
-   the hover tint supplies the affordance. */
+/* The launcher grid. The icon chip is the recognition key — every tool has
+   its own glyph, tinted by family — and the name confirms it. Dense enough
+   that two full rows land in the first viewport. */
 .grid {
   display: grid;
-  gap: var(--s1) var(--s8);
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: var(--s3);
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+}
+
+/* One hue per family, resolved once per tile via data-cat. */
+[data-cat='cut'] {
+  --cat: var(--cat-cut);
+  --cat-soft: var(--cat-cut-soft);
+}
+[data-cat='convert'] {
+  --cat: var(--cat-convert);
+  --cat-soft: var(--cat-convert-soft);
+}
+[data-cat='volume'] {
+  --cat: var(--cat-volume);
+  --cat-soft: var(--cat-volume-soft);
+}
+[data-cat='speed'] {
+  --cat: var(--cat-speed);
+  --cat-soft: var(--cat-speed-soft);
+}
+[data-cat='effects'] {
+  --cat: var(--cat-effects);
+  --cat-soft: var(--cat-effects-soft);
+}
+[data-cat='utility'] {
+  --cat: var(--cat-utility);
+  --cat-soft: var(--cat-utility-soft);
 }
 
 .tile {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding: var(--s3);
-  margin-inline: calc(var(--s3) * -1);
-  border-radius: var(--r-md);
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: var(--s3) var(--s3);
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
   text-decoration: none;
   color: var(--ink);
-  transition: background-color var(--dur-micro) var(--ease);
+  transition:
+    border-color var(--dur-micro) var(--ease),
+    transform var(--dur-micro) var(--ease);
 }
 
 .tile:hover {
-  background: var(--brand-soft);
+  border-color: var(--cat, var(--brand));
+  transform: translateY(-1px);
+}
+
+.tile__chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  flex: none;
+  border-radius: var(--r-md);
+  background: var(--cat-soft, var(--brand-soft));
+  color: var(--cat, var(--brand));
+  transition: transform var(--dur-micro) var(--ease);
+}
+
+.tile:hover .tile__chip {
+  transform: scale(1.06);
+}
+
+.tile__text {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding-top: 1px;
 }
 
 .tile__name {
   font-size: var(--t-ui);
   font-weight: 600;
-  transition: color var(--dur-micro) var(--ease);
-}
-
-.tile:hover .tile__name {
-  color: var(--brand);
 }
 
 .tile__desc {
   font-size: var(--t-small);
   color: var(--ink-2);
-  line-height: 1.5;
+  line-height: 1.45;
 }
 
 .tile[hidden] {
   display: none;
+}
+
+@media (max-width: 480px) {
+  .grid {
+    gap: var(--s2);
+  }
 }
 
 .searchempty {

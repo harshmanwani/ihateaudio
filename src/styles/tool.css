@@ -575,6 +575,13 @@ body[data-dragging='true'] .drop-overlay {
   flex-wrap: wrap;
 }
 
+/* The next tool's own glyph, in its family colour. */
+.chain__icon {
+  display: flex;
+  flex: none;
+  color: var(--cat, var(--brand));
+}
+
 /* ---------- Multi-file list (merger, batch convert) ---------- */
 
 .filelist {
