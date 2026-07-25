@@ -25,7 +25,17 @@ export default defineConfig({
   // Always the built output: these tests exist to check what ships, and the
   // dev server's on-the-fly transforms are not that.
   webServer: {
-    command: 'npm run build:fast && npm run preview -- --port 4331',
+    // The ids are blanked explicitly, and this is not belt-and-braces.
+    //
+    // This builds in production mode, which loads .env.production, so the real
+    // GA4 and PostHog ids were compiled in and every test run sent a few hundred
+    // page_view events to production from localhost. An empty value in the
+    // environment wins over the dotenv file, so nothing third-party loads.
+    //
+    // A test asserts the result, which is how this was caught.
+    command:
+      'PUBLIC_GA_ID= PUBLIC_POSTHOG_KEY= PUBLIC_GOOGLE_VERIFICATION= ' +
+      'npm run build:fast && npm run preview -- --port 4331',
     url: 'http://localhost:4331',
     reuseExistingServer: false,
     timeout: 180_000,

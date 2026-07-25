@@ -1,0 +1,43 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ihateaudio",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-07-01",
+
+  "assets": {
+    "directory": "./dist",
+    "binding": "ASSETS",
+
+    // Every canonical, the sitemap, llms.txt and tools.json use the bare form
+    // (/audio-trimmer, no trailing slash), so that is what has to answer 200.
+    // "auto-trailing-slash" 307-redirected it to /audio-trimmer/ instead, which
+    // means every crawl of a canonical URL hit a redirect first. This serves the
+    // bare form and redirects the slashed one onto it.
+    "html_handling": "drop-trailing-slash",
+
+    // Serve the real 404 page rather than a bare Cloudflare error. Not
+    // "single-page-application": this is a multi-page site, and returning
+    // index.html with a 200 for URLs that do not exist is the fastest way to get
+    // junk indexed.
+    "not_found_handling": "404-page",
+
+    // Only the ffmpeg core goes through the Worker. Every one of the other 250
+    // files is served directly by the asset layer with no Worker invocation,
+    // which is both faster and free.
+    "run_worker_first": ["/ffmpeg/*"]
+  },
+
+  "r2_buckets": [
+    {
+      // The 31 MB core cannot be a static asset: Cloudflare caps those at
+      // 25 MiB. R2 has no egress charge, which for a file this size served to
+      // this many people is the whole reason to be on Cloudflare at all.
+      "binding": "FFMPEG",
+      "bucket_name": "ihateaudio-ffmpeg"
+    }
+  ],
+
+  "observability": {
+    "enabled": true
+  }
+}

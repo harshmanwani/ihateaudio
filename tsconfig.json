@@ -6,7 +6,10 @@
     "node_modules",
     // Vendored build artefacts, including a 31 MB minified core that would
     // otherwise be typechecked on every run.
-    "public/ffmpeg"
+    "public/ffmpeg",
+    // Has its own tsconfig: the Workers runtime types conflict with the DOM
+    // types every other file here needs.
+    "worker"
   ],
   "compilerOptions": {
     // Astro components and the build scripts run in Node; the tests use

@@ -9,6 +9,7 @@
  */
 import { audioError } from './errors';
 import { encodeWav } from './encode-wav';
+import { FFMPEG_CORE_VERSION } from './ffmpeg-version';
 
 export interface FFmpegProgress {
   (ratio: number): void;
@@ -66,7 +67,12 @@ export async function loadFFmpeg(
       //
       // A blob URL would not work either: the core derives sibling filenames
       // by string-replacing the ".js" extension, which a blob URL lacks.
-      const base = new URL('/ffmpeg/', window.location.origin);
+      //
+      // The version is in the path so the response can be cached immutably for
+      // a year. Without it the filename never changes when the package does, so
+      // it could only be cached for a day and every returning visitor paid the
+      // 31 MB again.
+      const base = new URL(`/ffmpeg/${FFMPEG_CORE_VERSION}/`, window.location.origin);
       const coreURL = new URL('ffmpeg-core.js', base).href;
       const wasmURL = new URL('ffmpeg-core.wasm', base).href;
 

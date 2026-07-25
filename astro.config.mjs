@@ -23,6 +23,19 @@ export default defineConfig({
       // The audio engine is the only real JS on the site. Keeping chunks
       // separate lets a tool page load just the modules it uses.
       chunkSizeWarningLimit: 700,
+
+      // Never inline a script into the HTML.
+      //
+      // Astro inlines small hoisted scripts by default, and the Content Security
+      // Policy in public/_headers has no 'unsafe-inline' for script-src, so the
+      // browser blocked every one of them. On the live site that silently killed
+      // the dropzone's "Choose file" button, the service worker registration,
+      // the all-tools menu and the install card. `astro dev` does not apply
+      // _headers, which is why it only showed up when served through wrangler.
+      //
+      // The alternative would be loosening the CSP, which is the wrong trade on
+      // a site whose whole promise is that your file never leaves the device.
+      assetsInlineLimit: 0,
     },
 
     // Worker format is left at Vite's default. @ffmpeg/ffmpeg spawns its own

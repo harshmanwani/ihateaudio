@@ -1,5 +1,6 @@
 import { test, expect, type Page } from '@playwright/test';
 import { TOOLS } from '../../src/data/tools';
+import { FFMPEG_CORE_VERSION } from '../../src/lib/audio/ffmpeg-version';
 
 const STATIC_PAGES = ['/', '/loudness-targets', '/audio-formats', '/about', '/privacy'];
 const ALL_PATHS = [...STATIC_PAGES, ...TOOLS.map((tool) => `/${tool.slug}`)];
@@ -591,5 +592,54 @@ test.describe('contact', () => {
         `${path} should offer a way to report a problem`
       ).toBeAttached();
     }
+  });
+});
+
+test.describe('deploy shape', () => {
+  test('the ffmpeg core is excluded from the static asset upload', async ({
+    request,
+  }) => {
+    // Cloudflare rejects any single asset over 25 MiB and the core is 30.7 MB, so
+    // it is served from R2 by worker/index.ts instead. .assetsignore is what keeps
+    // it out of the upload, and without it the deploy fails outright.
+    const ignore = await request.get('/.assetsignore');
+    expect(ignore.status(), '/.assetsignore must ship in dist').toBe(200);
+    expect(await ignore.text()).toContain('ffmpeg/');
+  });
+
+  test('the core sits at the versioned path the loader asks for', async ({
+    request,
+  }) => {
+    // A stable filename could only ever be cached for a day, which made every
+    // returning visitor pay the 31 MB again. The version comes from the installed
+    // package via a generated module, so this asserts the two agree rather than
+    // hardcoding a number that would need editing on every upgrade.
+    expect(FFMPEG_CORE_VERSION).toMatch(/^\d+\.\d+\.\d+/);
+
+    for (const file of ['ffmpeg-core.js', 'ffmpeg-core.wasm']) {
+      const path = `/ffmpeg/${FFMPEG_CORE_VERSION}/${file}`;
+      // HEAD, because the wasm is 31 MB and the size is all that matters here.
+      const response = await request.fetch(path, { method: 'HEAD' });
+      expect(response.status(), `${path} should be served`).toBe(200);
+    }
+
+    // And the loader must be pointing at exactly that, not a bare /ffmpeg/.
+    const wasm = await request.fetch(
+      `/ffmpeg/${FFMPEG_CORE_VERSION}/ffmpeg-core.wasm`,
+      { method: 'HEAD' }
+    );
+    expect(Number(wasm.headers()['content-length'] ?? 0)).toBeGreaterThan(
+      20_000_000
+    );
+  });
+
+  test('there is a real 404 page for Cloudflare to serve', async ({ request }) => {
+    // not_found_handling is set to "404-page", which needs one to exist.
+    const response = await request.get('/404');
+    expect(response.status()).toBe(200);
+    const body = await response.text();
+    expect(body).toContain('That page is not here');
+    // Must not be indexable: a soft 404 in the index is worse than no page.
+    expect(body).toMatch(/name="robots"[^>]*noindex/);
   });
 });

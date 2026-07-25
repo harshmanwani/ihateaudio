@@ -111,9 +111,16 @@ converter still involves no third-party request.
 
 Both are configured to not contradict the promise on every other page.
 
-**Analytics** is off unless the ids are set, which keeps local dev and the test
-suite free of third-party requests. Set `PUBLIC_GA_ID` and
-`PUBLIC_POSTHOG_KEY` in the host's environment; see [DEPLOY.md](DEPLOY.md).
+**Analytics** is off unless the ids are set. They live in `.env.production`,
+which `astro dev` does not load, so local browsing stays out of production
+numbers.
+
+The test suite needs one more step, and it is easy to get wrong: Playwright
+builds in production mode, so it *does* load `.env.production`.
+`playwright.config.ts` blanks the ids in the webServer environment, because an
+empty value in the environment wins over a dotenv file. The
+`nothing third-party loads` test is what caught this, after a few hundred
+localhost page views had already reached production.
 
 The bootstrap lives in `public/analytics.js`, a same-origin file rather than an
 inline block, so `script-src` never needs `'unsafe-inline'` and the CSP stays
@@ -124,6 +131,14 @@ Google's advertising signals disabled. `src/lib/track.ts` sends three product
 events, and never a filename, a file size, or a raw duration. Change any of
 this and `/privacy` has to change with it; a test asserts that page still
 describes reality.
+
+The bootstrap being an external file is also load bearing beyond the CSP: Astro
+inlines small hoisted scripts by default, and because `script-src` has no
+`'unsafe-inline'`, any inlined script is silently blocked in production while
+working perfectly in `astro dev`, which does not apply `public/_headers`. That
+shipped once and killed the dropzone's "Choose file" button and the service
+worker registration. `vite.build.assetsInlineLimit: 0` prevents it and
+`npm run csp` fails the build if it ever returns.
 
 **Installable.** `public/manifest.webmanifest` plus icons, a maskable icon, 11
 iOS launch images and 2 install-dialog screenshots, all rendered from

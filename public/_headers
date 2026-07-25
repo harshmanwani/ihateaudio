@@ -34,10 +34,11 @@
 /screenshots/*
   Cache-Control: public, max-age=604800
 
-# The core is versioned by the package, not by filename, so revalidate daily.
-/ffmpeg/*
-  Cache-Control: public, max-age=86400
-  Cross-Origin-Resource-Policy: same-origin
+# No rule for /ffmpeg/* on purpose. The core is over Cloudflare's 25 MiB asset
+# limit, so it is excluded from the upload by public/.assetsignore and served
+# from R2 by src/worker.ts, which sets its own headers. The path now carries the
+# core's version, so the Worker can mark it immutable for a year instead of the
+# one day a stable filename allowed.
 
 # Must never be cached, or a stale worker pins an old build for repeat visitors.
 /sw.js

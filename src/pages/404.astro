@@ -1,0 +1,116 @@
+---
+/**
+ * Served by Cloudflare for any unmatched path, via `not_found_handling` in
+ * wrangler.jsonc.
+ *
+ * A 404 on a site like this almost always means a mistyped or stale tool URL, so
+ * it offers the launcher rather than an apology. noindex, because a soft 404 in
+ * the index is worse than no page at all.
+ */
+import Base from '../layouts/Base.astro';
+import Icon from '../components/Icon.astro';
+import { TOOLS } from '../data/tools';
+
+/** The ones people actually arrive looking for. */
+const POPULAR = [
+  'audio-trimmer',
+  'audio-joiner',
+  'mp3-converter',
+  'volume-booster',
+  'audio-splitter',
+  'video-to-audio',
+]
+  .map((slug) => TOOLS.find((tool) => tool.slug === slug))
+  .filter((tool): tool is (typeof TOOLS)[number] => Boolean(tool));
+---
+
+<Base
+  title="Page not found"
+  description="That page does not exist. Every audio tool on the site is one click away from here, and all of them run in your browser with nothing uploaded."
+  path="/404"
+  noindex
+>
+  <div class="wrap page notfound">
+    <p class="notfound__code" aria-hidden="true">404</p>
+    <h1>That page is not here</h1>
+    <p class="notfound__sub">
+      Either the address has a typo in it or we moved something. Nothing is
+      broken on your end.
+    </p>
+
+    <div class="grid notfound__grid">
+      {
+        POPULAR.map((tool) => (
+          <a class="tile" href={`/${tool.slug}`} data-cat={tool.category}>
+            <span
+              class:list={['tile__chip', tool.icon3d && 'tile__chip--art']}
+              aria-hidden="true"
+            >
+              {tool.icon3d ? (
+                <img
+                  src={`/icons3d/${tool.slug}.png`}
+                  alt=""
+                  width="56"
+                  height="56"
+                  loading="lazy"
+                  decoding="async"
+                />
+              ) : (
+                <Icon name={tool.icon} weight="duotone" size={24} />
+              )}
+            </span>
+            <span class="tile__text">
+              <span class="tile__name">{tool.name}</span>
+              <span class="tile__desc">{tool.short}</span>
+            </span>
+          </a>
+        ))
+      }
+    </div>
+
+    <p class="notfound__all">
+      <a class="btn btn--solid" href="/">
+        <Icon name="squares-four" size={17} />
+        See all {TOOLS.length} tools
+      </a>
+    </p>
+  </div>
+</Base>
+
+<style>
+  .notfound {
+    padding-block: var(--s16) var(--s20);
+    max-width: var(--content);
+  }
+
+  .notfound__code {
+    font-size: var(--t-small);
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.08em;
+    color: var(--brand);
+  }
+
+  .notfound h1 {
+    margin-top: var(--s2);
+    font-size: var(--t-h1);
+    letter-spacing: -0.025em;
+    text-wrap: balance;
+  }
+
+  .notfound__sub {
+    margin-top: var(--s3);
+    max-width: var(--prose);
+    font-size: var(--t-lead);
+    color: var(--ink-2);
+    line-height: 1.55;
+  }
+
+  .notfound__grid {
+    margin-top: var(--s10);
+  }
+
+  .notfound__all {
+    margin-top: var(--s8);
+  }
+</style>

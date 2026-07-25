@@ -10,7 +10,7 @@
     "postinstall": "node scripts/sync-ffmpeg-core.mjs",
     "dev": "astro dev",
     "prebuild": "node scripts/sync-ffmpeg-core.mjs",
-    "build": "node scripts/generate-app-icons.mjs && astro check && astro build && node scripts/generate-og-images.mjs",
+    "build": "astro check && tsc -p worker && astro build && node scripts/check-csp.mjs",
     "build:fast": "astro build",
     "preview": "astro preview",
     "test": "vitest run",
@@ -21,7 +21,13 @@
     "icons": "node scripts/generate-tool-icons.mjs && node scripts/normalize-tool-icons.mjs",
     "appicons": "node scripts/generate-app-icons.mjs",
     "shots": "node scripts/generate-pwa-screenshots.mjs",
-    "verify": "node scripts/verify-tools.mjs"
+    "verify": "node scripts/verify-tools.mjs",
+    "check:worker": "tsc -p worker",
+    "assets": "node scripts/generate-app-icons.mjs && astro build && node scripts/generate-og-images.mjs",
+    "deploy": "npm run build && wrangler deploy",
+    "dev:worker": "npm run build && wrangler dev",
+    "csp": "node scripts/check-csp.mjs",
+    "ffmpeg:upload": "node scripts/upload-ffmpeg-core.mjs"
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",
@@ -31,6 +37,7 @@
   },
   "devDependencies": {
     "@astrojs/check": "^0.9.9",
+    "@cloudflare/workers-types": "^5.20260724.1",
     "@ffmpeg/core": "^0.12.10",
     "@phosphor-icons/core": "^2.1.1",
     "@playwright/test": "^1.62.0",
