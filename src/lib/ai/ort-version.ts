@@ -4,8 +4,7 @@
  * The installed onnxruntime-web versions, which are also the path segments their
  * WebAssembly builds are served under so they can be cached immutably.
  *
- * There are two because transformers.js pins its own copy of the runtime and the
- * glue must match the binary it loads. See the script for why that is left alone.
+ * Normally there is exactly one, held there by an npm override — see the script
+ * for why more than one is a problem rather than a convenience.
  */
 export const ORT_VERSION = '1.27.0';
-export const ORT_TRANSFORMERS_VERSION = '1.26.0-dev.20260416-b7804b056c';

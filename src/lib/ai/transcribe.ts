@@ -14,7 +14,7 @@
  * library is configured to refuse anything else.
  */
 import { WHISPER } from './models';
-import { ORT_TRANSFORMERS_VERSION } from './ort-version';
+import { ORT_VERSION } from './ort-version';
 import { MODELS_VERSION } from './models';
 
 export interface Segment {
@@ -64,22 +64,29 @@ async function getPipeline(
       env.allowLocalModels = false;
       env.allowRemoteModels = true;
 
-      // transformers.js pins its own onnxruntime-web, so this must be that
-      // version's binary rather than the one the separation tools use. The glue and
-      // the .wasm have to match or it fails inside emscripten talking about a
-      // missing export.
+      // One runtime for the whole project, forced by an npm override. Before that,
+      // installing onnxruntime-web for the separation tools hoisted a third
+      // onnxruntime-common to the top of node_modules alongside transformers' own
+      // nested pair, and the web build ended up resolved against a version of
+      // common it was not built for. That fails as a missing method deep inside
+      // the bundle, which points nowhere near its cause.
       //
       // The wasm backend object is created lazily, so it may not exist yet. Missing
       // it entirely would silently fall back to fetching the binary from a CDN,
       // which is the one outcome this whole arrangement exists to prevent — so it
       // is created rather than skipped.
       const onnx = env.backends.onnx as {
-        wasm?: { wasmPaths?: unknown; numThreads?: number };
+        wasm?: { wasmPaths?: unknown; numThreads?: number; proxy?: boolean };
       };
       onnx.wasm ??= {};
       onnx.wasm.wasmPaths = {
-        wasm: `/ort/${ORT_TRANSFORMERS_VERSION}/ort-wasm-simd-threaded.wasm`,
+        wasm: `/ort/${ORT_VERSION}/ort-wasm-simd-threaded.wasm`,
       };
+      // Run the runtime in its own worker. Without this, model loading and every
+      // inference step happen on the main thread, which locks the page solid for
+      // the duration — no progress bar repaint, no cancel, and on a long recording
+      // a browser that may decide the tab has hung.
+      onnx.wasm.proxy = true;
       onnx.wasm.numThreads =
         typeof crossOriginIsolated !== 'undefined' && crossOriginIsolated
           ? Math.max(1, Math.min(4, (navigator.hardwareConcurrency || 2) - 1))
