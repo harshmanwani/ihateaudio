@@ -21,7 +21,7 @@ const steps = [
   'Drop an audio file onto the page. It is decoded by your browser, so a long DJ set opens as fast as a voice memo and nothing is uploaded.',
   'Pick a preset as a starting point, or leave it on Flat and go straight to the sliders.',
   'Move individual bands between -12 and +12 dB. The number beside each label is the current gain, and the box next to each slider takes an exact value if you know what you want.',
-  'Press play — the preview is re-rendered with the current curve — and compare against the original by setting the preset back to Flat.',
+  'Press play (the preview is re-rendered with the current curve) and compare against the original by setting the preset back to Flat.',
   'Choose an output format and click Download.',
 ];
 
@@ -32,7 +32,7 @@ const faq = [
   },
   {
     q: 'Should I boost or cut?',
-    a: 'Cut where you can. A cut costs nothing in headroom, whereas every decibel of boost brings the file closer to clipping, and the ear finds a subtractive change less obvious than an additive one. If a mix sounds dull, try cutting 400 Hz before reaching for 12 kHz — the result is usually the same perceived brightness with more room left.',
+    a: 'Cut where you can. A cut costs nothing in headroom, whereas every decibel of boost brings the file closer to clipping, and the ear finds a subtractive change less obvious than an additive one. If a mix sounds dull, try cutting 400 Hz before reaching for 12 kHz. The result is usually the same perceived brightness with more room left.',
   },
   {
     q: 'Why does the file distort after I boost the bass?',
@@ -40,7 +40,7 @@ const faq = [
   },
   {
     q: 'Boosting 16 kHz does nothing to my MP3. Why?',
-    a: 'Most lossy encoders discard everything above a cutoff to save bits — around 16 kHz at 128 kbps and 19 to 20 kHz at higher rates. If the content was thrown away at encode time there is nothing up there to lift, and all you gain is a little hiss. Check the source with the waveform or loudness tools, or start from a lossless file if the top octave matters.',
+    a: 'Most lossy encoders discard everything above a cutoff to save bits. Around 16 kHz at 128 kbps and 19 to 20 kHz at higher rates. If the content was thrown away at encode time there is nothing up there to lift, and all you gain is a little hiss. Check the source with the waveform or loudness tools, or start from a lossless file if the top octave matters.',
   },
   {
     q: 'What is the Radio preset doing?',
@@ -62,19 +62,19 @@ const faq = [
     <div class="controls">
       <div class="controls__head">
         <span class="controls__title">Curve</span>
-        <span class="hint">Presets are a starting point — move any band and the curve becomes custom.</span>
+        <span class="hint">Presets are a starting point. Move any band and the curve becomes custom.</span>
       </div>
 
       <div class="field controls__full">
         <label class="label" for="eq-preset">Preset</label>
         <select class="select" id="eq-preset" data-control="preset">
-          <option value="flat" selected>Flat — no change</option>
-          <option value="voice">Voice / podcast — clarity for speech</option>
-          <option value="music">Music — gentle smile curve</option>
-          <option value="bass">Bass boost — weight at the bottom</option>
-          <option value="treble">Treble boost — detail and air</option>
-          <option value="podcast">Podcast — rumble cut, mid forward</option>
-          <option value="radio">Radio — band-limited broadcast tone</option>
+          <option value="flat" selected>Flat, no change</option>
+          <option value="voice">Voice / podcast, clarity for speech</option>
+          <option value="music">Music, gentle smile curve</option>
+          <option value="bass">Bass boost, weight at the bottom</option>
+          <option value="treble">Treble boost, detail and air</option>
+          <option value="podcast">Podcast, rumble cut, mid forward</option>
+          <option value="radio">Radio, band-limited broadcast tone</option>
           <option value="custom">Custom</option>
         </select>
       </div>
@@ -113,7 +113,7 @@ const faq = [
       }
 
       <p class="hint controls__full" data-headroom aria-live="polite">
-        Flat — the export will be identical to the source apart from the format change.
+        Flat. The export will be identical to the source apart from the format change.
       </p>
     </div>
   </ToolShell>
@@ -127,13 +127,13 @@ const faq = [
       dragging.
     </p>
     <p>
-      <strong>60 Hz</strong> is weight — the body of a kick drum, the bottom of
+      <strong>60 Hz</strong> is weight. The body of a kick drum, the bottom of
       a bass guitar, and the rumble of a truck outside the window. Phone
       speakers cannot reproduce it at all, so boosting here only pays off on
       headphones and real speakers. <strong>150 Hz</strong> is warmth, and also
       where a small room adds its boom; a cut here is the single most common fix
       for a recording that sounds muddy. <strong>400 Hz</strong> is the
-      boxiness region — too much and a voice sounds like it is coming from
+      boxiness region. Too much and a voice sounds like it is coming from
       inside a cupboard. <strong>1 kHz</strong> carries the honk and nasal
       quality; it is rarely a place to boost.
     </p>
@@ -162,7 +162,7 @@ const faq = [
       Move in small amounts. Three decibels is a clearly audible change on a
       single band; six is a heavy one; twelve is a special effect. If a curve
       needs more than a few decibels on several bands at once, the problem is
-      usually the source rather than the tone — a microphone in the wrong place,
+      usually the source rather than the tone. A microphone in the wrong place,
       or a room that needed treating.
     </p>
 
@@ -321,7 +321,7 @@ const faq = [
         );
         if (bands.every((band) => Math.abs(band.gain) < 0.01)) {
           headroom.textContent =
-            'Flat — the export will be identical to the source apart from the format change.';
+            'Flat. The export will be identical to the source apart from the format change.';
           return;
         }
         if (boost.gain <= 0) {

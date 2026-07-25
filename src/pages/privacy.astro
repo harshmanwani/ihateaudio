@@ -3,7 +3,7 @@ import Base from '../layouts/Base.astro';
 ---
 
 <Base
-  title="Privacy — ihateaudio"
+  title="Privacy: ihateaudio"
   description="No files are uploaded, no accounts exist, and no personal data is collected. Here is exactly what happens to your audio and how to verify it yourself."
   path="/privacy"
 >
@@ -24,7 +24,7 @@ import Base from '../layouts/Base.astro';
     </p>
     <p>
       At no point is your audio transmitted anywhere. There is no upload step,
-      no processing server, and no storage bucket — not because we delete files
+      no processing server, and no storage bucket, not because we delete files
       quickly, but because they are never sent in the first place. Closing the
       tab discards everything.
     </p>
@@ -37,7 +37,7 @@ import Base from '../layouts/Base.astro';
       <li>
         Open your browser's developer tools, switch to the Network tab, and use
         any tool normally. You will see the page and its code load, and then
-        nothing further — no request carrying your file.
+        nothing further, no request carrying your file.
       </li>
       <li>
         Load a tool page, then disconnect from the internet entirely and use it.
@@ -62,14 +62,13 @@ import Base from '../layouts/Base.astro';
 
     <h2>The one network request worth explaining</h2>
     <p>
-      Most tools need nothing beyond the page itself. A few output formats —
-      M4A, OGG, FLAC, WMA, AIFF and iPhone ringtones — require a converter that
+      Most tools need nothing beyond the page itself. A few output formats (M4A, OGG, FLAC, WMA, AIFF and iPhone ringtones) require a converter that
       is too large to include in every page, so it downloads on demand the first
       time you use one, from this site's own servers.
     </p>
     <p>
       That download goes one way: code comes to you, and your audio still does
-      not go anywhere. It is also the only third-party-free way to do it — the
+      not go anywhere. It is also the only third-party-free way to do it, the
       converter is hosted here rather than pulled from someone else's CDN,
       precisely so no other company sees that you requested it.
     </p>

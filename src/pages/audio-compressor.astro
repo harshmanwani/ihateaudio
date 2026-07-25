@@ -8,7 +8,7 @@ const tool = getTool('audio-compressor');
 const steps = [
   'Drop the file that is too big onto the page. Its real size appears in the table below as soon as it is decoded.',
   'Lower the target bitrate until the projected size fits under whatever limit you are up against. The number updates as you change it.',
-  'If the recording is speech, switch it to mono and drop the sample rate — both let the same bitrate describe far less, so the result sounds better than the number suggests.',
+  'If the recording is speech, switch it to mono and drop the sample rate. Both let the same bitrate describe far less, so the result sounds better than the number suggests.',
   'Play it back before you commit. Aggressive settings are obvious on music long before they are on a voice.',
   'Click Download when the projected size and the sound are both acceptable.',
 ];
@@ -16,7 +16,7 @@ const steps = [
 const faq = [
   {
     q: 'Why does lowering the sample rate not shrink the MP3?',
-    a: 'Because a constant-bitrate lossy file is exactly bitrate times duration divided by eight, regardless of what is inside it. Lowering the sample rate does not save bytes — it reduces how much frequency range the encoder has to describe with the bytes it already has, so the same file size sounds cleaner. Use it to buy quality, not size.',
+    a: 'Because a constant-bitrate lossy file is exactly bitrate times duration divided by eight, regardless of what is inside it. Lowering the sample rate does not save bytes. It reduces how much frequency range the encoder has to describe with the bytes it already has, so the same file size sounds cleaner. Use it to buy quality, not size.',
   },
   {
     q: 'How small can a one-hour recording get?',
@@ -28,11 +28,11 @@ const faq = [
   },
   {
     q: 'Should I convert to mono?',
-    a: 'For interviews, lectures, voice notes and most podcasts, yes — there is usually no meaningful stereo information and the encoder gets to spend every bit on one channel instead of two, which is a large quality gain at any given bitrate. For music, no. Mixes rely on stereo placement, and folding them down can make instruments disappear where the two channels cancel.',
+    a: 'For interviews, lectures, voice notes and most podcasts, yes. There is usually no meaningful stereo information and the encoder gets to spend every bit on one channel instead of two, which is a large quality gain at any given bitrate. For music, no. Mixes rely on stereo placement, and folding them down can make instruments disappear where the two channels cancel.',
   },
   {
     q: 'Which output format gives the smallest usable file?',
-    a: 'Opus, by a wide margin, especially for speech — 32 kbps Opus is more intelligible than 96 kbps MP3. M4A is next. MP3 is the least efficient of the three but the only one you can send to anyone without checking what they can play. Choose based on where the file is going, then set the bitrate to fit.',
+    a: 'Opus, by a wide margin, especially for speech. 32 kbps Opus is more intelligible than 96 kbps MP3. M4A is next. MP3 is the least efficient of the three but the only one you can send to anyone without checking what they can play. Choose based on where the file is going, then set the bitrate to fit.',
   },
   {
     q: 'The file is still too big. What else can I do?',
@@ -40,7 +40,7 @@ const faq = [
   },
   {
     q: 'Does compressing an already-compressed file make it worse?',
-    a: 'Yes. Re-encoding an MP3 at a lower bitrate stacks a second set of artifacts on the first, and the result is worse than a file encoded once at the lower rate would have been. It is still often the right trade when you have a hard size limit — just start from the original recording if you still have it.',
+    a: 'Yes. Re-encoding an MP3 at a lower bitrate stacks a second set of artifacts on the first, and the result is worse than a file encoded once at the lower rate would have been. It is still often the right trade when you have a hard size limit. Just start from the original recording if you still have it.',
   },
 ];
 ---
@@ -50,7 +50,7 @@ const faq = [
     tool={tool}
     action="Download smaller file"
     dropTitle="Drop the file that is too big"
-    dropHint="any size — there is no upload to limit"
+    dropHint="any size. There is no upload to limit"
   >
     <div class="controls">
       <div class="controls__head">
@@ -70,13 +70,13 @@ const faq = [
         <label class="label" for="rate">Sample rate</label>
         <select class="select" id="rate" data-control="rate">
           <option value="0" selected>Keep original</option>
-          <option value="48000">48 kHz — video and broadcast</option>
-          <option value="44100">44.1 kHz — CD standard</option>
-          <option value="32000">32 kHz — FM-radio range</option>
-          <option value="22050">22.05 kHz — acceptable for voice</option>
-          <option value="16000">16 kHz — wideband speech</option>
-          <option value="11025">11.025 kHz — very rough</option>
-          <option value="8000">8 kHz — telephone quality</option>
+          <option value="48000">48 kHz, video and broadcast</option>
+          <option value="44100">44.1 kHz. CD standard</option>
+          <option value="32000">32 kHz. FM-radio range</option>
+          <option value="22050">22.05 kHz, acceptable for voice</option>
+          <option value="16000">16 kHz, wideband speech</option>
+          <option value="11025">11.025 kHz, very rough</option>
+          <option value="8000">8 kHz, telephone quality</option>
         </select>
       </div>
 
@@ -98,15 +98,15 @@ const faq = [
             <tbody>
               <tr>
                 <th scope="row">Original file</th>
-                <td class="tnum" data-size-original>—</td>
+                <td class="tnum" data-size-original>·</td>
               </tr>
               <tr>
                 <th scope="row">Projected output</th>
-                <td class="tnum" data-size-output>—</td>
+                <td class="tnum" data-size-output>·</td>
               </tr>
               <tr>
                 <th scope="row">Saved</th>
-                <td class="tnum" data-size-saved>—</td>
+                <td class="tnum" data-size-saved>·</td>
               </tr>
             </tbody>
           </table>
@@ -116,7 +116,7 @@ const faq = [
       <div class="controls__full">
         <p class="hint">
           Sample rate and channel count do not change the byte count of a lossy
-          file — the bitrate alone decides that. What they change is how much the
+          file, the bitrate alone decides that. What they change is how much the
           encoder has to describe with those bytes, which is why a mono 16 kHz
           voice recording sounds far better at 64 kbps than a stereo 44.1 kHz one
           does.
@@ -137,8 +137,8 @@ const faq = [
     </p>
     <p>
       The other two work indirectly, and that is not a weakness. Sample rate sets
-      the highest frequency the file can represent — half the rate, by Nyquist's
-      theorem — so dropping from 44.1 kHz to 16 kHz tells the encoder it no
+      the highest frequency the file can represent, half the rate, by Nyquist's
+      theorem, so dropping from 44.1 kHz to 16 kHz tells the encoder it no
       longer has to describe anything above 8 kHz. Switching to mono halves the
       number of signals it has to describe at all. Neither saves a single byte,
       but both hand the encoder a much easier problem, and at a fixed bitrate an
@@ -153,7 +153,7 @@ const faq = [
       platforms and forums often set their own smaller caps. Working backwards
       from the limit is simple arithmetic: a target of 10 MB over a 40-minute
       recording is 10 megabytes divided by 2400 seconds, about 4.2 kilobytes per
-      second, which is 33 kbps — too low for MP3, comfortable for Opus, and a
+      second, which is 33 kbps. Too low for MP3, comfortable for Opus, and a
       sign that mono and a 16 kHz sample rate are not optional.
     </p>
     <p>
@@ -161,7 +161,7 @@ const faq = [
       29 MB at 64 kbps and 43 MB at 96 kbps. An hour of stereo music is roughly
       58 MB at 128 kbps and 86 MB at 192 kbps. If those numbers do not get you
       under the limit, the answer is to make the recording shorter rather than to
-      keep pushing the bitrate down — cutting the dead air out of an interview
+      keep pushing the bitrate down. Cutting the dead air out of an interview
       routinely removes a fifth of its length without touching quality at all.
     </p>
 
@@ -178,7 +178,7 @@ const faq = [
       If you came here because a voice recording swings between shouting and
       whispering, the dynamics tool is what you want, and it is a separate page.
       If you came because an upload form rejected your file, you are in the right
-      place. Doing both is a reasonable workflow — level it first, then shrink it,
+      place. Doing both is a reasonable workflow. Level it first, then shrink it,
       because a compressed dynamic range is slightly cheaper to encode as well.
     </p>
   </Fragment>
@@ -276,12 +276,12 @@ const faq = [
       return;
     }
 
-    if (originalCell) originalCell.textContent = bytes > 0 ? filesize(bytes) : '—';
+    if (originalCell) originalCell.textContent = bytes > 0 ? filesize(bytes) : ', ';
     if (outputCell) outputCell.textContent = `about ${filesize(projected)}`;
 
     if (savedCell) {
       if (bytes <= 0) {
-        savedCell.textContent = '—';
+        savedCell.textContent = ', ';
       } else {
         const change = Math.round((1 - projected / bytes) * 100);
         savedCell.textContent =

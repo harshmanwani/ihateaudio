@@ -8,9 +8,9 @@ const tool = getTool('ogg-converter');
 
 const steps = [
   'Drop an MP3, WAV, FLAC, M4A or Opus file onto the page. Decoding happens in the tab, so nothing is uploaded.',
-  'Pick a target bitrate in the export bar. Vorbis is efficient in the middle of the range — 128 to 192 kbps covers most music comfortably.',
+  'Pick a target bitrate in the export bar. Vorbis is efficient in the middle of the range. 128 to 192 kbps covers most music comfortably.',
   'Click Download. The first OGG of your session loads the Vorbis encoder, roughly 31 MB, shown as its own progress step.',
-  'Drop the resulting .ogg straight into Unity, Godot or a web project — both engines treat it as a native compressed audio asset.',
+  'Drop the resulting .ogg straight into Unity, Godot or a web project. Both engines treat it as a native compressed audio asset.',
 ];
 
 const faq = [
@@ -103,7 +103,7 @@ const faq = [
       Vorbis splits each block of spectrum into two parts and codes them
       separately: a coarse "floor" describing the overall spectral envelope, and
       a "residue" carrying the fine structure that sits on top of it. Both are
-      coded against vector-quantisation codebooks — and unusually, those
+      coded against vector-quantisation codebooks, and unusually, those
       codebooks are not fixed by the standard. They are written into the header
       of every file. That decision meant encoders could keep improving for years
       without breaking a single existing decoder, and it is why a Vorbis file
@@ -133,7 +133,7 @@ const faq = [
       stereos and hardware players almost universally cannot. Phones have no
       hardware Vorbis decoder, so long playback costs more battery than AAC does.
       And for new work where you control both ends, Opus is the better codec by
-      almost every measure — Vorbis's real advantage today is the enormous amount
+      almost every measure. Vorbis's real advantage today is the enormous amount
       of software already built to expect it.
     </p>
   </Fragment>

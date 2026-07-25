@@ -9,7 +9,7 @@ const steps = [
   'Drop the track onto the page. The waveform you see is drawn from the real samples, so the shape of the fade will be visible once you set one.',
   'Set how long the fade in and the fade out should last. The waveform redraws with the ramps applied, which is usually enough to tell whether a length is right.',
   'Pick a curve. Linear is the safe choice for very short fades; the s-curve is the one to reach for on anything longer than a second or two.',
-  'Press play — the transport plays the faded version, not the original — then choose a format and download.',
+  'Press play (the transport plays the faded version, not the original) then choose a format and download.',
 ];
 
 const faq = [
@@ -19,19 +19,19 @@ const faq = [
   },
   {
     q: 'Why does a linear fade-out sound like nothing happens and then it vanishes?',
-    a: 'Because hearing is roughly logarithmic and a linear fade is not. Halfway through a linear fade the signal is at half amplitude, which is only 6 dB down — noticeably quieter but nowhere near half as loud, since that takes about 10 dB. All the perceived disappearing is crammed into the final quarter. If a fade-out feels like it falls off a cliff at the end, that is the reason, and the s-curve or exponential shape fixes it.',
+    a: 'Because hearing is roughly logarithmic and a linear fade is not. Halfway through a linear fade the signal is at half amplitude, which is only 6 dB down. Noticeably quieter but nowhere near half as loud, since that takes about 10 dB. All the perceived disappearing is crammed into the final quarter. If a fade-out feels like it falls off a cliff at the end, that is the reason, and the s-curve or exponential shape fixes it.',
   },
   {
     q: 'How long should a fade actually be?',
-    a: 'Ten to twenty milliseconds is a declick, not a fade — long enough to remove a pop, too short to hear as anything. Half a second to a second suits speech and podcast segments. Three to eight seconds is the range almost every faded song ending falls into. Video beds usually want one to two seconds so the fade finishes before the cut.',
+    a: 'Ten to twenty milliseconds is a declick, not a fade. Long enough to remove a pop, too short to hear as anything. Half a second to a second suits speech and podcast segments. Three to eight seconds is the range almost every faded song ending falls into. Video beds usually want one to two seconds so the fade finishes before the cut.',
   },
   {
     q: 'Can I put a fade somewhere in the middle of the track?',
-    a: 'Not here. This tool fades in from the very first sample and out to the very last one. To fade at an internal point, cut the file at that point in the trimmer, fade the two pieces separately, and put them back together in the joiner — or use the crossfade joiner, which is that operation in one step.',
+    a: 'Not here. This tool fades in from the very first sample and out to the very last one. To fade at an internal point, cut the file at that point in the trimmer, fade the two pieces separately, and put them back together in the joiner. Or use the crossfade joiner, which is that operation in one step.',
   },
   {
     q: 'The fade-in eats the first word or the first beat.',
-    a: 'The fade is longer than the run-up in the material. A fade-in reaches full level only at its end, so anything inside that window is attenuated — a one-second fade on a track that starts singing at 0.3 seconds will always sound wrong. Shorten the fade, or trim the silence off the front first so the fade has somewhere to live.',
+    a: 'The fade is longer than the run-up in the material. A fade-in reaches full level only at its end, so anything inside that window is attenuated. A one-second fade on a track that starts singing at 0.3 seconds will always sound wrong. Shorten the fade, or trim the silence off the front first so the fade has somewhere to live.',
   },
   {
     q: 'Can adding a fade cause clipping or distortion?',
@@ -39,7 +39,7 @@ const faq = [
   },
   {
     q: 'Does fading out to silence make the file smaller?',
-    a: 'Slightly, in a lossy format — near-silence is cheap to encode, so an MP3 of a faded track is marginally smaller than the same track without the fade. In WAV it makes no difference at all, because every sample takes the same number of bytes whether it is loud or zero.',
+    a: 'Slightly, in a lossy format. Near-silence is cheap to encode, so an MP3 of a faded track is marginally smaller than the same track without the fade. In WAV it makes no difference at all, because every sample takes the same number of bytes whether it is loud or zero.',
   },
 ];
 ---
@@ -113,10 +113,10 @@ const faq = [
       <div class="field">
         <label class="label" for="fade-curve">Curve</label>
         <select class="select" id="fade-curve" data-control="curve">
-          <option value="linear">Linear — straight line</option>
-          <option value="scurve" selected>S-curve — flat at both ends</option>
-          <option value="exponential">Exponential — leaves a tail</option>
-          <option value="logarithmic">Logarithmic — moves early</option>
+          <option value="linear">Linear, straight line</option>
+          <option value="scurve" selected>S-curve, flat at both ends</option>
+          <option value="exponential">Exponential, leaves a tail</option>
+          <option value="logarithmic">Logarithmic, moves early</option>
         </select>
       </div>
     </div>
@@ -144,8 +144,7 @@ const faq = [
     <h2>Why the shape changes what you hear</h2>
     <p>
       Loudness perception is closer to logarithmic than linear. Roughly 10 dB of
-      attenuation is needed before something sounds half as loud, so a linear fade —
-      which spends half its time between 0 and −6 dB — sounds like it is barely
+      attenuation is needed before something sounds half as loud, so a linear fade (which spends half its time between 0 and −6 dB) sounds like it is barely
       doing anything for the first half and then disappears in a hurry. This is the
       single most common complaint about fades, and it is not the tool's fault; it
       is a mismatch between arithmetic and ears.
@@ -156,7 +155,7 @@ const faq = [
       audible tail. Logarithmic holds the level up and then falls off at the end,
       which is what you want for a fade-in that needs to establish the material
       quickly. The s-curve is flat at the start and flat at the finish, which means
-      there is no perceptible instant when the fade begins or ends — it is the most
+      there is no perceptible instant when the fade begins or ends, it is the most
       "hands on a fader" of the four, and the safest default for anything longer than
       a second.
     </p>
@@ -166,7 +165,7 @@ const faq = [
       Most fades in professional work are 15 milliseconds long and nobody ever hears
       them. They exist because audio that starts or stops mid-waveform asks the
       speaker cone to jump instantly from silence to some non-zero value, and that
-      jump is broadband — you hear it as a click or a thump. A fade of a few
+      jump is broadband. You hear it as a click or a thump. A fade of a few
       milliseconds removes the discontinuity while being far too short to register
       as a fade.
     </p>

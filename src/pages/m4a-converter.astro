@@ -16,7 +16,7 @@ const steps = [
 const faq = [
   {
     q: 'What is the difference between M4A, MP4, M4B and M4R?',
-    a: 'Nothing structural — they are the same MPEG-4 container with different extensions signalling what is inside. M4A means audio only. MP4 usually means it also carries video. M4B is an audiobook, which players treat as bookmarkable. M4R is a ringtone, which is the only thing iOS will accept for that purpose. M4P is a FairPlay-encrypted purchase and cannot be converted by anything.',
+    a: 'Nothing structural. They are the same MPEG-4 container with different extensions signalling what is inside. M4A means audio only. MP4 usually means it also carries video. M4B is an audiobook, which players treat as bookmarkable. M4R is a ringtone, which is the only thing iOS will accept for that purpose. M4P is a FairPlay-encrypted purchase and cannot be converted by anything.',
   },
   {
     q: 'Is AAC really better than MP3, or is that marketing?',
@@ -86,7 +86,7 @@ const faq = [
     <p>
       Advanced Audio Coding was standardised in 1997 as MPEG-2 Part 7 and
       extended two years later in MPEG-4 Part 3, by a group that included
-      Fraunhofer IIS, Dolby, Sony, AT&amp;T and Nokia — several of the same
+      Fraunhofer IIS, Dolby, Sony, AT&amp;T and Nokia, several of the same
       people who had built MP3. The brief was to design a modern perceptual codec
       with no obligation to remain backward compatible with anything, and the
       freedom shows.
@@ -118,8 +118,7 @@ const faq = [
       the convention stuck. The same container with .m4b tells a player the file
       is an audiobook and should remember its position; with .m4r it tells iOS
       the file is a ringtone; with .m4p it is a FairPlay-encrypted purchase.
-      Rename one to another and, DRM aside, players generally go along with it —
-      which is exactly how ringtone tools work.
+      Rename one to another and, DRM aside, players generally go along with it. Which is exactly how ringtone tools work.
     </p>
 
     <h2>When to pick something else</h2>
@@ -129,7 +128,7 @@ const faq = [
       whether the recipient's device will cope. Choose OGG Vorbis if the audio is
       an asset in a Unity or Godot project, where it is the expected format.
       Choose Opus if the content is speech and you want the smallest possible
-      file — below 96 kbps it beats AAC comfortably. Choose FLAC or ALAC if the
+      file. Below 96 kbps it beats AAC comfortably. Choose FLAC or ALAC if the
       point is archival, since AAC discards information permanently no matter how
       high you set the bitrate.
     </p>

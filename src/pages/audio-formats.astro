@@ -65,7 +65,7 @@ const rows: Row[] = [
     lossy: 'Uncompressed',
     typical: '10 MB/min at 44.1 kHz stereo',
     support: 'Universal',
-    use: 'Editing and mastering. Never for distribution — it is ten times the size for no audible gain.',
+    use: 'Editing and mastering. Never for distribution. It is ten times the size for no audible gain.',
   },
   {
     format: 'AIFF',
@@ -90,7 +90,7 @@ const schema = [
 ---
 
 <Base
-  title="Audio Format Guide — MP3 vs AAC vs FLAC vs WAV vs Opus"
+  title="Audio Format Guide: MP3 vs AAC vs FLAC vs WAV vs Opus"
   description="A plain comparison of every common audio format: file size per minute, quality, device support, and what each one is genuinely best at. Plus what bitrate to actually use."
   path="/audio-formats"
   schema={schema}
@@ -155,7 +155,7 @@ const schema = [
         pick the compressed file out of a pair in a blind test, and 256 kbps is
         comfortably transparent for nearly everyone. 320 kbps exists mostly for
         peace of mind. Below 128 kbps you start hearing it on cymbals and
-        applause first — dense high-frequency noise is what MP3 handles worst.
+        applause first. Dense high-frequency noise is what MP3 handles worst.
       </p>
       <p>
         For speech, the numbers drop dramatically. A voice recording at 64 kbps
@@ -172,8 +172,7 @@ const schema = [
 
       <h2>Sample rate and bit depth</h2>
       <p>
-        44.1 kHz is the CD standard and covers everything humans can hear —
-        sampling theory means it reproduces frequencies up to 22 kHz, which is
+        44.1 kHz is the CD standard and covers everything humans can hear. Sampling theory means it reproduces frequencies up to 22 kHz, which is
         already above most adults' hearing. 48 kHz is the video and broadcast
         standard. Higher rates matter during production, where processing
         artefacts can fold back into the audible range, but they buy nothing in
@@ -191,7 +190,7 @@ const schema = [
         Do not distribute WAV. It is ten times the size of a transparent MP3 and
         nobody can hear the difference on a finished master. Do not convert
         <em>to</em> WMA in 2026 unless a specific device demands it. And do not
-        convert a lossy file to FLAC expecting improvement — you get a lossless
+        convert a lossy file to FLAC expecting improvement, you get a lossless
         copy of the damage that was already done, at five times the size.
       </p>
       <p>

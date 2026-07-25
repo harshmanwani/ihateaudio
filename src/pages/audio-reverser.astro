@@ -6,7 +6,7 @@ import { getTool } from '../data/tools';
 const tool = getTool('audio-reverser');
 
 const steps = [
-  'Drop the file onto the page. It is decoded in the tab and reversed there — nothing is uploaded and no encoder is downloaded.',
+  'Drop the file onto the page. It is decoded in the tab and reversed there. Nothing is uploaded and no encoder is downloaded.',
   'To reverse the whole thing, leave the selection alone: it covers the entire file by default.',
   'To reverse only a section, drag across the waveform to select it. The handles also respond to the arrow keys, one twentieth of a second at a time.',
   'Press play to hear it backwards, then pick a format and download.',
@@ -15,7 +15,7 @@ const steps = [
 const faq = [
   {
     q: 'Does reversing lose any quality?',
-    a: 'None. Reversing writes the same sample values out in the opposite order — no filtering, no resampling, no interpolation. The peak level, the RMS level and the frequency content of the result are identical to the source. The only quality question is the format you export to, and that would apply to any edit.',
+    a: 'None. Reversing writes the same sample values out in the opposite order. No filtering, no resampling, no interpolation. The peak level, the RMS level and the frequency content of the result are identical to the source. The only quality question is the format you export to, and that would apply to any edit.',
   },
   {
     q: 'If I reverse it twice, do I get the original back?',
@@ -23,11 +23,11 @@ const faq = [
   },
   {
     q: 'Why does reversed audio have that distinctive swelling, swooshing sound?',
-    a: 'Because almost every real sound is asymmetric in time. A piano note or a drum hit begins with a sharp attack and decays slowly; played backwards, that becomes a slow swell into an abrupt stop. Reverb makes it stronger still — the tail that followed a sound now arrives before it, so you hear the room before you hear what caused it. That is the whole trick behind reversed cymbal risers.',
+    a: 'Because almost every real sound is asymmetric in time. A piano note or a drum hit begins with a sharp attack and decays slowly; played backwards, that becomes a slow swell into an abrupt stop. Reverb makes it stronger still. The tail that followed a sound now arrives before it, so you hear the room before you hear what caused it. That is the whole trick behind reversed cymbal risers.',
   },
   {
     q: 'Will reversing a song reveal a hidden message?',
-    a: 'It will reveal exactly what is on the recording, played backwards. Where a producer deliberately recorded something in reverse, you will hear it clearly and unambiguously. What people usually find instead is that forwards speech, reversed, throws up syllables the brain assembles into words it was already expecting — the same effect that makes faces appear in clouds.',
+    a: 'It will reveal exactly what is on the recording, played backwards. Where a producer deliberately recorded something in reverse, you will hear it clearly and unambiguously. What people usually find instead is that forwards speech, reversed, throws up syllables the brain assembles into words it was already expecting. The same effect that makes faces appear in clouds.',
   },
   {
     q: 'Are the left and right channels swapped?',
@@ -35,7 +35,7 @@ const faq = [
   },
   {
     q: 'Can I reverse the audio in a video file?',
-    a: 'Extract the soundtrack with the video to audio tool first, then reverse the audio it gives you. This tool only produces audio files — it cannot write the reversed audio back into a video, and it will not reverse the picture.',
+    a: 'Extract the soundtrack with the video to audio tool first, then reverse the audio it gives you. This tool only produces audio files. It cannot write the reversed audio back into a video, and it will not reverse the picture.',
   },
 ];
 ---
@@ -62,8 +62,8 @@ const faq = [
   <Fragment slot="about">
     <h2>What reversing actually does</h2>
     <p>
-      An audio file is a list of numbers — one per channel, tens of thousands per
-      second — each describing where a speaker cone should be at that instant.
+      An audio file is a list of numbers. One per channel, tens of thousands per
+      second. Each describing where a speaker cone should be at that instant.
       Reversing reads that list from the end to the beginning and writes it back
       out. The sample that was last becomes first, and nothing else changes. No
       value is altered, averaged, filtered or interpolated, which is why the
@@ -82,7 +82,7 @@ const faq = [
     <h2>Why it sounds so unmistakable</h2>
     <p>
       Real sounds are lopsided in time. A struck string, a plucked guitar, a snare,
-      a consonant — nearly everything starts abruptly and dies away gradually. Run
+      a consonant. Nearly everything starts abruptly and dies away gradually. Run
       that backwards and the envelope inverts: a slow rise out of nothing into a
       sudden cut-off. Your ear uses attack shape as one of its main cues for
       identifying an instrument, so inverting it makes even a familiar sound
@@ -92,7 +92,7 @@ const faq = [
       Reverb amplifies the effect enormously. In a normal recording, the room's
       response trails behind whatever caused it. Reversed, that trail arrives
       first, so you hear a swelling wash of a room and only afterwards the thing
-      that made the sound — an ordering that never happens in the physical world.
+      that made the sound. An ordering that never happens in the physical world.
       Producers have used this deliberately for sixty years: reverse a cymbal crash
       and you get the standard riser that leads into a chorus, reverse a piano
       chord and you get the sound of something arriving.
@@ -112,8 +112,8 @@ const faq = [
     <p>
       One practical note: a reversed section inside forward audio reads as an
       obvious effect, not as an edit you can hide. If you want it to feel intentional,
-      put the boundaries somewhere the music already changes — the start of a bar,
-      a beat, the gap between two words — rather than in the middle of a sustained
+      put the boundaries somewhere the music already changes, the start of a bar,
+      a beat, the gap between two words. Rather than in the middle of a sustained
       note.
     </p>
   </Fragment>
@@ -159,7 +159,7 @@ const faq = [
         if (!text) return;
         const { start, end } = runtime.getSelection();
         text.textContent = coversAll(ctx.buffer, start, end)
-          ? `Reversing the whole file — ${fmtDuration(ctx.buffer.duration)}.`
+          ? `Reversing the whole file, ${fmtDuration(ctx.buffer.duration)}.`
           : `Reversing ${timecode(start)} to ${timecode(end)}. The rest plays forward.`;
       };
 

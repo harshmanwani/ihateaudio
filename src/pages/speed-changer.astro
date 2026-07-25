@@ -16,11 +16,11 @@ const steps = [
 const faq = [
   {
     q: 'What does "Keep original pitch" actually change?',
-    a: 'With it off, the tool resamples: it reads the same samples at a different rate, so every frequency in the file moves by the same ratio. With it on, the tool time-stretches instead — it chops the audio into overlapping 46 ms windows and reassembles them at a new spacing, so the number of cycles per second never changes. Same speed, two completely different sounds.',
+    a: 'With it off, the tool resamples: it reads the same samples at a different rate, so every frequency in the file moves by the same ratio. With it on, the tool time-stretches instead. It chops the audio into overlapping 46 ms windows and reassembles them at a new spacing, so the number of cycles per second never changes. Same speed, two completely different sounds.',
   },
   {
     q: 'Why does a voice sound like a chipmunk when I speed it up?',
-    a: 'Because a plain speed change multiplies every frequency by the speed factor. At 1.5x a 200 Hz voice becomes 300 Hz, which is a jump of about seven semitones, and the vocal formants — the resonances that make a voice sound like it came from a human-sized throat — move up with it. Your ear reads the mismatch as a smaller head. Turning on pitch preservation leaves the formants alone.',
+    a: 'Because a plain speed change multiplies every frequency by the speed factor. At 1.5x a 200 Hz voice becomes 300 Hz, which is a jump of about seven semitones, and the vocal formants (the resonances that make a voice sound like it came from a human-sized throat) move up with it. Your ear reads the mismatch as a smaller head. Turning on pitch preservation leaves the formants alone.',
   },
   {
     q: 'How far can I push the speed before it sounds bad?',
@@ -40,7 +40,7 @@ const faq = [
   },
   {
     q: 'Can I use this on a video file?',
-    a: 'Not directly — this page handles audio only. Run the video through the video-to-audio extractor first, change the speed here, and recombine it in your editor. Remember that a sped-up audio track will no longer match the picture unless the video is retimed by the same factor.',
+    a: 'Not directly, this page handles audio only. Run the video through the video-to-audio extractor first, change the speed here, and recombine it in your editor. Remember that a sped-up audio track will no longer match the picture unless the video is retimed by the same factor.',
   },
 ];
 ---
@@ -108,7 +108,7 @@ const faq = [
       <div class="field">
         <span class="label">
           New length
-          <span class="label__value tnum" data-out="length">—</span>
+          <span class="label__value tnum" data-out="length">·</span>
         </span>
         <span class="hint" data-out="length-hint">Load a file to see the new running time.</span>
       </div>
@@ -128,12 +128,12 @@ const faq = [
       play at 2x and every frequency doubles, which is a rise of exactly one
       octave. Play at 1.5x and the pitch climbs about seven semitones, a perfect
       fifth. Nothing is invented or thrown away, so the result is mathematically
-      clean at any ratio — it simply sounds like a different recording.
+      clean at any ratio. It simply sounds like a different recording.
     </p>
     <p>
       The second is <strong>time-stretching</strong>. The audio is cut into
       overlapping windows of about 46 milliseconds and laid back down at a new
-      spacing — closer together to speed up, further apart to slow down. Because
+      spacing. Closer together to speed up, further apart to slow down. Because
       each window still contains the original waveform at its original
       frequency, the pitch never moves. The hard part is joining the windows:
       butt them together at the wrong phase and you get a rasp on every join. The
@@ -162,7 +162,7 @@ const faq = [
 
     <h2>Choosing a number</h2>
     <p>
-      For speech, 1.25x is nearly free — most listeners stop noticing within a
+      For speech, 1.25x is nearly free. Most listeners stop noticing within a
       sentence. 1.5x needs attention but works for familiar material. Past 2x
       intelligibility falls off quickly, because consonants get shorter than the
       ear needs to tell them apart. Going the other way, 0.75x is the usual
@@ -227,7 +227,7 @@ const faq = [
         if (lengthHint) {
           lengthHint.textContent =
             rate === 1
-              ? `Unchanged — ${duration(sourceDuration)}.`
+              ? `Unchanged, ${duration(sourceDuration)}.`
               : `Was ${duration(sourceDuration)}.`;
         }
         if (pitchHint) {

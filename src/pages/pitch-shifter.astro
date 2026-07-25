@@ -7,7 +7,7 @@ const tool = getTool('pitch-shifter');
 
 const steps = [
   'Drop an audio file onto the page. It is decoded in the tab; nothing is sent anywhere.',
-  'Drag the semitone slider. Each step is one half step on a piano — 12 steps is a full octave, and the interval name under the slider tells you what you have asked for.',
+  'Drag the semitone slider. Each step is one half step on a piano. 12 steps is a full octave, and the interval name under the slider tells you what you have asked for.',
   'If you need to land between the notes, nudge the cents control. One hundred cents makes a semitone, so ±10 cents is about the smallest change most people can hear on a sustained note.',
   'Click Preview the shift to render it and hear it in the player. Pitch shifting is heavy enough that it is not recomputed on every drag.',
   'Choose a format and click Download. The length of the file is identical to what you started with.',
@@ -40,7 +40,7 @@ const faq = [
   },
   {
     q: 'Should I use this or the speed changer?',
-    a: 'Use this when the timing must stay exactly where it is — transposing a backing track, tuning a take, matching two recordings. Use the speed changer with pitch preservation off when you want the old-fashioned coupled effect, where the recording speeds up as it rises.',
+    a: 'Use this when the timing must stay exactly where it is. Transposing a backing track, tuning a take, matching two recordings. Use the speed changer with pitch preservation off when you want the old-fashioned coupled effect, where the recording speeds up as it rises.',
   },
 ];
 ---
@@ -50,7 +50,7 @@ const faq = [
     <div class="controls">
       <div class="controls__head">
         <span class="controls__title">Pitch</span>
-        <span class="hint">The running time never changes — only the pitch moves.</span>
+        <span class="hint">The running time never changes, only the pitch moves.</span>
       </div>
 
       <div class="field controls__full">
@@ -142,7 +142,7 @@ const faq = [
     </p>
     <p>
       To separate them you have to rebuild the signal. This tool stretches the
-      audio in time first — cutting it into overlapping windows of about 46
+      audio in time first. Cutting it into overlapping windows of about 46
       milliseconds and laying them back down at wider spacing, searching for the
       offset where each window best continues the waveform already written. That
       gives a longer file at the original pitch. Then it resamples the stretched
@@ -183,8 +183,8 @@ const faq = [
     </p>
     <p>
       Keep shifts small when you want the result to pass as unprocessed. Go large
-      deliberately when you want an effect — a voice dropped an octave for a
-      character, or raised for a chipmunk part — and let it sound like the effect
+      deliberately when you want an effect. A voice dropped an octave for a
+      character, or raised for a chipmunk part. And let it sound like the effect
       it is.
     </p>
   </Fragment>
@@ -304,7 +304,7 @@ const faq = [
           if (state) {
             state.textContent = auditionBuffer
               ? 'Preview ready. Press play.'
-              : 'Nothing to hear — the shift is zero.';
+              : 'Nothing to hear, the shift is zero.';
           }
         } catch {
           if (state) {

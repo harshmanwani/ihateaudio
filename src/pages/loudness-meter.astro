@@ -19,7 +19,7 @@ const faq = [
   },
   {
     q: 'Why does my DAW report a slightly different number?',
-    a: 'Almost always gating or a different measurement window. This meter implements ITU-R BS.1770-4 with both gates — the absolute gate at -70 LUFS and the relative gate 10 LU below the ungated mean — which is what Spotify, YouTube and the podcast hosts use. A meter without the relative gate reads lower on material with quiet passages. Differences under about 0.3 LU are normal and inconsequential.',
+    a: 'Almost always gating or a different measurement window. This meter implements ITU-R BS.1770-4 with both gates (the absolute gate at -70 LUFS and the relative gate 10 LU below the ungated mean) which is what Spotify, YouTube and the podcast hosts use. A meter without the relative gate reads lower on material with quiet passages. Differences under about 0.3 LU are normal and inconsequential.',
   },
   {
     q: 'The true peak is higher than the sample peak. Is that a bug?',
@@ -39,7 +39,7 @@ const faq = [
   },
   {
     q: 'My file reads as silent or shows no number.',
-    a: 'That happens when every 400 ms block falls below the -70 LUFS absolute gate — the file is either genuinely silent or so quiet it is indistinguishable from silence. Check the waveform above the readout. If it looks flat, the recording failed rather than the measurement.',
+    a: 'That happens when every 400 ms block falls below the -70 LUFS absolute gate. The file is either genuinely silent or so quiet it is indistinguishable from silence. Check the waveform above the readout. If it looks flat, the recording failed rather than the measurement.',
   },
 ];
 
@@ -105,9 +105,7 @@ const stats = [
                 data-stat={stat.id}
                 style="font-size:var(--t-h1); font-weight:700; line-height:1.2"
                 aria-live="polite"
-              >
-                —
-              </div>
+              >·</div>
               <div class="hint">
                 {stat.unit} · {stat.note}
               </div>
@@ -144,9 +142,7 @@ const stats = [
                 <td>
                   {target.lufs} LUFS
                 </td>
-                <td class="tnum" data-delta={target.id}>
-                  —
-                </td>
+                <td class="tnum" data-delta={target.id}>·</td>
                 <td style="white-space:normal" data-verdict={target.id}>
                   Waiting for a measurement
                 </td>
@@ -178,8 +174,7 @@ const stats = [
       can share a peak and be four decibels apart to the ear.
     </p>
     <p>
-      ITU-R BS.1770 fixes this in three stages. First it applies K-weighting —
-      a high shelf that approximates the effect of a human head in a sound
+      ITU-R BS.1770 fixes this in three stages. First it applies K-weighting. A high shelf that approximates the effect of a human head in a sound
       field, followed by a high-pass that discards rumble which contributes
       nothing to perceived loudness. Then it measures mean square energy in
       400-millisecond blocks that overlap by 75 per cent. Finally it gates:
@@ -198,7 +193,7 @@ const stats = [
     <p>
       Sample peak is the largest absolute value stored in the file. True peak is
       an estimate of the largest value the signal reaches after a converter
-      reconstructs the continuous waveform running through those samples — and
+      reconstructs the continuous waveform running through those samples, and
       that curve can overshoot every sample it passes through. Four times
       oversampling, used here, catches most of the difference.
     </p>
@@ -218,7 +213,7 @@ const stats = [
       The difference column is your measured loudness minus the platform target.
       A positive number means the file is louder than the platform wants, and
       playback normalization will turn it down by that amount. Nothing is
-      damaged when this happens — but if you compressed heavily to reach that
+      damaged when this happens. But if you compressed heavily to reach that
       level, you gave up dynamic range and received nothing in exchange.
     </p>
     <p>
@@ -254,7 +249,7 @@ const stats = [
 
   /** One decimal, always signed, so a column of them lines up and reads fast. */
   function signed(value: number): string {
-    if (!Number.isFinite(value)) return '—';
+    if (!Number.isFinite(value)) return ', ';
     const rounded = Math.abs(value) < 0.05 ? 0 : value;
     return `${rounded > 0 ? '+' : rounded < 0 ? '−' : ''}${Math.abs(rounded).toFixed(1)}`;
   }
@@ -263,7 +258,7 @@ const stats = [
     if (!Number.isFinite(delta)) return 'Nothing measurable in this file.';
     if (Math.abs(delta) <= 0.5) return 'On target. Nothing to change.';
     if (delta > 0) {
-      return `${delta.toFixed(1)} LU too loud — playback normalization will turn it down by that much.`;
+      return `${delta.toFixed(1)} LU too loud. Playback normalization will turn it down by that much.`;
     }
     return `${Math.abs(delta).toFixed(1)} LU quieter than the target. Some services lift it, some do not.`;
   }
@@ -319,7 +314,7 @@ const stats = [
               `[data-verdict="${target.id}"]`
             );
             if (deltaCell) {
-              deltaCell.textContent = Number.isFinite(delta) ? `${signed(delta)} LU` : '—';
+              deltaCell.textContent = Number.isFinite(delta) ? `${signed(delta)} LU` : ', ';
             }
             if (verdictCell) verdictCell.textContent = verdictFor(delta);
           }

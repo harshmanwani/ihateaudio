@@ -6,7 +6,7 @@ import { getTool } from '../data/tools';
 const tool = getTool('reverb-adder');
 
 const steps = [
-  'Drop an audio file onto the page. It is decoded by your browser and stays on your machine — nothing is sent anywhere.',
+  'Drop an audio file onto the page. It is decoded by your browser and stays on your machine, nothing is sent anywhere.',
   'Pick a space. Small room and Studio keep the source close and present; Hall, Cathedral and Canyon push it further back and hold the tail longer.',
   'Press play to hear the reverb over the whole file, then adjust decay, mix and pre-delay until the dry sound still cuts through the wash.',
   'Choose a format and click Download. The exported file runs a little longer than the original, because the tail is written out in full instead of being chopped off.',
@@ -23,7 +23,7 @@ const faq = [
   },
   {
     q: 'Is this a real convolution reverb?',
-    a: 'Yes, in the sense that it convolves your audio with an impulse response rather than faking depth with a delay network. The impulse response is generated here — decaying noise, darkened toward the tail — rather than sampled from an actual building. That trades the character of a specific famous hall for a decay control you can move continuously from 0.2 to 8 seconds.',
+    a: 'Yes, in the sense that it convolves your audio with an impulse response rather than faking depth with a delay network. The impulse response is generated here (decaying noise, darkened toward the tail) rather than sampled from an actual building. That trades the character of a specific famous hall for a decay control you can move continuously from 0.2 to 8 seconds.',
   },
   {
     q: 'How much mix is too much?',
@@ -31,7 +31,7 @@ const faq = [
   },
   {
     q: 'Can I use this to remove reverb from a room recording?',
-    a: 'No. This tool only adds reverb. Removing it is a genuinely hard inverse problem — the reflections are mixed into the same samples as the direct sound — and the tools that attempt it are machine-learning models that need far more compute than a browser tab. Re-recording closer to the microphone beats any amount of processing.',
+    a: 'No. This tool only adds reverb. Removing it is a genuinely hard inverse problem (the reflections are mixed into the same samples as the direct sound) and the tools that attempt it are machine-learning models that need far more compute than a browser tab. Re-recording closer to the microphone beats any amount of processing.',
   },
   {
     q: 'My source is mono. Will the reverb still be stereo?',
@@ -55,11 +55,11 @@ const faq = [
       <div class="field controls__full">
         <label class="label" for="reverb-space">Room</label>
         <select class="select" id="reverb-space" data-control="space">
-          <option value="room">Small room — 0.6 s, close and dry</option>
-          <option value="studio">Studio — 1.2 s, a little air</option>
-          <option value="hall" selected>Hall — 2.5 s, concert stage</option>
-          <option value="cathedral">Cathedral — 5 s, stone and space</option>
-          <option value="canyon">Canyon — 8 s, enormous</option>
+          <option value="room">Small room, 0.6 s, close and dry</option>
+          <option value="studio">Studio, 1.2 s, a little air</option>
+          <option value="hall" selected>Hall, 2.5 s, concert stage</option>
+          <option value="cathedral">Cathedral, 5 s, stone and space</option>
+          <option value="canyon">Canyon, 8 s, enormous</option>
           <option value="custom">Custom</option>
         </select>
       </div>
@@ -169,7 +169,7 @@ const faq = [
     <p>
       Convolution is the operation that applies that behaviour to new audio,
       sample by sample. The impulse response here is generated rather than
-      recorded in a real building — noise on a decay curve, progressively
+      recorded in a real building. Noise on a decay curve, progressively
       darkened toward the tail so the late reflections lose their top end the
       way air and soft furnishings absorb high frequencies in a real space. It
       will not give you the exact signature of a particular famous hall, but it
@@ -183,7 +183,7 @@ const faq = [
       the RT60 figure acousticians quote for a building. A treated studio is
       well under a second. A concert hall is around two. A stone cathedral runs
       five or more, which is a large part of why choral music written for those
-      buildings moves so slowly — anything faster turns into a chord that never
+      buildings moves so slowly. Anything faster turns into a chord that never
       resolves.
     </p>
     <p>
@@ -201,7 +201,7 @@ const faq = [
       the first 30 milliseconds into a single perceived event and locates it
       where the earliest arrival came from. Give the reverb 20 to 40 milliseconds
       of head start and a spoken word gets to finish before the building answers
-      — the tail blooms behind the voice instead of on top of it, and the
+. The tail blooms behind the voice instead of on top of it, and the
       consonants survive. Set pre-delay to zero and the reflections begin in the
       same instant as the word, smearing exactly the transients that carry
       meaning. That is why a singer in a vast hall can still be perfectly

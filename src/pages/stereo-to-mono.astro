@@ -15,19 +15,19 @@ const steps = [
 const faq = [
   {
     q: 'Does converting to mono halve the file size?',
-    a: 'For uncompressed formats like WAV, yes, almost exactly — half the channels, half the samples. For MP3, AAC and Opus the saving is smaller, usually 30 to 45 percent, because those encoders already exploit the similarity between the two channels. The bigger win is quality: a mono file at a given bitrate spends the entire bitrate on one channel.',
+    a: 'For uncompressed formats like WAV, yes, almost exactly. Half the channels, half the samples. For MP3, AAC and Opus the saving is smaller, usually 30 to 45 percent, because those encoders already exploit the similarity between the two channels. The bigger win is quality: a mono file at a given bitrate spends the entire bitrate on one channel.',
   },
   {
     q: 'Can I lose anything by downmixing?',
-    a: 'Yes. Mono is the sum of the channels, so any sound present in both at opposite polarity cancels out. Wide synth pads, some reverb tails and anything processed by a stereo widener can drop in level or vanish entirely. Play the downmix before downloading — that is the only reliable test.',
+    a: 'Yes. Mono is the sum of the channels, so any sound present in both at opposite polarity cancels out. Wide synth pads, some reverb tails and anything processed by a stereo widener can drop in level or vanish entirely. Play the downmix before downloading. That is the only reliable test.',
   },
   {
     q: 'Why would I want mono at all?',
-    a: 'A single voice recorded on one microphone has no stereo information worth keeping, and most podcast platforms prefer mono for that reason. It is also the safer choice for anything played back on one speaker — phones, most Bluetooth speakers, public address systems — since those devices sum to mono anyway, and doing it yourself means you hear the result first.',
+    a: 'A single voice recorded on one microphone has no stereo information worth keeping, and most podcast platforms prefer mono for that reason. It is also the safer choice for anything played back on one speaker (phones, most Bluetooth speakers, public address systems) since those devices sum to mono anyway, and doing it yourself means you hear the result first.',
   },
   {
     q: 'Does converting mono to stereo give me actual stereo sound?',
-    a: 'No. It writes the same audio into two channels, so the file is stereo in structure and mono in content. That satisfies software and hardware that refuses single-channel input, but nothing about the sound changes. If you want an actual stereo image from a mono source, the stereo widener cannot help either — there is no side information to widen.',
+    a: 'No. It writes the same audio into two channels, so the file is stereo in structure and mono in content. That satisfies software and hardware that refuses single-channel input, but nothing about the sound changes. If you want an actual stereo image from a mono source, the stereo widener cannot help either. There is no side information to widen.',
   },
   {
     q: 'When is splitting the channels useful?',
@@ -35,7 +35,7 @@ const faq = [
   },
   {
     q: 'Can this separate the vocals from the instrumental?',
-    a: 'No. Left and right are the only division a stereo file contains — there is no vocal channel inside it. The old trick of subtracting one channel from the other removes anything panned dead centre, which usually takes the bass and kick with the vocal and leaves an unusable result. That is a different kind of tool entirely.',
+    a: 'No. Left and right are the only division a stereo file contains. There is no vocal channel inside it. The old trick of subtracting one channel from the other removes anything panned dead centre, which usually takes the bass and kick with the vocal and leaves an unusable result. That is a different kind of tool entirely.',
   },
   {
     q: 'What happens with a file that has more than two channels?',
@@ -83,7 +83,7 @@ const faq = [
     <p>
       Folding stereo to mono is addition. Every sample in the left channel is added to the
       matching sample in the right, and the result is halved so the overall level stays where
-      it was. That sounds harmless, and most of the time it is — but addition has a failure
+      it was. That sounds harmless, and most of the time it is, but addition has a failure
       mode. Wherever the two channels hold the same sound at opposite polarity, adding them
       produces silence.
     </p>
@@ -95,7 +95,7 @@ const faq = [
       one microphone captured to two channels with a small timing offset between them will
       cancel at some frequencies and reinforce at others, which sounds hollow and
       comb-filtered rather than simply narrower. If a downmix sounds thin, that is why, and
-      the fix is to keep one channel rather than average both — which is what the split mode
+      the fix is to keep one channel rather than average both. Which is what the split mode
       gives you.
     </p>
 
@@ -108,7 +108,7 @@ const faq = [
       one channel and comes out audibly cleaner than the stereo version at the same setting.
     </p>
     <p>
-      Mono is also the safer choice for anything destined for a single speaker — a phone, most
+      Mono is also the safer choice for anything destined for a single speaker, a phone, most
       Bluetooth speakers, a public address system, video that will autoplay in a feed. Those
       devices sum to mono themselves, without asking. Doing it deliberately in advance means
       you discover any cancellation while you can still do something about it, rather than
@@ -128,7 +128,7 @@ const faq = [
       contains; there is no drum channel or vocal channel hiding inside an ordinary music
       file, and no filter can invent one. The same limit applies in reverse. Duplicating a
       mono recording into two identical channels produces a file that is stereo in structure
-      and mono in content — which is exactly what some software and hardware demands, and
+      and mono in content. Which is exactly what some software and hardware demands, and
       nothing more than that.
     </p>
   </Fragment>
@@ -158,11 +158,11 @@ const faq = [
       if (readout) {
         if (channels === 1) {
           readout.textContent =
-            'This file is mono — one channel. It can be duplicated into a stereo pair, but ' +
+            'This file is mono, one channel. It can be duplicated into a stereo pair, but ' +
             'that adds structure, not stereo information.';
         } else if (channels === 2) {
           readout.textContent =
-            'This file is stereo — two channels. It can be folded down to mono, or split so ' +
+            'This file is stereo, two channels. It can be folded down to mono, or split so ' +
             'that left and right become separate files.';
         } else {
           readout.textContent =

@@ -6,7 +6,7 @@ import { getTool } from '../data/tools';
 const tool = getTool('audio-looper');
 
 const steps = [
-  'Drop the clip you want repeated. Trim it first if the start or end is ragged — a loop exposes every flaw at its edges, over and over.',
+  'Drop the clip you want repeated. Trim it first if the start or end is ragged. A loop exposes every flaw at its edges, over and over.',
   'Set how many times it should repeat. The running total next to the heading updates as you drag, so you can aim for a length rather than guess at a count.',
   'Add a gap if the repeats should not run straight into each other. Gaps go between repeats, so the file still ends on audio rather than on silence.',
   'Choose a format and download. The repeats are copies of the same samples, so the file gets longer without getting any worse.',
@@ -19,11 +19,11 @@ const faq = [
   },
   {
     q: 'How many repeats can I ask for before it fails?',
-    a: 'The limit is memory, and it is easy to work out. Decoded audio costs roughly 21 MB per minute of 44.1 kHz stereo, and the whole result must exist in the tab at once. Thirty repeats of a four-minute track is two hours, which is around 2.5 GB — more than most browser tabs will give you. Thirty repeats of a ten-second loop is five minutes and about 105 MB, which is nothing. Short clips are where this tool lives.',
+    a: 'The limit is memory, and it is easy to work out. Decoded audio costs roughly 21 MB per minute of 44.1 kHz stereo, and the whole result must exist in the tab at once. Thirty repeats of a four-minute track is two hours, which is around 2.5 GB. More than most browser tabs will give you. Thirty repeats of a ten-second loop is five minutes and about 105 MB, which is nothing. Short clips are where this tool lives.',
   },
   {
     q: 'Is there a gap after the final repeat?',
-    a: 'No. The gap is defined as the space between repeats, so a file with five repeats and a two-second gap contains four gaps, not five. The audio ends the moment the last repeat does. If you actually want silence on the end — for a hold-music file that should pause before the player restarts it — add it with the trimmer, or set the gap and accept that the loop point is now inside the file.',
+    a: 'No. The gap is defined as the space between repeats, so a file with five repeats and a two-second gap contains four gaps, not five. The audio ends the moment the last repeat does. If you actually want silence on the end (for a hold-music file that should pause before the player restarts it) add it with the trimmer, or set the gap and accept that the loop point is now inside the file.',
   },
   {
     q: 'Why build a long file instead of just pressing repeat in a player?',
@@ -31,7 +31,7 @@ const faq = [
   },
   {
     q: 'Does each repeat lose a bit of quality?',
-    a: 'No. Every repeat is a copy of the same decoded samples, so repeat forty is identical to repeat one. Encoding happens once at the end, to the whole result, exactly as it would for any other export. Quality does not compound with repetition here — only file size does.',
+    a: 'No. Every repeat is a copy of the same decoded samples, so repeat forty is identical to repeat one. Encoding happens once at the end, to the whole result, exactly as it would for any other export. Quality does not compound with repetition here, only file size does.',
   },
   {
     q: 'Can I make a file that loops forever?',
@@ -120,7 +120,7 @@ const faq = [
     <h2>What makes a loop seamless</h2>
     <p>
       A loop is seamless when the end of the clip and the start of the clip are
-      interchangeable — same level, same phase, same musical position. Repetition
+      interchangeable. Same level, same phase, same musical position. Repetition
       does not create that property; it only reveals whether you already had it.
       Everything this tool can do is join copies together perfectly, and it does,
       so any bump you hear at the loop point was in the clip before it arrived
@@ -136,7 +136,7 @@ const faq = [
       the error you would hear.
     </p>
     <p>
-      For everything else — room tone, rain, machinery, a synth pad — the rule is
+      For everything else (room tone, rain, machinery, a synth pad) the rule is
       to cut where the waveform crosses zero and the content is unremarkable. A
       loop point in the middle of a bird call announces itself once a cycle; the
       same point two seconds later, in flat background, does not.
@@ -154,7 +154,7 @@ const faq = [
     <p>
       Gaps are digital silence, not a fade, so they are only useful when the clip
       already ends cleanly. A practice loop with two seconds between passes is the
-      classic use — long enough to reset your hands, short enough to keep the tempo
+      classic use. Long enough to reset your hands, short enough to keep the tempo
       in your head. For a continuous bed, leave the gap at zero.
     </p>
 
@@ -170,7 +170,7 @@ const faq = [
       Two things buy you room. A mono source halves the cost immediately, which is
       free if the clip is a voice or a mono sound effect. And a shorter source loop
       repeated more times costs exactly the same as a longer one repeated fewer
-      times — it is total output length that matters, not the count. If you need
+      times. It is total output length that matters, not the count. If you need
       hours of ambience, generate twenty minutes here and let whatever plays it
       repeat that.
     </p>
@@ -208,7 +208,7 @@ const faq = [
           const tooBig = total > 1800 || bytes > 700_000_000;
           heavyText.textContent = tooBig
             ? `${fmtDuration(total)} of audio needs about ${filesize(bytes)} of memory while it is built. ` +
-              'That is enough to fail on a phone and to be slow on a laptop — try fewer repeats.'
+              'That is enough to fail on a phone and to be slow on a laptop, try fewer repeats.'
             : '';
           heavy.hidden = !tooBig;
         }

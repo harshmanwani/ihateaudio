@@ -67,22 +67,22 @@ const faq = [
             <tbody>
               <tr>
                 <th scope="row">Integrated loudness</th>
-                <td data-m="lufs">—</td>
+                <td data-m="lufs">·</td>
                 <td>How loud the whole file sounds</td>
               </tr>
               <tr>
                 <th scope="row">Loudness range</th>
-                <td data-m="range">—</td>
+                <td data-m="range">·</td>
                 <td>How much the level moves across it</td>
               </tr>
               <tr>
                 <th scope="row">True peak</th>
-                <td data-m="truepeak">—</td>
+                <td data-m="truepeak">·</td>
                 <td>The highest point after reconstruction</td>
               </tr>
               <tr>
                 <th scope="row">Sample peak</th>
-                <td data-m="peak">—</td>
+                <td data-m="peak">·</td>
                 <td>The largest value actually stored</td>
               </tr>
             </tbody>
@@ -93,14 +93,14 @@ const faq = [
       <div class="field">
         <label class="label" for="an-preset">Platform</label>
         <select class="select" id="an-preset" data-control="preset">
-          <option value="spotify" selected>Spotify — −14 LUFS</option>
-          <option value="apple">Apple Music — −14 LUFS</option>
-          <option value="youtube">YouTube — −14 LUFS</option>
-          <option value="amazon">Amazon Music — −14 LUFS</option>
-          <option value="tidal">Tidal — −14 LUFS</option>
-          <option value="podcast">Podcasts, Apple and Spotify — −16 LUFS</option>
-          <option value="aes">AES streaming recommendation — −16 LUFS</option>
-          <option value="ebu">Broadcast, EBU R128 — −23 LUFS</option>
+          <option value="spotify" selected>Spotify, −14 LUFS</option>
+          <option value="apple">Apple Music, −14 LUFS</option>
+          <option value="youtube">YouTube, −14 LUFS</option>
+          <option value="amazon">Amazon Music, −14 LUFS</option>
+          <option value="tidal">Tidal, −14 LUFS</option>
+          <option value="podcast">Podcasts, Apple and Spotify, −16 LUFS</option>
+          <option value="aes">AES streaming recommendation, −16 LUFS</option>
+          <option value="ebu">Broadcast, EBU R128, −23 LUFS</option>
           <option value="custom">Custom target</option>
         </select>
         <span class="hint">Picking a platform sets both the target and its peak ceiling.</span>
@@ -199,8 +199,7 @@ const faq = [
     </p>
     <p>
       That gating is why integrated loudness tracks what people report hearing, and why it
-      replaced peak normalization everywhere it mattered. A peak meter describes one sample —
-      the single loudest instant in a file of forty million — and says nothing about the rest.
+      replaced peak normalization everywhere it mattered. A peak meter describes one sample (the single loudest instant in a file of forty million) and says nothing about the rest.
       Two tracks can both peak at −0.1 dBFS while one is a heavily limited pop master and the
       other a solo piano recording, and still differ by 12 LU in how loud they sound. Once
       services began playing material from thousands of sources back to back, matching peaks
@@ -212,8 +211,8 @@ const faq = [
       Every major platform measures your file on ingest and applies a static gain at playback
       so it lands on their target. Deliver a master at −8 LUFS to a service targeting −14 and
       it does not play back 6 dB louder than anyone else; it plays back at −14, with 6 dB of
-      attenuation applied. Everything you gave up to reach −8 — the transients you limited
-      away, the dynamic range you compressed out — is gone, and it bought you nothing. You are
+      attenuation applied. Everything you gave up to reach −8, the transients you limited
+      away, the dynamic range you compressed out. Is gone, and it bought you nothing. You are
       left with a flatter, more fatiguing version of your own mix, playing at the same volume
       as the version you did not squash.
     </p>
@@ -265,7 +264,7 @@ const faq = [
   let measured: LoudnessResult | null = null;
 
   function signed(value: number, unit: string, digits = 1): string {
-    if (!Number.isFinite(value)) return '—';
+    if (!Number.isFinite(value)) return ', ';
     // A true peak above zero is the whole point of the warning, so it needs a
     // visible plus rather than a bare number.
     const sign = value < 0 ? '−' : value > 0 ? '+' : '';
@@ -299,7 +298,7 @@ const faq = [
       };
 
       cell('lufs', signed(measured.integrated, 'LUFS'));
-      cell('range', Number.isFinite(measured.range) ? `${measured.range.toFixed(1)} LU` : '—');
+      cell('range', Number.isFinite(measured.range) ? `${measured.range.toFixed(1)} LU` : ', ');
       cell('truepeak', signed(measured.truePeak, 'dBTP'));
       cell('peak', signed(measured.peak, 'dBFS'));
 
@@ -325,14 +324,14 @@ const faq = [
           planEl.textContent =
             `${db(applied)} of gain, landing the file at ${signed(after, 'LUFS')} ` +
             `with a true peak of ${signed(peakAfter, 'dBTP')}. ` +
-            `The loudness range of ${measured.range.toFixed(1)} LU is unchanged — ` +
+            `The loudness range of ${measured.range.toFixed(1)} LU is unchanged, ` +
             'this is one static gain, not compression.';
         }
 
         if (limited && limitedDetail) {
           limitedDetail.textContent =
             `Reaching ${signed(target, 'LUFS')} needs ${db(wanted)}, which would put the true ` +
-            `peak at ${signed(measured.truePeak + wanted, 'dBTP')} — past your ceiling. ` +
+            `peak at ${signed(measured.truePeak + wanted, 'dBTP')}, past your ceiling. ` +
             `Only ${db(applied)} is applied, so the file finishes ` +
             `${Math.abs(target - after).toFixed(1)} LU below target. To get the rest, ` +
             'compress or limit the peaks first, then normalize again.';

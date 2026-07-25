@@ -9,7 +9,7 @@ const steps = [
   'Drop the quiet file onto the page. Before you touch anything, the tool measures the loudest sample in it and tells you how much headroom you have left.',
   'Pick a method: add a fixed number of decibels, or normalize so the loudest moment lands exactly on a level you choose.',
   'Press play. The transport plays the boosted version rather than the original, so what you hear is what you are about to download.',
-  'If the clipping warning appears, lower the boost by the amount it names, or switch to normalizing — that method measures first and cannot clip.',
+  'If the clipping warning appears, lower the boost by the amount it names, or switch to normalizing. That method measures first and cannot clip.',
   'Choose an output format and download. The original file on your disk is never modified.',
 ];
 
@@ -24,23 +24,23 @@ const faq = [
   },
   {
     q: 'What is the difference between boosting and normalizing here?',
-    a: 'Boosting multiplies every sample by the same fixed amount, whatever the file contains. Normalizing measures the single loudest sample first, then applies precisely enough gain to land it on your target — so it can never clip, but a single stray thump can cap the level of the whole recording.',
+    a: 'Boosting multiplies every sample by the same fixed amount, whatever the file contains. Normalizing measures the single loudest sample first, then applies precisely enough gain to land it on your target. So it can never clip, but a single stray thump can cap the level of the whole recording.',
   },
   {
     q: 'It is still too quiet at maximum boost. What now?',
-    a: 'That means the peaks are already near the ceiling even though the average level is low — a voice that mumbles and then laughs, for example. Gain cannot fix that, because there is no headroom left. Run it through the dynamics compressor to pull the peaks down first, then boost.',
+    a: 'That means the peaks are already near the ceiling even though the average level is low. A voice that mumbles and then laughs, for example. Gain cannot fix that, because there is no headroom left. Run it through the dynamics compressor to pull the peaks down first, then boost.',
   },
   {
     q: 'Does boosting make the background hiss louder too?',
-    a: 'Yes, by exactly the same amount. Gain is a single multiplication applied to everything in the file, so the ratio between the voice and the hiss does not change at all. If the noise becomes obvious after boosting, it was always there — it was just below the threshold of your attention.',
+    a: 'Yes, by exactly the same amount. Gain is a single multiplication applied to everything in the file, so the ratio between the voice and the hiss does not change at all. If the noise becomes obvious after boosting, it was always there. It was just below the threshold of your attention.',
   },
   {
     q: 'Can I boost only one section of the file?',
-    a: 'Not in this tool — the gain applies to the whole file. Trim out the quiet section with the audio trimmer, boost it here, then put it back with the audio joiner. Chain links appear under the download button so you can hand the file straight to the next tool.',
+    a: 'Not in this tool. The gain applies to the whole file. Trim out the quiet section with the audio trimmer, boost it here, then put it back with the audio joiner. Chain links appear under the download button so you can hand the file straight to the next tool.',
   },
   {
     q: 'Which target should I normalize the peak to?',
-    a: 'Around −1 dBFS is the usual choice. Leaving a decibel of headroom means that when the file is later encoded to MP3 or AAC, the encoder’s reconstruction of the waveform still has somewhere to go — lossy encoding can push peaks slightly above where they sat in the original.',
+    a: 'Around −1 dBFS is the usual choice. Leaving a decibel of headroom means that when the file is later encoded to MP3 or AAC, the encoder’s reconstruction of the waveform still has somewhere to go. Lossy encoding can push peaks slightly above where they sat in the original.',
   },
 ];
 ---
@@ -154,14 +154,14 @@ const faq = [
     <p>
       Decibels are a ratio, not an amount. Going up 6 dB doubles the amplitude of the
       waveform; going up 20 dB multiplies it by ten. Perceived loudness moves far more
-      slowly than that — as a rough rule it takes about 10 dB before most people describe a
+      slowly than that. As a rough rule it takes about 10 dB before most people describe a
       sound as twice as loud. So a +3 dB nudge is a polite adjustment, +10 dB is a genuine
       change of character, and if you need +25 dB the original recording was very nearly
       silent.
     </p>
     <p>
       Digital levels are quoted in <strong>dBFS</strong>, decibels relative to full scale, and
-      they are always negative or zero. Zero is not a volume — it is the ceiling, the largest
+      they are always negative or zero. Zero is not a volume. It is the ceiling, the largest
       number the format can store. A file whose loudest sample reads −18 dBFS has 18 dB of
       headroom: you can add 18 dB before anything touches the ceiling, and every decibel past
       that starts flattening the tops of the waves.
@@ -187,7 +187,7 @@ const faq = [
     <h2>When more gain is the wrong tool</h2>
     <p>
       Gain is indiscriminate. It lifts the speech and the air-conditioning hum by the same
-      amount, so the ratio between them — the thing you actually care about — does not move
+      amount, so the ratio between them (the thing you actually care about) does not move
       at all. A recording that sounds quiet because it was made from across the room becomes
       a louder recording of a room, not a closer one. No amount of gain undoes distance.
     </p>
@@ -195,8 +195,8 @@ const faq = [
       The other case gain cannot solve is a file with a low average level but peaks already
       near the ceiling: a voice that drops to a mumble and then laughs. There is no headroom
       left to give it. That needs compression to bring the peaks down before any gain is
-      useful. And if the goal is a delivery target rather than simply "louder" — a podcast
-      host, a streaming platform — normalize to LUFS instead, which measures loudness across
+      useful. And if the goal is a delivery target rather than simply "louder", a podcast
+      host, a streaming platform. Normalize to LUFS instead, which measures loudness across
       the whole programme rather than looking at one sample.
     </p>
   </Fragment>

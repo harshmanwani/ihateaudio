@@ -25,37 +25,37 @@ export const CATEGORIES: CategoryMeta[] = [
     id: 'cut',
     name: 'Cut & join',
     blurb:
-      'Trim, split, merge and clean up recordings. Everything here runs instantly — no encoder download, no waiting.',
+      "Trim it, split it, stick bits together, cut out the dead air. All of it happens the instant you ask.",
   },
   {
     id: 'convert',
     name: 'Convert',
     blurb:
-      'Move between formats without uploading anything. MP3 and WAV are instant; other formats load a converter once, then stay fast.',
+      "Get your file into whatever format the thing you're using demands. MP3 and WAV are instant; the rarer ones grab a converter once and then fly.",
   },
   {
     id: 'volume',
     name: 'Volume & loudness',
     blurb:
-      'Make quiet recordings usable, and hit the loudness targets Spotify, YouTube and podcast hosts actually measure.',
+      "For recordings that came out too quiet, too loud, or all over the place. Includes the real loudness numbers Spotify and podcast hosts actually check.",
   },
   {
     id: 'speed',
     name: 'Speed & pitch',
     blurb:
-      'Change tempo, pitch, or both. Pitch-preserving tools use real time-stretching, not a resample that turns voices into chipmunks.',
+      "Faster, slower, higher, lower. The pitch-keeping ones use proper time-stretching, so nobody ends up sounding like a chipmunk.",
   },
   {
     id: 'effects',
     name: 'Effects',
     blurb:
-      'Reverb, echo, EQ and spatial effects, rendered with the browser’s own audio engine.',
+      "Reverb, echo, EQ, the spinning 8D thing. Rendered with your browser's own audio engine, which is better at this than you'd expect.",
   },
   {
     id: 'utility',
     name: 'Utility & analysis',
     blurb:
-      'Ringtones, recording, and measuring what is actually in a file.',
+      "Ringtones, recording straight off your mic, and finding out what's actually in a file.",
   },
 ];
 
@@ -89,11 +89,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'audio-trimmer',
     name: 'Audio Trimmer',
-    title: 'Audio Trimmer — Cut MP3 and Audio Files Online Free',
+    title: 'Audio Trimmer: Cut MP3 and Audio Files Online Free',
     description:
-      'Trim and cut audio online free. Drag to select, preview, and download. Works with MP3, WAV, M4A and more. Nothing is uploaded — it all runs in your browser.',
-    tagline: 'Drag to select the part you want. Preview it, then download.',
-    short: 'Cut a section out of any audio file. Instant, no upload.',
+      'Trim and cut audio online free. Drag to select, preview, and download. Works with MP3, WAV, M4A and more. Nothing is uploaded. It all runs in your browser.',
+    tagline: "Drag the handles, hear it, keep what you want.",
+    short: "Snip a bit out of any audio file. Instantly.",
     category: 'cut',
     icon: 'scissors',
     keywords: ['cut crop shorten clip snip mp3 cutter song cutter trim music ringtone cut'],
@@ -103,11 +103,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'audio-joiner',
     name: 'Audio Joiner',
-    title: 'Audio Joiner — Merge MP3 and Audio Files Online Free',
+    title: 'Audio Joiner: Merge MP3 and Audio Files Online Free',
     description:
       'Merge multiple audio files into one, in any order. Drag to reorder, add a crossfade, and download. Free, no upload, no account.',
-    tagline: 'Combine files into one. Drag to reorder, add a crossfade if you want.',
-    short: 'Merge several files into one track, in the order you choose.',
+    tagline: "Stack your files up and glue them into one.",
+    short: "Glue a few files into one, in whatever order you like.",
     category: 'cut',
     icon: 'arrows-merge',
     keywords: ['merge combine join concatenate stitch put together append songs one file'],
@@ -117,11 +117,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'audio-splitter',
     name: 'Audio Splitter',
-    title: 'Audio Splitter — Split Audio Files Into Parts Online',
+    title: 'Audio Splitter: Split Audio Files Into Parts Online',
     description:
       'Split one audio file into several: by equal parts, by a set length, or at every silence. Download each piece separately. Runs entirely in your browser.',
-    tagline: 'Break one file into several — by length, by count, or at every gap.',
-    short: 'Split a long recording into parts you can download separately.',
+    tagline: "Chop one file into pieces, wherever you want the cuts.",
+    short: "Break a long recording into parts you can grab separately.",
     category: 'cut',
     icon: 'split-horizontal',
     keywords: ['split divide chop cut into parts chapters segments break up'],
@@ -131,11 +131,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'silence-remover',
     name: 'Silence Remover',
-    title: 'Silence Remover — Cut Dead Air From Audio Online',
+    title: 'Silence Remover: Cut Dead Air From Audio Online',
     description:
       'Automatically remove silent gaps from a recording. Adjustable threshold and minimum gap length, with a preview before you commit. Free and private.',
-    tagline: 'Find every silent gap and cut it out. Adjust how aggressive it is.',
-    short: 'Strip dead air out of interviews, lectures and voice notes.',
+    tagline: "Finds every awkward pause and yanks it out.",
+    short: "Kill the dead air in interviews, lectures and voice notes.",
     category: 'cut',
     icon: 'speaker-slash',
     keywords: ['remove silence dead air gaps pauses tighten podcast cleanup auto trim'],
@@ -148,8 +148,8 @@ export const TOOLS: Tool[] = [
     title: 'Add Fade In and Fade Out to Audio Online Free',
     description:
       'Add a smooth fade in at the start and fade out at the end of any audio file. Four curve shapes, adjustable length, instant preview. No upload needed.',
-    tagline: 'Soften the start and end. Pick a curve and a length.',
-    short: 'Add a clean fade to the beginning and end of a track.',
+    tagline: "Ease it in, ease it out. No abrupt starts.",
+    short: "Give a track a soft opening and a soft landing.",
     category: 'cut',
     icon: 'wave-sine',
     keywords: ['fade in fade out fades smooth start end soften intro outro'],
@@ -159,11 +159,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'audio-reverser',
     name: 'Audio Reverser',
-    title: 'Reverse Audio Online — Play Any Sound Backwards',
+    title: 'Reverse Audio Online: Play Any Sound Backwards',
     description:
       'Reverse any audio file so it plays backwards. Instant, free, and runs entirely in your browser with no upload or signup.',
-    tagline: 'Play it backwards. That is the whole tool.',
-    short: 'Flip a track so it plays from end to start.',
+    tagline: "Plays it backwards. That is the entire tool.",
+    short: "Flip a track so it runs end to start.",
     category: 'cut',
     icon: 'rewind',
     keywords: ['reverse backwards backmasking play in reverse flip'],
@@ -173,11 +173,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'audio-looper',
     name: 'Audio Looper',
-    title: 'Audio Looper — Repeat and Loop Audio Files Online',
+    title: 'Audio Looper: Repeat and Loop Audio Files Online',
     description:
       'Repeat an audio file any number of times, with an optional gap between repeats. Useful for backing tracks, practice loops and ambience.',
-    tagline: 'Repeat a clip as many times as you need, with an optional gap.',
-    short: 'Repeat a clip to make a longer track.',
+    tagline: "Repeat a clip as many times as you need.",
+    short: "Turn a short clip into something much longer.",
     category: 'cut',
     icon: 'repeat',
     keywords: ['loop repeat extend seamless background music hour version'],
@@ -187,11 +187,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'crossfade-joiner',
     name: 'Crossfade Joiner',
-    title: 'Crossfade Audio Online — Blend Tracks Together',
+    title: 'Crossfade Audio Online: Blend Tracks Together',
     description:
       'Join audio files with a smooth crossfade instead of a hard cut. Equal-power blending keeps the volume steady through the transition.',
-    tagline: 'Blend one track into the next instead of cutting hard.',
-    short: 'Merge tracks with a smooth overlap between them.',
+    tagline: "Blend one track into the next instead of slamming them together.",
+    short: "Merge tracks with a smooth handover between them.",
     category: 'cut',
     icon: 'intersect',
     keywords: ['crossfade blend mix transition dj smooth join overlap'],
@@ -203,11 +203,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'audio-converter',
     name: 'Audio Converter',
-    title: 'Audio Converter — Convert Audio Files Online Free',
+    title: 'Audio Converter: Convert Audio Files Online Free',
     description:
       'Convert audio between MP3, WAV, M4A, OGG, FLAC, AAC, Opus, AIFF and WMA. No upload, no size limit, no account. Everything runs in your browser.',
-    tagline: 'Convert between every common audio format, without uploading.',
-    short: 'Convert between MP3, WAV, M4A, OGG, FLAC and more.',
+    tagline: "Any format in, any format out. Nothing leaves your device.",
+    short: "Move between MP3, WAV, M4A, OGG, FLAC and the rest.",
     category: 'convert',
     icon: 'swap',
     keywords: ['convert change format transcode any to any file type'],
@@ -217,11 +217,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'mp3-converter',
     name: 'Convert to MP3',
-    title: 'Convert to MP3 Online Free — WAV, M4A, OGG to MP3',
+    title: 'Convert to MP3 Online Free: WAV, M4A, OGG to MP3',
     description:
       'Convert any audio file to MP3 in your browser. Choose the bitrate, see the output size before you download. Free, unlimited, nothing uploaded.',
-    tagline: 'Turn anything into an MP3. Pick a bitrate and go.',
-    short: 'Convert any audio file to MP3 at the quality you choose.',
+    tagline: "Turn anything into an MP3. Pick your quality and go.",
+    short: "Get an MP3 out of whatever you started with.",
     category: 'convert',
     icon: 'music-note',
     keywords: ['wav to mp3 m4a to mp3 flac to mp3 ogg to mp3 convert to mp3 make mp3'],
@@ -231,11 +231,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'wav-converter',
     name: 'Convert to WAV',
-    title: 'Convert to WAV Online Free — MP3 to WAV Converter',
+    title: 'Convert to WAV Online Free: MP3 to WAV Converter',
     description:
       'Convert audio to uncompressed WAV in your browser. Choose 16, 24 or 32-bit depth. Instant, lossless from this point on, and nothing is uploaded.',
-    tagline: 'Convert to uncompressed WAV. Instant, no encoder download.',
-    short: 'Convert to WAV at 16, 24 or 32-bit.',
+    tagline: "Straight to uncompressed WAV. Nothing to download first.",
+    short: "Convert to WAV at 16, 24 or 32-bit.",
     category: 'convert',
     icon: 'wave-square',
     keywords: ['mp3 to wav convert to wav uncompressed pcm lossless'],
@@ -245,11 +245,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'm4a-converter',
     name: 'Convert to M4A',
-    title: 'Convert to M4A Online Free — MP3 to M4A (AAC) Converter',
+    title: 'Convert to M4A Online Free: MP3 to M4A (AAC) Converter',
     description:
       'Convert audio to M4A (AAC) in your browser. Better quality than MP3 at the same file size, and the format Apple devices prefer.',
-    tagline: 'Convert to M4A — better quality than MP3 at the same size.',
-    short: 'Convert to M4A/AAC, the Apple-friendly format.',
+    tagline: "Better sound than MP3 at the same file size.",
+    short: "Convert to M4A, the one Apple gear prefers.",
     category: 'convert',
     icon: 'apple-logo',
     keywords: ['mp3 to m4a convert to m4a aac apple itunes iphone format'],
@@ -259,11 +259,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'ogg-converter',
     name: 'Convert to OGG',
-    title: 'Convert to OGG Online Free — MP3 to OGG Vorbis Converter',
+    title: 'Convert to OGG Online Free: MP3 to OGG Vorbis Converter',
     description:
       'Convert audio to OGG Vorbis in your browser. The open format used by games, Godot, Unity and much of the Android ecosystem.',
-    tagline: 'Convert to OGG Vorbis — open, royalty-free, game-engine friendly.',
-    short: 'Convert to OGG Vorbis for games and open platforms.',
+    tagline: "The format Unity and Godot are expecting.",
+    short: "Convert to OGG Vorbis for games and open platforms.",
     category: 'convert',
     icon: 'game-controller',
     keywords: ['mp3 to ogg convert to ogg vorbis game unity godot'],
@@ -273,11 +273,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'flac-converter',
     name: 'Convert to FLAC',
-    title: 'Convert to FLAC Online Free — Lossless Audio Converter',
+    title: 'Convert to FLAC Online Free: Lossless Audio Converter',
     description:
       'Convert audio to FLAC in your browser. Lossless compression at roughly half the size of WAV, with no quality loss at all.',
-    tagline: 'Convert to FLAC — lossless, and about half the size of WAV.',
-    short: 'Convert to FLAC for lossless archiving.',
+    tagline: "Lossless, and about half the size of a WAV.",
+    short: "Convert to FLAC when you want to keep every bit.",
     category: 'convert',
     icon: 'archive',
     keywords: ['mp3 to flac wav to flac convert to flac lossless archive'],
@@ -287,11 +287,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'video-to-audio',
     name: 'Video to Audio',
-    title: 'Video to Audio Converter — MP4 to MP3 Online Free',
+    title: 'Video to Audio Converter: MP4 to MP3 Online Free',
     description:
-      'Extract the soundtrack from MP4, MOV, MKV, WEBM and AVI files and save it as MP3, WAV or M4A. Runs in your browser — videos are never uploaded.',
-    tagline: 'Pull the audio out of a video file and save it on its own.',
-    short: 'Extract the soundtrack from MP4, MOV, MKV and more.',
+      'Extract the soundtrack from MP4, MOV, MKV, WEBM and AVI files and save it as MP3, WAV or M4A. Runs in your browser, videos are never uploaded.',
+    tagline: "Grab the sound out of a video and leave the picture behind.",
+    short: "Pull the audio out of MP4, MOV, MKV and friends.",
     category: 'convert',
     icon: 'film-strip',
     keywords: ['mp4 to mp3 extract audio from video mov mkv webm soundtrack rip audio youtube video sound'],
@@ -301,11 +301,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'audio-compressor',
     name: 'Reduce Audio File Size',
-    title: 'Compress Audio Online Free — Reduce MP3 File Size',
+    title: 'Compress Audio Online Free: Reduce MP3 File Size',
     description:
       'Make an audio file smaller by lowering the bitrate, sample rate or channel count. See the projected size before you download. No upload required.',
-    tagline: 'Make the file smaller. See exactly how small before you commit.',
-    short: 'Shrink a file for email, messaging or upload limits.',
+    tagline: "Make the file smaller. See exactly how small before you commit.",
+    short: "Shrink a file that's too big to email or send.",
     category: 'convert',
     icon: 'arrows-in-simple',
     keywords: ['compress shrink reduce file size smaller mb email whatsapp limit kb'],
@@ -315,11 +315,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'sample-rate-converter',
     name: 'Sample Rate Converter',
-    title: 'Change Audio Sample Rate Online — 44.1kHz, 48kHz, 22kHz',
+    title: 'Change Audio Sample Rate Online: 44.1kHz, 48kHz, 22kHz',
     description:
       'Resample audio to 8, 16, 22.05, 32, 44.1, 48 or 96 kHz. Useful for game engines, telephony systems and hardware with fixed rate requirements.',
-    tagline: 'Resample to whatever rate your target system needs.',
-    short: 'Change the sample rate to match a device or engine.',
+    tagline: "Match whatever rate your gear insists on.",
+    short: "Change the sample rate for a device or game engine.",
     category: 'convert',
     icon: 'stairs',
     keywords: ['resample 44100 48000 22050 16khz 8khz hz sample rate change'],
@@ -331,11 +331,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'volume-booster',
     name: 'Volume Booster',
-    title: 'Increase Audio Volume Online Free — MP3 Volume Booster',
+    title: 'Increase Audio Volume Online Free: MP3 Volume Booster',
     description:
       'Make a quiet recording louder. Boost by a set amount or normalize to the loudest safe level, with clipping protection and a live preview.',
-    tagline: 'Make a quiet recording louder without turning it to mush.',
-    short: 'Turn up a recording that came out too quiet.',
+    tagline: "Rescue a recording that came out way too quiet.",
+    short: "Turn up something you can barely hear.",
     category: 'volume',
     icon: 'speaker-high',
     keywords: ['louder increase volume boost gain amplify quiet recording turn up'],
@@ -345,11 +345,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'audio-normalizer',
     name: 'Audio Normalizer',
-    title: 'Audio Normalizer — Normalize to LUFS Online Free',
+    title: 'Audio Normalizer: Normalize to LUFS Online Free',
     description:
       'Normalize audio to a target loudness in LUFS, using the same ITU-R BS.1770 measurement Spotify, YouTube and podcast hosts use. With true-peak limiting.',
-    tagline: 'Hit the exact loudness target your platform measures.',
-    short: 'Normalize to -14 LUFS for Spotify, -16 for podcasts, and so on.',
+    tagline: "Hit the exact loudness your platform is measuring.",
+    short: "Land on -14 LUFS for Spotify, -16 for podcasts, and so on.",
     category: 'volume',
     icon: 'equals',
     keywords: ['normalize lufs loudness spotify youtube podcast level target -14 -16'],
@@ -359,11 +359,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'bass-booster',
     name: 'Bass Booster',
-    title: 'Bass Booster Online Free — Add Bass to MP3',
+    title: 'Bass Booster Online Free: Add Bass to MP3',
     description:
       'Boost the low end of any track with a proper low-shelf filter. Adjustable amount and corner frequency, with instant preview. Free and private.',
-    tagline: 'Add low end with a shelf filter, not a crude EQ bump.',
-    short: 'Add weight to the low end of a track.',
+    tagline: "Add weight down low, with a proper shelf filter.",
+    short: "Give the low end some actual body.",
     category: 'volume',
     icon: 'speaker-low',
     keywords: ['bass boost low end sub deep 808 heavy'],
@@ -376,8 +376,8 @@ export const TOOLS: Tool[] = [
     title: 'Audio Dynamic Range Compressor Online Free',
     description:
       'Even out the loud and quiet parts of a recording with threshold, ratio, attack and release controls. Ideal for voice, podcasts and interviews.',
-    tagline: 'Even out the loud and quiet parts of a recording.',
-    short: 'Level out a recording where volume jumps around.',
+    tagline: "Tame a recording where the volume keeps jumping around.",
+    short: "Even out levels that swing all over the place.",
     category: 'volume',
     icon: 'faders',
     keywords: ['compressor dynamics even out levels smooth voice leveler'],
@@ -387,11 +387,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'stereo-to-mono',
     name: 'Stereo to Mono',
-    title: 'Convert Stereo to Mono Online Free — And Mono to Stereo',
+    title: 'Convert Stereo to Mono Online Free: And Mono to Stereo',
     description:
       'Downmix stereo to mono, or duplicate mono to stereo. Also split a stereo file into separate left and right channel files. Instant, no upload.',
-    tagline: 'Downmix to mono, expand to stereo, or split the channels apart.',
-    short: 'Switch between mono and stereo, or split the channels.',
+    tagline: "Squash to mono, spread to stereo, or pull the channels apart.",
+    short: "Switch between mono and stereo, or split the channels.",
     category: 'volume',
     icon: 'headphones',
     keywords: ['stereo mono downmix one channel split channels left right'],
@@ -403,11 +403,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'speed-changer',
     name: 'Audio Speed Changer',
-    title: 'Change Audio Speed Online Free — Speed Up or Slow Down MP3',
+    title: 'Change Audio Speed Online Free: Speed Up or Slow Down MP3',
     description:
       'Speed up or slow down audio, with the option to keep the original pitch. 0.25x to 4x, with live preview. Runs entirely in your browser.',
-    tagline: 'Speed it up or slow it down — keep the pitch, or let it shift.',
-    short: 'Change playback speed, with or without changing pitch.',
+    tagline: "Speed it up or slow it down. Keep the pitch, or don't.",
+    short: "Change playback speed, with or without the pitch moving.",
     category: 'speed',
     icon: 'fast-forward',
     keywords: ['speed up slow down faster slower playback rate 2x 0.5x sped up'],
@@ -417,11 +417,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'pitch-shifter',
     name: 'Pitch Shifter',
-    title: 'Change Audio Pitch Online Free — Pitch Shifter Tool',
+    title: 'Change Audio Pitch Online Free: Pitch Shifter Tool',
     description:
       'Shift pitch up or down by semitones without changing the length. Real time-stretching, so voices stay natural instead of turning into chipmunks.',
-    tagline: 'Move the pitch up or down without changing the length.',
-    short: 'Transpose a track by semitones, keeping the same duration.',
+    tagline: "Move the pitch, leave the length exactly where it was.",
+    short: "Shift a track up or down by semitones.",
     category: 'speed',
     icon: 'arrows-vertical',
     keywords: ['pitch up down higher lower deeper semitone transpose key change'],
@@ -431,11 +431,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'tempo-changer',
     name: 'Tempo Changer',
-    title: 'Change Tempo Without Changing Pitch — Online and Free',
+    title: 'Change Tempo Without Changing Pitch: Online and Free',
     description:
       'Speed up or slow down music while holding the pitch exactly where it is. Uses WSOLA time-stretching, the same technique DAWs use.',
-    tagline: 'Change the tempo. The pitch stays exactly where it was.',
-    short: 'Change speed while holding pitch — for practice and edits.',
+    tagline: "Slow the music down to learn it. Pitch stays put.",
+    short: "Change the speed while the pitch holds still.",
     category: 'speed',
     icon: 'metronome',
     keywords: ['tempo bpm faster slower keep pitch practice slow down music'],
@@ -445,11 +445,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'slowed-reverb',
     name: 'Slowed + Reverb Maker',
-    title: 'Slowed and Reverb Maker Online Free — No Signup',
+    title: 'Slowed and Reverb Maker Online Free: No Signup',
     description:
       'Turn any song into a slowed + reverb edit. Adjustable slowdown and reverb depth, with instant preview. Free, no watermark, no account, no upload.',
-    tagline: 'The slowed + reverb sound, in about ten seconds.',
-    short: 'Make the slowed + reverb edit everyone posts.',
+    tagline: "That slowed and reverb sound, in about ten seconds.",
+    short: "Make the slowed + reverb edit everyone's posting.",
     category: 'speed',
     icon: 'moon-stars',
     keywords: ['slowed and reverb slowed down tiktok edit aesthetic chill daycore'],
@@ -459,11 +459,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'nightcore-maker',
     name: 'Nightcore Maker',
-    title: 'Nightcore Maker Online Free — Make Nightcore Songs',
+    title: 'Nightcore Maker Online Free: Make Nightcore Songs',
     description:
       'Turn any song into nightcore: faster tempo and higher pitch, the classic sped-up sound. Adjustable intensity, instant preview, free with no signup.',
-    tagline: 'Faster and higher — the classic nightcore treatment.',
-    short: 'Speed up and pitch up a track, nightcore style.',
+    tagline: "Faster and higher. The proper nightcore treatment.",
+    short: "Speed up and pitch up a track, nightcore style.",
     category: 'speed',
     icon: 'lightning',
     keywords: ['nightcore sped up fast high pitch anime edit spedup version'],
@@ -473,11 +473,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'voice-changer',
     name: 'Voice Changer',
-    title: 'Voice Changer Online Free — Change Your Voice in a Recording',
+    title: 'Voice Changer Online Free: Change Your Voice in a Recording',
     description:
       'Change a recorded voice: deeper, higher, robotic, telephone or radio. Applies to any recording you drop in. Free, instant and never uploaded.',
-    tagline: 'Deeper, higher, robot, telephone, radio. Pick one and preview it.',
-    short: 'Disguise or restyle a recorded voice.',
+    tagline: "Deeper, higher, robot, phone. Pick one and hear it.",
+    short: "Disguise or restyle a recorded voice.",
     category: 'speed',
     icon: 'mask-happy',
     keywords: ['voice changer deep voice chipmunk robot funny disguise anonymous'],
@@ -489,11 +489,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'reverb-adder',
     name: 'Add Reverb',
-    title: 'Add Reverb to Audio Online Free — Reverb Effect Tool',
+    title: 'Add Reverb to Audio Online Free: Reverb Effect Tool',
     description:
       'Add room, hall or cathedral reverb to any audio file. Adjustable decay, mix and pre-delay, rendered with real convolution. Free and private.',
-    tagline: 'Put the recording in a room. Choose how big a room.',
-    short: 'Add space and depth with real convolution reverb.',
+    tagline: "Drop the recording into a room. You choose how big.",
+    short: "Add space and depth with real convolution reverb.",
     category: 'effects',
     icon: 'waves',
     keywords: ['reverb echo room hall cathedral space wet ambience'],
@@ -503,11 +503,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'echo-adder',
     name: 'Add Echo',
-    title: 'Add Echo to Audio Online Free — Delay Effect Tool',
+    title: 'Add Echo to Audio Online Free: Delay Effect Tool',
     description:
       'Add an echo or delay to any audio file. Control the delay time, how many repeats you get, and how loud they are. Instant preview, no upload.',
-    tagline: 'Add repeats. Control how far apart and how many.',
-    short: 'Add a delay or echo effect to a track.',
+    tagline: "Add repeats. You decide how many and how far apart.",
+    short: "Put an echo or delay on a track.",
     category: 'effects',
     icon: 'broadcast',
     keywords: ['echo delay repeat trail dub slapback'],
@@ -517,11 +517,11 @@ export const TOOLS: Tool[] = [
   {
     slug: '8d-audio-maker',
     name: '8D Audio Maker',
-    title: '8D Audio Maker Online Free — Convert Songs to 8D',
+    title: '8D Audio Maker Online Free: Convert Songs to 8D',
     description:
       'Turn any song into 8D audio, where the sound orbits your head. Uses real HRTF spatial panning, not simple left-right panning. Best with headphones.',
-    tagline: 'Make the sound orbit your head. Headphones required.',
-    short: 'Turn a track into the 8D effect everyone shares.',
+    tagline: "Makes the sound circle your head. Headphones only.",
+    short: "Turn a track into the 8D thing everyone shares.",
     category: 'effects',
     icon: 'planet',
     keywords: ['8d audio surround rotating spatial headphones 3d moving around head'],
@@ -531,11 +531,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'equalizer',
     name: 'Audio Equalizer',
-    title: 'Online Audio Equalizer Free — 8-Band EQ for MP3',
+    title: 'Online Audio Equalizer Free: 8-Band EQ for MP3',
     description:
       'Shape the tone of any audio file with an eight-band equalizer. Presets for voice, music, podcast and bass, plus full manual control.',
-    tagline: 'Eight bands, four presets, live preview.',
-    short: 'Shape the tone of a track band by band.',
+    tagline: "Eight bands, four presets, and you hear it as you move them.",
+    short: "Shape the tone of a track band by band.",
     category: 'effects',
     icon: 'equalizer',
     keywords: ['eq equalizer bands frequency treble mids tone shape'],
@@ -545,11 +545,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'stereo-widener',
     name: 'Stereo Widener',
-    title: 'Stereo Widener Online Free — Widen the Stereo Image',
+    title: 'Stereo Widener Online Free: Widen the Stereo Image',
     description:
       'Make a stereo mix sound wider, or narrow it toward mono. Uses mid/side processing, so the centre stays put while the sides move.',
-    tagline: 'Push the mix wider, or pull it back toward the centre.',
-    short: 'Widen or narrow the stereo image of a mix.',
+    tagline: "Push the mix wider, or pull it back to the middle.",
+    short: "Widen or narrow how spread out a mix sounds.",
     category: 'effects',
     icon: 'arrows-out-line-horizontal',
     keywords: ['wide widen stereo image bigger spacious mid side'],
@@ -561,11 +561,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'ringtone-maker',
     name: 'iPhone Ringtone Maker',
-    title: 'iPhone Ringtone Maker — Make M4R Ringtones Online Free',
+    title: 'iPhone Ringtone Maker: Make M4R Ringtones Online Free',
     description:
       'Cut any song into an iPhone ringtone and download it as M4R. Enforces the 30-second limit automatically, with step-by-step install instructions.',
-    tagline: 'Cut a ringtone, get an M4R, and install it in a couple of minutes.',
-    short: 'Make an M4R ringtone for iPhone from any song.',
+    tagline: "Cut a ringtone, get an M4R, and we'll walk you through installing it.",
+    short: "Make an M4R iPhone ringtone out of any song.",
     category: 'utility',
     icon: 'bell',
     keywords: ['iphone ringtone m4r make ringtone from song custom text tone'],
@@ -575,11 +575,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'android-ringtone-maker',
     name: 'Android Ringtone Maker',
-    title: 'Android Ringtone Maker — Make MP3 Ringtones Online Free',
+    title: 'Android Ringtone Maker: Make MP3 Ringtones Online Free',
     description:
       'Cut any song into an Android ringtone and download it as MP3, with instructions for setting it on Samsung, Pixel and other Android phones.',
-    tagline: 'Cut a ringtone and save it as MP3 — no length limit on Android.',
-    short: 'Make an MP3 ringtone for any Android phone.',
+    tagline: "Cut a ringtone, save the MP3, done. No length limit here.",
+    short: "Make an MP3 ringtone for any Android phone.",
     category: 'utility',
     icon: 'android-logo',
     keywords: ['android ringtone samsung pixel mp3 ringtone notification sound'],
@@ -589,11 +589,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'voice-recorder',
     name: 'Voice Recorder',
-    title: 'Online Voice Recorder Free — Record Audio in Your Browser',
+    title: 'Online Voice Recorder Free: Record Audio in Your Browser',
     description:
       'Record from your microphone and download the result. Nothing is uploaded, nothing is stored on a server, and no account is needed.',
-    tagline: 'Record from your mic. The audio never leaves this tab.',
-    short: 'Record straight from your microphone and download it.',
+    tagline: "Record off your mic. It never leaves this tab.",
+    short: "Record straight from your microphone and keep the file.",
     category: 'utility',
     icon: 'microphone',
     keywords: ['record voice mic microphone memo dictation online recorder'],
@@ -603,11 +603,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'bpm-detector',
     name: 'BPM Detector',
-    title: 'BPM Detector Online Free — Find the Tempo of Any Song',
+    title: 'BPM Detector Online Free: Find the Tempo of Any Song',
     description:
       'Detect the tempo of any track in beats per minute, using onset detection and autocorrelation. Drop a file and read the number. No upload.',
-    tagline: 'Find the tempo of a track. Drop it in and read the number.',
-    short: 'Detect the BPM of any song automatically.',
+    tagline: "Drop a track in and read the number.",
+    short: "Find out the BPM of any song automatically.",
     category: 'utility',
     icon: 'heartbeat',
     keywords: ['bpm tempo finder beats per minute what bpm song speed detect'],
@@ -617,11 +617,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'loudness-meter',
     name: 'Loudness Meter',
-    title: 'LUFS Meter Online Free — Measure Loudness and True Peak',
+    title: 'LUFS Meter Online Free: Measure Loudness and True Peak',
     description:
       'Measure integrated loudness (LUFS), loudness range and true peak using the ITU-R BS.1770-4 standard, and compare against every platform target.',
-    tagline: 'Measure LUFS, loudness range and true peak — properly.',
-    short: 'Measure loudness the way streaming platforms measure it.',
+    tagline: "LUFS, loudness range and true peak. Measured properly.",
+    short: "Check loudness the way streaming platforms check it.",
     category: 'utility',
     icon: 'gauge',
     keywords: ['lufs meter loudness check measure true peak dbfs how loud'],
@@ -631,11 +631,11 @@ export const TOOLS: Tool[] = [
   {
     slug: 'waveform-generator',
     name: 'Waveform Image Generator',
-    title: 'Waveform Image Generator — Make Waveform PNGs Online',
+    title: 'Waveform Image Generator: Make Waveform PNGs Online',
     description:
       'Turn an audio file into a waveform image you can use in a video, a thumbnail or a post. Choose colours, size and style, then download a PNG.',
-    tagline: 'Turn a track into a waveform picture you can actually use.',
-    short: 'Generate a waveform PNG from any audio file.',
+    tagline: "Turn a track into a waveform picture you can actually use.",
+    short: "Make a waveform PNG out of any audio file.",
     category: 'utility',
     icon: 'waveform',
     keywords: ['waveform image png picture visualizer soundwave art poster'],

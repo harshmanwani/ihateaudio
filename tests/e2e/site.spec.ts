@@ -89,6 +89,29 @@ test.describe('structured data', () => {
   }
 });
 
+test.describe('house style', () => {
+  test('no em dashes in any rendered copy', async ({ page }) => {
+    // A deliberate voice choice: em dashes read as edited-magazine prose, and
+    // this product does not talk like that. Asserted on rendered text so a
+    // stray one in any of the 44 pages fails the build rather than shipping.
+    const offenders: string[] = [];
+
+    for (const path of ALL_PATHS) {
+      await page.goto(path);
+      const text = await page.locator('body').innerText();
+      if (text.includes('—')) {
+        const around = text.slice(
+          Math.max(0, text.indexOf('—') - 45),
+          text.indexOf('—') + 45
+        );
+        offenders.push(`${path}: …${around.replace(/\n/g, ' ')}…`);
+      }
+    }
+
+    expect(offenders, offenders.join('\n')).toEqual([]);
+  });
+});
+
 test.describe('content quality', () => {
   test('tool pages carry enough unique prose to not read as templated', async ({
     page,
@@ -192,9 +215,9 @@ test.describe('navigation', () => {
 
   test('homepage trust band and FAQ are present after the grid', async ({ page }) => {
     await page.goto('/');
-    await expect(page.locator('.trust h2')).toContainText(/check for yourself/i);
+    await expect(page.locator('.trust h2')).toContainText(/never leaves your/i);
     await expect(page.locator('.trust__fact')).toHaveCount(4);
-    await expect(page.locator('.homefaq details')).toHaveCount(6);
+    await expect(page.locator('.homefaq details')).toHaveCount(7);
 
     // The homepage FAQ must also be in the structured data.
     const blocks = await page

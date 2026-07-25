@@ -6,7 +6,7 @@ import { getTool } from '../data/tools';
 const tool = getTool('voice-changer');
 
 const steps = [
-  'Drop a recording onto the page — a voice note, a take from your phone, anything your browser can decode. It stays on your device.',
+  'Drop a recording onto the page. A voice note, a take from your phone, anything your browser can decode. It stays on your device.',
   'Choose a preset. The line underneath says what it does to the sound and whether it changes the length of the recording.',
   'Add a manual pitch shift if the preset alone is not enough. It runs after the preset, so you can push Telephone lower or lift Radio slightly.',
   'Press Preview to render the chain and listen to it in the player. Pitch shifting is heavy, so it runs when you ask rather than on every change.',
@@ -24,7 +24,7 @@ const faq = [
   },
   {
     q: 'What is the difference between Deeper and Giant, then?',
-    a: 'Deeper moves only the pitch: the words come out at the same speed, four semitones down, so it still sounds like someone talking normally in a lower register. Giant slows everything, so the delivery drags as well as descending — the difference between a low voice and a very large slow one. Pick Deeper for a natural result and Giant when you want the character.',
+    a: 'Deeper moves only the pitch: the words come out at the same speed, four semitones down, so it still sounds like someone talking normally in a lower register. Giant slows everything, so the delivery drags as well as descending. The difference between a low voice and a very large slow one. Pick Deeper for a natural result and Giant when you want the character.',
   },
   {
     q: 'How does the Telephone preset get that sound?',
@@ -40,7 +40,7 @@ const faq = [
   },
   {
     q: 'Does the source recording quality matter?',
-    a: 'A great deal, particularly for Radio. That preset compresses hard, and compression raises quiet material — which means room noise, air conditioning and hiss come up with the voice. Record close to the microphone in the quietest space you have. A clean recording survives heavy processing; a noisy one gets worse with every stage.',
+    a: 'A great deal, particularly for Radio. That preset compresses hard, and compression raises quiet material. Which means room noise, air conditioning and hiss come up with the voice. Record close to the microphone in the quietest space you have. A clean recording survives heavy processing; a noisy one gets worse with every stage.',
   },
 ];
 ---
@@ -63,7 +63,7 @@ const faq = [
           <option value="robot">Robot</option>
           <option value="telephone">Telephone</option>
           <option value="radio">Radio</option>
-          <option value="none">None — manual pitch only</option>
+          <option value="none">None, manual pitch only</option>
         </select>
         <span class="hint" data-out="preset-note">
           Four semitones down, length unchanged.
@@ -125,8 +125,7 @@ const faq = [
       Formant positions depend mostly on the size and shape of the cavities, not
       on the note being sung. That is why you can recognise the same person
       speaking high or low, and it is why simply moving the pitch never quite
-      produces a different person. It produces the same person transposed —
-      which is a perfectly good effect, but a different thing from a disguise.
+      produces a different person. It produces the same person transposed. Which is a perfectly good effect, but a different thing from a disguise.
     </p>
 
     <h2>Two families of effect</h2>

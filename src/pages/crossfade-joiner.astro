@@ -8,22 +8,22 @@ const tool = getTool('crossfade-joiner');
 const steps = [
   'Drop every file you want blended together in one go. They are decoded on your machine, so a set of full-length tracks opens as fast as a set of clips.',
   'Arrange them in playing order. Drag a row by its handle, or move it with the up and down buttons, which work from the keyboard.',
-  'Set the crossfade length. Each join overlaps by that amount, so the finished file is shorter than the parts added together — the running total shows by how much.',
+  'Set the crossfade length. Each join overlaps by that amount, so the finished file is shorter than the parts added together. The running total shows by how much.',
   'Choose a format and download. Every join is rendered with an equal-power blend, so the level stays steady straight through the transition.',
 ];
 
 const faq = [
   {
     q: 'What does "equal-power" mean, and why not just fade one down while the other comes up?',
-    a: 'That simpler approach — equal-gain — makes both tracks 50 percent at the midpoint. For unrelated material, power adds rather than amplitude, so 0.5 plus 0.5 gives half the power you started with: an audible 3 dB dip right in the middle of every transition. An equal-power crossfade uses cosine and sine curves instead, and because cos² plus sin² is always 1, the total power stays constant the whole way across. You hear one thing become another rather than a dip between them.',
+    a: 'That simpler approach (equal-gain) makes both tracks 50 percent at the midpoint. For unrelated material, power adds rather than amplitude, so 0.5 plus 0.5 gives half the power you started with: an audible 3 dB dip right in the middle of every transition. An equal-power crossfade uses cosine and sine curves instead, and because cos² plus sin² is always 1, the total power stays constant the whole way across. You hear one thing become another rather than a dip between them.',
   },
   {
     q: 'Why is the merged file shorter than the sum of the parts?',
-    a: 'Because the tracks overlap rather than queue up. Each join eats one crossfade length out of the total, so joining four four-minute tracks with an eight-second crossfade gives 16 minutes minus three lots of eight seconds — 15 minutes 36 seconds. The running total in the panel already accounts for this.',
+    a: 'Because the tracks overlap rather than queue up. Each join eats one crossfade length out of the total, so joining four four-minute tracks with an eight-second crossfade gives 16 minutes minus three lots of eight seconds, 15 minutes 36 seconds. The running total in the panel already accounts for this.',
   },
   {
     q: 'How long should the crossfade be?',
-    a: 'For beat-matched dance music, four to twelve seconds, which is roughly eight to sixteen bars at club tempos. For ambience and drones, three to five seconds, long enough that no single moment is the transition. For speech and podcast segments, 0.3 to 1 second — anything longer and two people are talking over each other, which sounds like a mistake rather than a blend.',
+    a: 'For beat-matched dance music, four to twelve seconds, which is roughly eight to sixteen bars at club tempos. For ambience and drones, three to five seconds, long enough that no single moment is the transition. For speech and podcast segments, 0.3 to 1 second. Anything longer and two people are talking over each other, which sounds like a mistake rather than a blend.',
   },
   {
     q: 'Does it beat-match or align the tempos for me?',
@@ -31,15 +31,15 @@ const faq = [
   },
   {
     q: 'What if the crossfade is longer than one of my files?',
-    a: 'The slider will not let you get there. Its maximum is set to half the length of your shortest file once everything has decoded, because an overlap longer than the file it is overlapping has no sensible meaning — the track would begin fading out before it had finished fading in. If you need a long crossfade, the short file is the thing to fix.',
+    a: 'The slider will not let you get there. Its maximum is set to half the length of your shortest file once everything has decoded, because an overlap longer than the file it is overlapping has no sensible meaning. The track would begin fading out before it had finished fading in. If you need a long crossfade, the short file is the thing to fix.',
   },
   {
     q: 'When would I use the plain joiner instead?',
-    a: 'Whenever the boundary should be a boundary. Album tracks, audiobook chapters, separate takes and anything with applause or announcements between segments all want a hard join, sometimes with a gap. A crossfade is for material meant to feel continuous — sets, mixes, ambience beds, and montages.',
+    a: 'Whenever the boundary should be a boundary. Album tracks, audiobook chapters, separate takes and anything with applause or announcements between segments all want a hard join, sometimes with a gap. A crossfade is for material meant to feel continuous. Sets, mixes, ambience beds, and montages.',
   },
   {
     q: 'The overlap sounds hollow or phasey rather than smooth.',
-    a: 'That happens when the two files contain the same or similar recorded material — two exports of one mix, or two takes of the same instrument. Overlapping them makes the copies interfere, cancelling some frequencies and reinforcing others, which is comb filtering and it sounds metallic. Crossfading works best between genuinely different audio. If both sides are the same source, use a hard cut.',
+    a: 'That happens when the two files contain the same or similar recorded material. Two exports of one mix, or two takes of the same instrument. Overlapping them makes the copies interfere, cancelling some frequencies and reinforcing others, which is comb filtering and it sounds metallic. Crossfading works best between genuinely different audio. If both sides are the same source, use a hard cut.',
   },
 ];
 ---
@@ -50,7 +50,7 @@ const faq = [
     multiple
     action="Download blended file"
     dropTitle="Drop the files you want to blend"
-    dropHint="choose them all at once — you can reorder them after"
+    dropHint="choose them all at once, you can reorder them after"
   >
     <div class="controls">
       <div class="controls__head">
@@ -103,8 +103,7 @@ const faq = [
       There are two ways to fade one piece of audio into another, and the obvious
       one is wrong. Equal-gain crossfading turns the outgoing track down along a
       straight line while turning the incoming one up along the mirror image, so at
-      the halfway point both sit at 50 percent. That reads as balanced, and it is —
-      in amplitude. The problem is that loudness follows power, not amplitude, and
+      the halfway point both sit at 50 percent. That reads as balanced, and it is, in amplitude. The problem is that loudness follows power, not amplitude, and
       for two unrelated signals power adds. Half plus half gives half the power you
       started with, which is a 3 dB hole in the middle of every transition.
     </p>
@@ -117,7 +116,7 @@ const faq = [
       material, and it is the one applied at each join here.
     </p>
     <p>
-      The exception worth knowing about is correlated audio — two copies of the same
+      The exception worth knowing about is correlated audio, two copies of the same
       recording, or two takes of the same part. There, amplitude adds rather than
       power, so equal-power gives you a 3 dB <em>bump</em> instead of a dip, plus
       comb filtering from the two nearly-identical signals interfering. That is not
@@ -129,7 +128,7 @@ const faq = [
       Everything else about a crossfade is arithmetic, so length is where the
       judgement goes. The useful way to think about it is how long you want the
       listener to be uncertain about which track they are hearing. In a dance mix,
-      eight to sixteen bars of uncertainty is the point — that ambiguity is the
+      eight to sixteen bars of uncertainty is the point, that ambiguity is the
       craft, and at 128 BPM sixteen bars is thirty seconds. Between two ambient beds,
       three to five seconds is enough that no single instant is the seam.
     </p>
@@ -137,7 +136,7 @@ const faq = [
       Speech is the opposite case. Two voices overlapping for more than about a
       second stop sounding like a transition and start sounding like a mistake in
       the edit, so podcast and interview joins want 300 milliseconds to a second at
-      most — long enough to remove the click, short enough that nobody notices.
+      most. Long enough to remove the click, short enough that nobody notices.
     </p>
 
     <h2>What the overlap costs you</h2>
@@ -154,7 +153,7 @@ const faq = [
       If the last eight seconds of a track contain something you need to hear
       clearly, an eight-second crossfade will bury it under whatever comes next.
       Trim the tracks so that the overlapping regions are the parts you are happy to
-      lose — intros and outros usually are, which is exactly why they exist.
+      lose. Intros and outros usually are, which is exactly why they exist.
     </p>
   </Fragment>
 </ToolPage>
@@ -191,7 +190,7 @@ const faq = [
         const overlap = fade * Math.max(0, order.length - 1);
         totalOut.textContent =
           order.length === 1
-            ? 'One file — add more to blend them.'
+            ? 'One file, add more to blend them.'
             : `${order.length} files · ${fmtDuration(Math.max(0, sum - overlap))} after ${order.length - 1} crossfade${order.length === 2 ? '' : 's'}`;
       };
 

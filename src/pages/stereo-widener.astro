@@ -7,7 +7,7 @@ import { getTool } from '../data/tools';
 const tool = getTool('stereo-widener');
 
 const steps = [
-  'Drop a stereo file onto the page. The tool needs two channels that differ from each other — a mono file has nothing to widen, and it will tell you so.',
+  'Drop a stereo file onto the page. The tool needs two channels that differ from each other. A mono file has nothing to widen, and it will tell you so.',
   'Move the width control. One is the original, above one pushes the sides outward, and zero collapses the whole mix to the centre.',
   'Watch the line under the slider: it reports how much of the sound disappears when the result is folded down to mono, which is what happens on most phone and smart speakers.',
   'Press play to hear the change, then back off until the image is wide but the centre still feels solid, and download.',
@@ -16,11 +16,11 @@ const steps = [
 const faq = [
   {
     q: 'What is the width number actually multiplying?',
-    a: 'The side signal. The tool rebuilds the file as a mid channel — everything the two channels have in common — and a side channel, which is what they differ by, then multiplies the side by the width before rebuilding left and right. At 1 the side is untouched and the file is bit-identical in intent to the original. At 0 the side is gone. At 3 it is three times its original level relative to the centre.',
+    a: 'The side signal. The tool rebuilds the file as a mid channel (everything the two channels have in common) and a side channel, which is what they differ by, then multiplies the side by the width before rebuilding left and right. At 1 the side is untouched and the file is bit-identical in intent to the original. At 0 the side is gone. At 3 it is three times its original level relative to the centre.',
   },
   {
     q: 'Why does my mix sound hollow when it plays in mono?',
-    a: 'Because a mono fold-down adds the two channels together, and anything that was in the side signal is equal and opposite in them, so it cancels exactly. Widening does not change how loud the mono version is — it changes how much of the total sound lives in the part that will vanish. That gap between the stereo and mono versions is what the readout under the slider measures.',
+    a: 'Because a mono fold-down adds the two channels together, and anything that was in the side signal is equal and opposite in them, so it cancels exactly. Widening does not change how loud the mono version is. It changes how much of the total sound lives in the part that will vanish. That gap between the stereo and mono versions is what the readout under the slider measures.',
   },
   {
     q: 'Where will people actually hear this in mono?',
@@ -28,7 +28,7 @@ const faq = [
   },
   {
     q: 'The slider does nothing to my file. What is wrong?',
-    a: 'The file is probably dual mono — two channels carrying identical audio, which is common when a mono recording is exported as stereo. Identical channels mean the side signal is silent, and multiplying silence by three is still silence. The tool detects this and says so when the file loads.',
+    a: 'The file is probably dual mono. Two channels carrying identical audio, which is common when a mono recording is exported as stereo. Identical channels mean the side signal is silent, and multiplying silence by three is still silence. The tool detects this and says so when the file loads.',
   },
   {
     q: 'Is width 0 the same as the stereo-to-mono tool?',
@@ -40,7 +40,7 @@ const faq = [
   },
   {
     q: 'How wide can I go before it sounds wrong?',
-    a: 'On music, 1.2 to 1.5 is usually the useful range. Past that the centre — which is where the lead vocal, kick and bass normally sit — starts to feel scooped out and the mix takes on a phasey, out-of-focus quality on headphones. The tell is that the track sounds impressive for ten seconds and tiring after a minute.',
+    a: 'On music, 1.2 to 1.5 is usually the useful range. Past that the centre (which is where the lead vocal, kick and bass normally sit) starts to feel scooped out and the mix takes on a phasey, out-of-focus quality on headphones. The tell is that the track sounds impressive for ten seconds and tiring after a minute.',
   },
 ];
 ---
@@ -136,7 +136,7 @@ const faq = [
       reconstructed as mid plus side and mid minus side. Turn the multiplier up
       and the differences between the channels are exaggerated, which the ear
       reads as a wider image. Turn it to zero and the side disappears, leaving
-      the mid in both channels — a centred, mono-sounding file. Nothing is
+      the mid in both channels, a centred, mono-sounding file. Nothing is
       delayed, nothing is phase-inverted, and nothing is added; the only thing
       changing is the ratio between what the channels share and what they do
       not.
@@ -147,7 +147,7 @@ const faq = [
       There is a catch built into the arithmetic. A mono fold-down is left plus
       right, and the side signal appears in those two with opposite signs, so it
       cancels perfectly. Whatever you pushed into the sides is not quieter in
-      mono — it is gone. Widening therefore never makes the mono version louder
+      mono, it is gone. Widening therefore never makes the mono version louder
       or bigger; it only widens the gap between what a stereo listener hears and
       what a mono listener does.
     </p>
@@ -182,7 +182,7 @@ const faq = [
       translate better to small speakers. For spoken word it is almost always
       the right move: a voice belongs in the centre, and any spread on it is
       room sound you would rather not have. For speech, consider going all the
-      way to a true mono file instead — same result, half the size.
+      way to a true mono file instead, same result, half the size.
     </p>
   </Fragment>
 </ToolPage>

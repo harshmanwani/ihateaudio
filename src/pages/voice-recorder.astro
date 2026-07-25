@@ -8,11 +8,11 @@ const tool = getTool('voice-recorder');
 const chain = relatedTools(tool.slug).slice(0, 3);
 
 const steps = [
-  'Click Start recording. The browser asks for microphone permission at that moment and not before — the page does not touch your microphone on load, so nothing is listening until you decide it should be.',
+  'Click Start recording. The browser asks for microphone permission at that moment and not before. The page does not touch your microphone on load, so nothing is listening until you decide it should be.',
   'Watch the level meter while you talk. Aim for it to sit around two-thirds of the way across on your loudest phrases; a meter that never moves means the wrong input is selected, and one pinned at the far end is clipping.',
   'Pause and resume as often as you need. The timer counts recorded time only, so a pause does not appear in the finished file.',
   'Press Stop. The recording is drawn as a waveform you can play back, scrub and check before you commit to it.',
-  'Download it as the original WebM, as MP3, or as WAV — or hand it straight to the trimmer or the silence remover without saving anything first.',
+  'Download it as the original WebM, as MP3, or as WAV. Or hand it straight to the trimmer or the silence remover without saving anything first.',
 ];
 
 const faq = [
@@ -26,15 +26,15 @@ const faq = [
   },
   {
     q: 'Why is the recording a WebM file?',
-    a: 'WebM containing Opus is what Chrome, Edge and Firefox produce natively from the recording API — it is efficient, high quality at speech bitrates, and involves no re-encoding. Safari produces MP4 with AAC instead. The MP3 and WAV options here decode that original and re-encode it, which is why they take a moment longer.',
+    a: 'WebM containing Opus is what Chrome, Edge and Firefox produce natively from the recording API. It is efficient, high quality at speech bitrates, and involves no re-encoding. Safari produces MP4 with AAC instead. The MP3 and WAV options here decode that original and re-encode it, which is why they take a moment longer.',
   },
   {
     q: 'It says the microphone is in use by another application.',
-    a: 'Some apps take exclusive control of the input device — Zoom, Teams, Discord, OBS and most DAWs do this. Quit the other application entirely rather than just leaving the meeting, then try again. On Windows, check that no background app holds the device under Settings → Privacy → Microphone.',
+    a: 'Some apps take exclusive control of the input device. Zoom, Teams, Discord, OBS and most DAWs do this. Quit the other application entirely rather than just leaving the meeting, then try again. On Windows, check that no background app holds the device under Settings → Privacy → Microphone.',
   },
   {
     q: 'Can it record system audio, or the other side of a call?',
-    a: 'No. The microphone API gives a page microphone input and nothing else, by design — a web page that could silently capture your speakers would be a serious security problem. To record something playing on your computer you need a loopback device such as BlackHole on macOS or VB-Cable on Windows, selected as your input.',
+    a: 'No. The microphone API gives a page microphone input and nothing else, by design. A web page that could silently capture your speakers would be a serious security problem. To record something playing on your computer you need a loopback device such as BlackHole on macOS or VB-Cable on Windows, selected as your input.',
   },
   {
     q: 'Is there a length limit?',
@@ -223,7 +223,7 @@ const faq = [
     <h2>What the browser is actually doing</h2>
     <p>
       Pressing record asks the browser for a microphone stream. The browser, not
-      this page, decides whether to grant it — which is why the permission
+      this page, decides whether to grant it, which is why the permission
       prompt is drawn by the browser chrome, why a page cannot suppress it, and
       why the recording indicator in the tab strip stays lit for as long as the
       stream is open. This page closes the stream the moment you press stop, so
@@ -234,7 +234,7 @@ const faq = [
       which encodes compressed chunks as it goes rather than holding raw audio,
       so an hour of speech costs a few megabytes rather than several hundred.
       The other goes to an analyser node that reads the raw waveform sixty times
-      a second purely to move the level meter — it is never connected to your
+      a second purely to move the level meter. It is never connected to your
       speakers, which is what stops the recording feeding back on itself.
     </p>
     <p>
@@ -255,7 +255,7 @@ const faq = [
     <p>
       Aim for the meter to reach around two-thirds on your loudest phrases and
       to move visibly on quiet ones. Sit about 15 to 20 centimetres from the
-      microphone — close enough to dominate the room, far enough that plosives
+      microphone. Close enough to dominate the room, far enough that plosives
       do not thump. Speaking across the microphone rather than straight into it
       helps with those too.
     </p>
@@ -386,7 +386,7 @@ const faq = [
     if (name === 'NotReadableError' || name === 'AbortError') {
       return {
         title: 'The microphone is in use by another application.',
-        body: 'Something else has taken exclusive control of the device — typically a video call, a recorder, or audio software. Quit that application completely, rather than just leaving the call, and try again.',
+        body: 'Something else has taken exclusive control of the device. Typically a video call, a recorder, or audio software. Quit that application completely, rather than just leaving the call, and try again.',
       };
     }
     return {
@@ -472,7 +472,7 @@ const faq = [
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
       showError(
         'This browser cannot record audio.',
-        'It does not provide the microphone recording APIs this page needs. Current versions of Chrome, Edge, Firefox and Safari all do — updating, or switching browser, will fix it.'
+        'It does not provide the microphone recording APIs this page needs. Current versions of Chrome, Edge, Firefox and Safari all do. Updating, or switching browser, will fix it.'
       );
       return;
     }

@@ -7,7 +7,7 @@ import ConversionPanel from '../components/ConversionPanel.astro';
 const tool = getTool('audio-converter');
 
 const steps = [
-  'Drop your audio file onto the page, or click to browse. The file is read straight off your disk — it is never sent to a server.',
+  'Drop your audio file onto the page, or click to browse. The file is read straight off your disk. It is never sent to a server.',
   'Check the waveform and play it back, so you know the file decoded correctly before you spend time encoding it.',
   'Pick the output format. MP3 and WAV encode immediately; the other formats load a converter once, and the page tells you before it starts.',
   'For lossy formats, choose a bitrate. The estimated output size updates as you change it.',
@@ -17,11 +17,11 @@ const steps = [
 const faq = [
   {
     q: 'Which formats can this open, and which can it write?',
-    a: 'It opens anything your browser decodes — MP3, WAV, M4A, AAC, OGG, Opus, FLAC, WebM, and the audio track of most MP4 and MOV files. It writes MP3, WAV, M4A, AAC, OGG, Opus, FLAC, AIFF, WMA and M4R. A handful of input formats (WMA, AIFF, AMR, APE) are not decodable by any browser and will be refused with an explanation rather than a silent failure.',
+    a: 'It opens anything your browser decodes. MP3, WAV, M4A, AAC, OGG, Opus, FLAC, WebM, and the audio track of most MP4 and MOV files. It writes MP3, WAV, M4A, AAC, OGG, Opus, FLAC, AIFF, WMA and M4R. A handful of input formats (WMA, AIFF, AMR, APE) are not decodable by any browser and will be refused with an explanation rather than a silent failure.',
   },
   {
     q: 'Why do some formats download a converter and others do not?',
-    a: 'Browsers ship an MP3 encoder in nothing, but WAV is trivial to write by hand and MP3 has a small pure-JavaScript encoder of about 110 KB. Everything else — AAC, Vorbis, Opus, FLAC, WMA — needs a real codec, which arrives as a WebAssembly build of ffmpeg weighing roughly 31 MB. It downloads once per session and is then reused for every subsequent export.',
+    a: 'Browsers ship an MP3 encoder in nothing, but WAV is trivial to write by hand and MP3 has a small pure-JavaScript encoder of about 110 KB. Everything else (AAC, Vorbis, Opus, FLAC, WMA) needs a real codec, which arrives as a WebAssembly build of ffmpeg weighing roughly 31 MB. It downloads once per session and is then reused for every subsequent export.',
   },
   {
     q: 'Does converting MP3 to another lossy format lose quality?',
@@ -37,7 +37,7 @@ const faq = [
   },
   {
     q: 'Will the tags, cover art and chapter marks survive?',
-    a: 'No. This is a decode-and-re-encode path, so the output contains audio and nothing else — no ID3 tags, no artwork, no chapter markers, no ReplayGain values. Re-tag the result in your music player or in a tag editor afterwards.',
+    a: 'No. This is a decode-and-re-encode path, so the output contains audio and nothing else. No ID3 tags, no artwork, no chapter markers, no ReplayGain values. Re-tag the result in your music player or in a tag editor afterwards.',
   },
   {
     q: 'Should I use this instead of the format-specific pages?',
@@ -81,8 +81,8 @@ const faq = [
     <p>
       There is no such thing as changing an audio file's format in place. Every
       conversion is two separate operations: a decoder turns the compressed
-      bitstream back into a plain list of numbers — one amplitude value per
-      channel, tens of thousands of times per second — and then an encoder packs
+      bitstream back into a plain list of numbers, one amplitude value per
+      channel, tens of thousands of times per second, and then an encoder packs
       those numbers back down using an entirely different set of rules. The
       middle stage is the same raw signal regardless of what you started with,
       which is why a file that has been through several formats carries the scars
@@ -100,8 +100,8 @@ const faq = [
     <p>
       WAV, AIFF and FLAC are lossless: decode one and you get back precisely the
       numbers that went in. MP3, AAC, Vorbis, Opus and WMA are lossy, and they
-      work by modelling what human hearing cannot detect — quiet sounds sitting
-      next to loud ones at nearby frequencies, mostly — and simply not storing
+      work by modelling what human hearing cannot detect, quiet sounds sitting
+      next to loud ones at nearby frequencies, mostly, and simply not storing
       it. The discarded information is gone permanently.
     </p>
     <p>
@@ -118,7 +118,7 @@ const faq = [
 
     <h2>Why some formats are instant and one download is not</h2>
     <p>
-      WAV needs no encoder at all — it is a 44-byte header followed by the raw
+      WAV needs no encoder at all. It is a 44-byte header followed by the raw
       samples, so it is written the instant you click. MP3 uses a compact
       JavaScript port of the LAME encoder, around 110 KB, which loads faster
       than most images on a typical web page.

@@ -10,7 +10,7 @@ const steps = [
   'Drag the handles over the part you want. The selection is capped at 30 seconds because iOS refuses to install anything longer, and the tool trims it for you rather than letting you find out after syncing.',
   'Press play with loop turned on and listen to the first second. A ringtone is judged almost entirely on how it starts, so land the beginning on a beat rather than halfway through a word.',
   'Turn on the fade-out if the clip stops mid-phrase, then click Download ringtone to get an M4R file.',
-  'Sync the M4R to the iPhone with Finder on macOS or iTunes on Windows — the full instructions appear under the tool once the file has saved.',
+  'Sync the M4R to the iPhone with Finder on macOS or iTunes on Windows. The full instructions appear under the tool once the file has saved.',
 ];
 
 const faq = [
@@ -20,7 +20,7 @@ const faq = [
   },
   {
     q: 'What actually is an M4R file?',
-    a: 'An AAC audio stream inside an MP4 container — byte for byte the same thing as an M4A. iOS decides whether a file is a song or a ringtone purely from the extension, which is why renaming an M4A to M4R works and renaming an MP3 does not. The container has to be MP4 to start with.',
+    a: 'An AAC audio stream inside an MP4 container. Byte for byte the same thing as an M4A. iOS decides whether a file is a song or a ringtone purely from the extension, which is why renaming an M4A to M4R works and renaming an MP3 does not. The container has to be MP4 to start with.',
   },
   {
     q: 'Can I install the ringtone directly from my iPhone?',
@@ -28,7 +28,7 @@ const faq = [
   },
   {
     q: 'Why does this tool take longer than the trimmer?',
-    a: 'Browsers ship an AAC decoder but not an AAC encoder, so writing a real M4R needs a proper encoder. The first export downloads a WebAssembly build of ffmpeg — roughly 31 MB — and the browser caches it afterwards, so a second ringtone exports immediately. The audio itself still never leaves your device; the code comes to the file.',
+    a: 'Browsers ship an AAC decoder but not an AAC encoder, so writing a real M4R needs a proper encoder. The first export downloads a WebAssembly build of ffmpeg (roughly 31 MB) and the browser caches it afterwards, so a second ringtone exports immediately. The audio itself still never leaves your device; the code comes to the file.',
   },
   {
     q: 'Where does the name in the ringtone list come from?',
@@ -40,7 +40,7 @@ const faq = [
   },
   {
     q: 'Can I use the same file as a text tone or an alarm?',
-    a: 'Yes. Tones synced to an iPhone appear in every tone list, so the same M4R can be picked under Ringtone, Text Tone or New Voicemail. For a text tone, cut something closer to two or three seconds — a 30-second alert repeated through a workday gets old quickly.',
+    a: 'Yes. Tones synced to an iPhone appear in every tone list, so the same M4R can be picked under Ringtone, Text Tone or New Voicemail. For a text tone, cut something closer to two or three seconds. A 30-second alert repeated through a workday gets old quickly.',
   },
 ];
 ---
@@ -167,7 +167,7 @@ const faq = [
           the sidebar under Locations; click it and trust the computer if
           prompted.</li>
         <li>Drag the .m4r file from Finder straight onto the iPhone in the
-          sidebar. It copies across in a second or two — there is no separate
+          sidebar. It copies across in a second or two, there is no separate
           Tones tab in Finder.</li>
         <li>On the phone, open Settings → Sounds &amp; Haptics → Ringtone. The
           new tone sits at the top of the list, above the built-in ones.</li>
@@ -186,7 +186,7 @@ const faq = [
 
       <h3>With no computer at all</h3>
       <ol>
-        <li>Install GarageBand from the App Store — it is free and this is the
+        <li>Install GarageBand from the App Store. It is free and this is the
           only Apple-supported route that does not involve a cable.</li>
         <li>GarageBand does not import .m4r files. Convert your clip to M4A or
           MP3 first with the audio converter, and save it into Files.</li>
@@ -208,7 +208,7 @@ const faq = [
   <Fragment slot="about">
     <h2>What an M4R file really is</h2>
     <p>
-      An M4R is an AAC audio stream in an MP4 container — the same thing as an
+      An M4R is an AAC audio stream in an MP4 container, the same thing as an
       M4A, with three different letters on the end. iOS never looks inside the
       file to decide what it is; it looks at the extension. That is why renaming
       an M4A to M4R works, why renaming an MP3 to M4R does not, and why the
@@ -229,7 +229,7 @@ const faq = [
     <h2>Choosing 30 seconds that work as a ringtone</h2>
     <p>
       A ringtone is not a short song. It is heard from a pocket, usually across
-      a room, and almost always for less time than it lasts — most people answer
+      a room, and almost always for less time than it lasts, most people answer
       or silence a call within five or six seconds. Everything that matters is
       at the front.
     </p>
@@ -239,7 +239,7 @@ const faq = [
       slow builds are wasted, because the call is answered before they resolve.
       Avoid starting on a breath or a room-tone gap, which reads as a delay in
       the phone rather than part of the music. Loop the selection while you
-      audition it — the loop button in the transport is there for this — and
+      audition it (the loop button in the transport is there for this) and
       listen specifically to the seam where the end meets the start again.
     </p>
     <p>
@@ -254,7 +254,7 @@ const faq = [
       Android treats a ringtone as an ordinary audio file: put an MP3 anywhere
       the phone can see it, point the picker at it, done. iOS treats tones as a
       synced device library, so a file on the phone is not a tone until
-      something tells the system it is one — and nothing in iOS does that. The
+      something tells the system it is one. And nothing in iOS does that. The
       Files app cannot, Safari cannot, and no web page can, whatever it claims
       in its instructions.
     </p>

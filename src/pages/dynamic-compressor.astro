@@ -20,7 +20,7 @@ const faq = [
   },
   {
     q: 'What ratio should I use?',
-    a: 'For speech, 3:1 to 5:1 evens out a delivery without drawing attention to itself. Around 2:1 is barely audible and useful for gentle glue on music. Above about 10:1 the compressor is functioning as a limiter — nothing gets past the threshold by much at all, which is right for peak control and wrong for tone.',
+    a: 'For speech, 3:1 to 5:1 evens out a delivery without drawing attention to itself. Around 2:1 is barely audible and useful for gentle glue on music. Above about 10:1 the compressor is functioning as a limiter. Nothing gets past the threshold by much at all, which is right for peak control and wrong for tone.',
   },
   {
     q: 'Why does a fast attack make things sound dull?',
@@ -40,7 +40,7 @@ const faq = [
   },
   {
     q: 'Should I compress before or after removing silence?',
-    a: 'Remove the silence first. A silence remover works from a level threshold, and compression raises the quiet parts — including room tone — which can lift background noise above that threshold and stop the gaps from being detected at all. Cut first, compress second, set the final level last.',
+    a: 'Remove the silence first. A silence remover works from a level threshold, and compression raises the quiet parts (including room tone) which can lift background noise above that threshold and stop the gaps from being detected at all. Cut first, compress second, set the final level last.',
   },
 ];
 ---
@@ -263,7 +263,7 @@ const faq = [
     <p>
       A compressor is an automatic volume control with a rule. It watches the level of the
       signal, and whenever that level rises above the <strong>threshold</strong> it turns the
-      signal down — not all the way down, only by the fraction set by the
+      signal down. Not all the way down, only by the fraction set by the
       <strong>ratio</strong>. At 4:1, four decibels of input above the threshold come out as
       one. Below the threshold nothing happens at all, so quiet passages are passed through
       exactly as they arrived.
@@ -293,7 +293,7 @@ const faq = [
     <p>
       Release is where the audible artefacts come from. Too short, and the compressor fully
       recovers during every pause, so the room noise under the voice swells and drops with
-      each syllable — the effect usually described as pumping or breathing. Too long, and it
+      each syllable. The effect usually described as pumping or breathing. Too long, and it
       never recovers, so a single loud moment holds everything after it down for seconds. For
       speech, 100–250 ms is a dependable range. For music, a release roughly in step with the
       tempo stops the compressor fighting the groove.
@@ -303,8 +303,8 @@ const faq = [
     <p>
       If the only problem is that a file is quiet from end to end, compression is the wrong
       tool: that is a gain or loudness-normalization job and it costs you nothing in dynamics.
-      If a recording is dynamic on purpose — a classical performance, a sound effect, anything
-      where the contrast is the content — compressing it removes the thing that made it work.
+      If a recording is dynamic on purpose. A classical performance, a sound effect, anything
+      where the contrast is the content. Compressing it removes the thing that made it work.
       And if you are delivering to a streaming platform, they normalize loudness at playback,
       so compressing harder to be louder does not make you louder. It makes you flatter, at
       the same volume as everybody else.

@@ -7,15 +7,15 @@ const tool = getTool('silence-remover');
 
 const steps = [
   'Drop the recording onto the page. It is scanned where it sits, so an hour-long interview costs you the decode and nothing else.',
-  'Set the threshold — the level below which audio counts as silence. The summary underneath immediately tells you how many gaps were found at that setting.',
+  'Set the threshold. The level below which audio counts as silence. The summary underneath immediately tells you how many gaps were found at that setting.',
   'Raise the minimum gap length until the tool stops cutting the natural beats between words, and raise the padding until speech stops sounding clipped at the joins.',
-  'When the summary says the right thing, pick a format and download. The audio that survives is untouched — only the gaps are gone.',
+  'When the summary says the right thing, pick a format and download. The audio that survives is untouched, only the gaps are gone.',
 ];
 
 const faq = [
   {
     q: 'What does the threshold number actually mean?',
-    a: 'It is dBFS: decibels relative to full scale, where 0 is the loudest a digital file can be and everything real sits below it. Your recording has a noise floor — the level of the room and the microphone when nobody is talking — and the threshold has to sit above it. A quiet indoor room floors out around -50 dBFS, a phone in a cafe closer to -35.',
+    a: 'It is dBFS: decibels relative to full scale, where 0 is the loudest a digital file can be and everything real sits below it. Your recording has a noise floor (the level of the room and the microphone when nobody is talking) and the threshold has to sit above it. A quiet indoor room floors out around -50 dBFS, a phone in a cafe closer to -35.',
   },
   {
     q: 'It is cutting the beginning off words. How do I stop that?',
@@ -31,7 +31,7 @@ const faq = [
   },
   {
     q: 'Will it work on music?',
-    a: 'Rarely, and usually not in a way you want. Music has a reverb tail, a bass note ringing out, or a sustained pad that keeps the level above any sensible threshold, so nothing is detected. Where it does trigger — between movements, or in a sparse acoustic recording — it will happily remove the rest the composer wrote in. Use the trimmer for music.',
+    a: 'Rarely, and usually not in a way you want. Music has a reverb tail, a bass note ringing out, or a sustained pad that keeps the level above any sensible threshold, so nothing is detected. Where it does trigger (between movements, or in a sparse acoustic recording) it will happily remove the rest the composer wrote in. Use the trimmer for music.',
   },
   {
     q: 'Does removing silence change the pitch or speed of what is left?',
@@ -39,7 +39,7 @@ const faq = [
   },
   {
     q: 'Can it get rid of background hiss?',
-    a: 'No — hiss is not silence, it is a continuous signal, and this tool only deletes time. What it does do is remove the passages where the hiss is all you can hear, which makes a noisy recording feel cleaner without touching the noise itself. For actual hiss reduction you want a noise reduction pass, or a high-pass filter if the problem is low rumble.',
+    a: 'No. Hiss is not silence, it is a continuous signal, and this tool only deletes time. What it does do is remove the passages where the hiss is all you can hear, which makes a noisy recording feel cleaner without touching the noise itself. For actual hiss reduction you want a noise reduction pass, or a high-pass filter if the problem is low rumble.',
   },
 ];
 ---
@@ -149,8 +149,8 @@ const faq = [
     <h2>What the tool calls silence</h2>
     <p>
       Silence in a recording is almost never silence. Even a treated room has a
-      noise floor — the microphone's self-noise, the air handling, traffic through a
-      wall — so the passage you think of as "nothing" still carries a signal. That is
+      noise floor. The microphone's self-noise, the air handling, traffic through a
+      wall. So the passage you think of as "nothing" still carries a signal. That is
       why the control is a threshold rather than a switch. The file is measured in
       20-millisecond windows, each window's RMS level is compared against your
       number, and anything below it is a candidate for removal.
@@ -163,7 +163,7 @@ const faq = [
       its individual cycles, which is what a listener hears anyway.
     </p>
     <p>
-      The second condition — minimum gap length — is what separates a pause from a
+      The second condition (minimum gap length) is what separates a pause from a
       rhythm. Ordinary speech contains dozens of sub-200-millisecond silences per
       minute, between words and inside stop consonants, and removing them makes a
       person sound like they are being played back wrong. Setting the minimum around
@@ -175,7 +175,7 @@ const faq = [
     <p>
       When a stretch is removed, the cut is pulled inward by the padding amount at
       both ends, so some of the quiet stays. This is not politeness; it is a fix for
-      a specific artefact. Plosives and fricatives — p, t, k, s — begin with a very
+      a specific artefact. Plosives and fricatives (p, t, k, s) begin with a very
       low-energy approach before the burst, and a cut placed exactly where the level
       crosses the threshold slices into that approach. The result sounds like the
       speaker is being interrupted by their own recording.
@@ -192,7 +192,7 @@ const faq = [
       Anything where the silence is the content. Music uses rests structurally, and a
       tool that cannot tell a rest from dead air will flatten a piece. Recordings
       intended as evidence or as a record of a meeting should not have time removed
-      at all — the edit is invisible in the result, which is exactly the problem.
+      at all. The edit is invisible in the result, which is exactly the problem.
     </p>
     <p>
       And if the goal is a shorter file rather than a tighter one, this is an
@@ -273,7 +273,7 @@ const faq = [
         const share = Math.round((removed / total) * 100);
         reportText.textContent =
           `Highlighted on the waveform: ${regions.length} gap${regions.length === 1 ? '' : 's'} found. ` +
-          `About ${fmtDuration(removed)} comes out — ${share}% of the file — ` +
+          `About ${fmtDuration(removed)} comes out (${share}% of the file) ` +
           `leaving ${fmtDuration(total - removed)} of ${fmtDuration(total)}.`;
         report.hidden = false;
       };

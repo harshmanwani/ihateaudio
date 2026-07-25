@@ -6,7 +6,7 @@ import { getTool } from '../data/tools';
 const tool = getTool('audio-joiner');
 
 const steps = [
-  'Drop every file you want to merge onto the page in one go. They are decoded on your machine — nothing is sent anywhere, and there is no queue to wait in.',
+  'Drop every file you want to merge onto the page in one go. They are decoded on your machine. Nothing is sent anywhere, and there is no queue to wait in.',
   'Put them in the order you want. Drag a row by its handle, or use the up and down buttons on each row if you would rather not drag. Row one plays first.',
   'Set a gap if you want a pause between tracks. Zero joins them with no space at all, which is what you want for segments of one continuous recording.',
   'Pick an output format and download. The merged file is written from the decoded samples, so the parts line up exactly where the list says they will.',
@@ -15,7 +15,7 @@ const steps = [
 const faq = [
   {
     q: 'Can I reorder the files after they load?',
-    a: 'Yes — that is the point of the list. Drag a row by the handle on the left, or move it with the up and down buttons, which work with a keyboard. The order you see top to bottom is the order in the exported file, and nothing is committed until you press download.',
+    a: 'Yes. That is the point of the list. Drag a row by the handle on the left, or move it with the up and down buttons, which work with a keyboard. The order you see top to bottom is the order in the exported file, and nothing is committed until you press download.',
   },
   {
     q: 'What happens if my files have different sample rates or channel counts?',
@@ -27,7 +27,7 @@ const faq = [
   },
   {
     q: 'Can I add more files after the first batch has loaded?',
-    a: 'Not to the existing list — dropping files again starts over with the new set. Select everything you want in one go from the file picker, or drag them all in together. Reordering afterwards is free, so the order you pick them in does not matter.',
+    a: 'Not to the existing list. Dropping files again starts over with the new set. Select everything you want in one go from the file picker, or drag them all in together. Reordering afterwards is free, so the order you pick them in does not matter.',
   },
   {
     q: 'How many files can I merge, and how long can the result be?',
@@ -39,7 +39,7 @@ const faq = [
   },
   {
     q: 'Is the gap real silence, or a fade?',
-    a: 'Real silence — digital zero, inserted between tracks. It does not soften anything. If a track ends abruptly, a gap makes the abruptness more obvious rather than less, because now there is nothing to distract from it. Fade the ends first if that is the problem you are solving.',
+    a: 'Real silence, digital zero, inserted between tracks. It does not soften anything. If a track ends abruptly, a gap makes the abruptness more obvious rather than less, because now there is nothing to distract from it. Fade the ends first if that is the problem you are solving.',
   },
 ];
 ---
@@ -50,7 +50,7 @@ const faq = [
     multiple
     action="Download merged file"
     dropTitle="Drop the files you want to merge"
-    dropHint="choose them all at once — you can reorder them after"
+    dropHint="choose them all at once, you can reorder them after"
   >
     <div class="controls">
       <div class="controls__head">
@@ -114,7 +114,7 @@ const faq = [
       of them has half as many channels. Everything is brought to the highest
       sample rate and the widest channel count present before the join, so the
       voice memo is resampled upward and copied across both channels. The
-      alternative — matching downward — would quietly degrade your best source to
+      alternative (matching downward) would quietly degrade your best source to
       accommodate your worst, and that is the wrong default.
     </p>
 
@@ -132,7 +132,7 @@ const faq = [
       seconds between album tracks reads as deliberate. One to two seconds between
       audiobook or podcast chapters gives a listener time to register that
       something changed. Between two halves of a single continuous take, any gap at
-      all sounds like a mistake — join those at zero and, if there is a click, fix
+      all sounds like a mistake. Join those at zero and, if there is a click, fix
       the click rather than papering over it with silence.
     </p>
 
@@ -146,8 +146,8 @@ const faq = [
       everyone.
     </p>
     <p>
-      If this merge is one step of several — say you plan to normalize the result,
-      or trim the front — take WAV or FLAC out of here instead. Both are lossless,
+      If this merge is one step of several. Say you plan to normalize the result,
+      or trim the front. Take WAV or FLAC out of here instead. Both are lossless,
       so the intermediate steps cost nothing, and you encode to MP3 once at the very
       end. FLAC is roughly half the size of WAV for identical audio, which matters
       when the merged file is an hour long.
@@ -187,7 +187,7 @@ const faq = [
         const spacing = gap * Math.max(0, order.length - 1);
         totalOut.textContent =
           order.length === 1
-            ? 'One file — add more to merge them.'
+            ? 'One file, add more to merge them.'
             : `${order.length} files · ${fmtDuration(sum + spacing)} total`;
       };
 

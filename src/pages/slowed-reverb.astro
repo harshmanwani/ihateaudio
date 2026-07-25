@@ -6,7 +6,7 @@ import { getTool } from '../data/tools';
 const tool = getTool('slowed-reverb');
 
 const steps = [
-  'Drop the song onto the page. It is read straight off your device — nothing is uploaded, so there is no queue and no watermark.',
+  'Drop the song onto the page. It is read straight off your device. Nothing is uploaded, so there is no queue and no watermark.',
   'Pick a preset, or drag the Intensity slider. One knob moves the slowdown and the reverb together, which is how the two settings actually behave in this style.',
   'Press Preview to render it, then play it back. Listen to a chorus rather than the intro, because that is where too much reverb shows up first.',
   'Open Advanced if you want to separate the two: speed on its own, reverb amount on its own, and how long the tail rings for.',
@@ -16,7 +16,7 @@ const steps = [
 const faq = [
   {
     q: 'What actually makes a song "slowed and reverb"?',
-    a: 'Two things and nothing else. The track is played back at roughly 80–90% of its original speed, which drops the pitch by two or three semitones as a side effect, and reverb is mixed in to blur the edges and make it sound like it is playing in a large empty room. Everything else people add — bass boosts, vinyl crackle, muffling — is decoration on top of those two moves.',
+    a: 'Two things and nothing else. The track is played back at roughly 80–90% of its original speed, which drops the pitch by two or three semitones as a side effect, and reverb is mixed in to blur the edges and make it sound like it is playing in a large empty room. Everything else people add (bass boosts, vinyl crackle, muffling) is decoration on top of those two moves.',
   },
   {
     q: 'Should the pitch drop, or should I keep it where it is?',
@@ -24,7 +24,7 @@ const faq = [
   },
   {
     q: 'What speed do most edits actually use?',
-    a: 'Around 0.85x is the centre of gravity — slow enough to be obvious in the first two seconds, not so slow that the vocal starts to drag. 0.9x reads as subtle and works well under talking-head video. Below 0.8x the vocal begins to smear and the track starts to feel like a different genre; that is where the deep and "super slowed" edits live.',
+    a: 'Around 0.85x is the centre of gravity. Slow enough to be obvious in the first two seconds, not so slow that the vocal starts to drag. 0.9x reads as subtle and works well under talking-head video. Below 0.8x the vocal begins to smear and the track starts to feel like a different genre; that is where the deep and "super slowed" edits live.',
   },
   {
     q: 'How much reverb is too much?',
@@ -85,16 +85,16 @@ const faq = [
       <div class="field controls__full">
         <span class="label" id="sr-presets">Presets</span>
         <div class="seg" role="group" aria-labelledby="sr-presets">
-          <button type="button" class="seg__btn" data-preset="18" aria-label="Subtle — 0.92x with light reverb" aria-pressed="false">Subtle</button>
-          <button type="button" class="seg__btn" data-preset="59" aria-label="Classic slowed — 0.85x with medium reverb" aria-pressed="true">Classic</button>
-          <button type="button" class="seg__btn" data-preset="88" aria-label="Deep slowed — 0.80x with heavy reverb" aria-pressed="false">Deep</button>
+          <button type="button" class="seg__btn" data-preset="18" aria-label="Subtle, 0.92x with light reverb" aria-pressed="false">Subtle</button>
+          <button type="button" class="seg__btn" data-preset="59" aria-label="Classic slowed, 0.85x with medium reverb" aria-pressed="true">Classic</button>
+          <button type="button" class="seg__btn" data-preset="88" aria-label="Deep slowed, 0.80x with heavy reverb" aria-pressed="false">Deep</button>
         </div>
       </div>
 
       <div class="field">
         <span class="label">
           New length
-          <span class="label__value tnum" data-out="length">—</span>
+          <span class="label__value tnum" data-out="length">·</span>
         </span>
         <span class="hint" data-out="drop">The pitch comes down with the speed.</span>
       </div>
@@ -220,9 +220,9 @@ const faq = [
       Houston in the early nineties, dragging tapes down to a crawl and creating
       the chopped and screwed style that shaped a generation of southern rap.
       Vaporwave picked the idea up in the 2010s and pointed it at old pop and
-      lounge music. The specific "slowed + reverb" version — a normal song,
+      lounge music. The specific "slowed + reverb" version, a normal song,
       slowed maybe fifteen percent, drowned in room reverb, posted as a whole
-      track — spread through SoundCloud and YouTube around 2016 and then became
+      track. Spread through SoundCloud and YouTube around 2016 and then became
       one of the default ways short-form video sets a mood.
     </p>
     <p>
@@ -238,7 +238,7 @@ const faq = [
     <p>
       Speed here is a genuine playback-rate change, the same operation as a
       turntable running slow. At 0.85x every frequency in the recording drops to
-      85% of where it was, which is a fall of about 2.8 semitones — a bit less
+      85% of where it was, which is a fall of about 2.8 semitones, a bit less
       than a minor third. At 0.8x it is roughly 3.9 semitones, near a major
       third. Nothing is stretched or reconstructed, so there are no processing
       artefacts at all; it is simply a lower, longer version of the same file.
@@ -247,7 +247,7 @@ const faq = [
       The reverb is convolution. A short burst of decaying, gradually darkening
       noise stands in for the impulse response of a room, and every sample of
       your song is smeared through it. <em>Mix</em> sets how much of that wet
-      signal is blended back with the dry track — 20% is a suggestion of space,
+      signal is blended back with the dry track. 20% is a suggestion of space,
       45% is properly cavernous. <em>Tail length</em> sets how long the room
       keeps ringing after a sound stops. Long tails suit slow, sparse songs;
       anything busy needs a short one or the reverb from one bar will still be
@@ -260,7 +260,7 @@ const faq = [
       Reverb past about 45% stops sounding atmospheric and starts sounding like a
       bad room recording, because the consonants that carry the words get buried
       under the tail. If the vocal is losing intelligibility, pull the mix down
-      before you pull the speed up — the slowdown is doing the heavy lifting and
+      before you pull the speed up. The slowdown is doing the heavy lifting and
       the reverb is there to support it.
     </p>
     <p>
@@ -375,7 +375,7 @@ const faq = [
           const semitones = Math.abs(12 * Math.log2(rate));
           dropOut.textContent =
             rate >= 0.999
-              ? 'No slowdown — the pitch stays where it is.'
+              ? 'No slowdown. The pitch stays where it is.'
               : `Pitch drops about ${semitones.toFixed(1)} semitones. Was ${duration(source?.duration ?? 0)}.`;
         }
 

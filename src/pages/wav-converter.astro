@@ -8,7 +8,7 @@ const tool = getTool('wav-converter');
 const steps = [
   'Drop an MP3, M4A, OGG, FLAC or Opus file onto the page. It is decoded in the tab; nothing is uploaded.',
   'Pick a bit depth. 16-bit matches CD and is what most software expects; 24-bit matches studio practice; 32-bit writes IEEE floating point.',
-  'Watch the projected size — WAV is uncompressed, so it grows quickly and the number below tells you exactly how quickly.',
+  'Watch the projected size. WAV is uncompressed, so it grows quickly and the number below tells you exactly how quickly.',
   'Click Download. WAV needs no encoder, so the file is written the moment you click and there is nothing to wait for.',
 ];
 
@@ -31,15 +31,15 @@ const faq = [
   },
   {
     q: 'Why does my WAV fail above about 4 GB?',
-    a: 'WAV inherited its chunk sizes from the RIFF container, and those sizes are unsigned 32-bit integers, so the format tops out just under 4 GB — around six and three quarter hours of 16-bit stereo at 44.1 kHz. Extensions such as RF64 and Wave64 lift the ceiling but are not widely supported. For anything that long, split the recording or use FLAC.',
+    a: 'WAV inherited its chunk sizes from the RIFF container, and those sizes are unsigned 32-bit integers, so the format tops out just under 4 GB. Around six and three quarter hours of 16-bit stereo at 44.1 kHz. Extensions such as RF64 and Wave64 lift the ceiling but are not widely supported. For anything that long, split the recording or use FLAC.',
   },
   {
     q: 'Will my tags and cover art survive?',
-    a: 'No. WAV has no standard tagging scheme worth relying on — a few programs write ID3 or LIST chunks and most ignore them. The output here is audio plus a 44-byte header and nothing else. If you care about metadata, FLAC or M4A are far better containers for it.',
+    a: 'No. WAV has no standard tagging scheme worth relying on. A few programs write ID3 or LIST chunks and most ignore them. The output here is audio plus a 44-byte header and nothing else. If you care about metadata, FLAC or M4A are far better containers for it.',
   },
   {
     q: 'Is the sample rate preserved?',
-    a: 'Yes. WAV can carry any sample rate, so whatever the source declares is what the output declares — 44.1 kHz stays 44.1 kHz and 96 kHz stays 96 kHz. That is one of the reasons WAV is a safe intermediate format, and why MP3, which is limited to 48 kHz and below, is not.',
+    a: 'Yes. WAV can carry any sample rate, so whatever the source declares is what the output declares, 44.1 kHz stays 44.1 kHz and 96 kHz stays 96 kHz. That is one of the reasons WAV is a safe intermediate format, and why MP3, which is limited to 48 kHz and below, is not.',
   },
 ];
 ---
@@ -85,7 +85,7 @@ const faq = [
     <p>
       A WAV file is a 44-byte header followed by the raw samples, in order,
       untouched. Microsoft and IBM defined it in 1991 as part of the Multimedia
-      PC specification, building on RIFF — Microsoft's little-endian rework of
+      PC specification, building on RIFF. Microsoft's little-endian rework of
       Electronic Arts' Interchange File Format. The header states how many
       channels there are, how many samples per second, and how many bits each
       sample uses. After that it is just numbers.
@@ -106,7 +106,7 @@ const faq = [
       roughly 96 dB between the loudest representable signal and the noise floor,
       which comfortably exceeds what any listening environment outside an anechoic
       chamber can resolve. Twenty-four bits gives about 144 dB, which no
-      microphone or converter can deliver either — its value is headroom during
+      microphone or converter can deliver either, its value is headroom during
       production, not fidelity at playback.
     </p>
     <p>
@@ -127,7 +127,7 @@ const faq = [
       authoring, game engines loading short sound effects that must not cost CPU
       to decode, and broadcast workflows built on BWF, which is a WAV with an
       extra chunk carrying timecode and origination data. Use it as a working
-      format between edits, where its lack of compression is a feature — nothing
+      format between edits, where its lack of compression is a feature, nothing
       degrades no matter how many times you save.
     </p>
     <p>

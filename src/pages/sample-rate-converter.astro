@@ -7,7 +7,7 @@ const tool = getTool('sample-rate-converter');
 
 const steps = [
   'Drop your audio file onto the page. Its current sample rate is read from the file header and shown below.',
-  'Pick the rate the destination system needs — 16 kHz for speech models, 44.1 kHz for CD and music, 48 kHz for anything going into video.',
+  'Pick the rate the destination system needs. 16 kHz for speech models, 44.1 kHz for CD and music, 48 kHz for anything going into video.',
   'Check the warnings. Choosing a rate higher than the original cannot add detail, and the page says so rather than letting you assume otherwise.',
   'Export as WAV or FLAC to keep the rate exactly as chosen. MP3 supports only a fixed list of rates and will move you to the nearest one.',
 ];
@@ -23,7 +23,7 @@ const faq = [
   },
   {
     q: 'Why is 44.1 kHz such an odd number?',
-    a: 'It comes from videotape. Before dedicated digital audio recorders existed, engineers stored digital audio as fake video on U-matic tape using a PCM adaptor. Fitting three samples per usable line worked out to 245 lines at 60 fields per second on NTSC and 294 lines at 50 fields on PAL — both of which multiply out to exactly 44,100. The CD standard inherited it in 1980 and it never went away.',
+    a: 'It comes from videotape. Before dedicated digital audio recorders existed, engineers stored digital audio as fake video on U-matic tape using a PCM adaptor. Fitting three samples per usable line worked out to 245 lines at 60 fields per second on NTSC and 294 lines at 50 fields on PAL. Both of which multiply out to exactly 44,100. The CD standard inherited it in 1980 and it never went away.',
   },
   {
     q: 'What is aliasing, and does this tool avoid it?',
@@ -31,7 +31,7 @@ const faq = [
   },
   {
     q: 'Does changing the sample rate change the pitch or the length?',
-    a: 'Not here. Resampling recalculates the sample values so the audio occupies the same amount of time at the new rate. What people are usually thinking of is reinterpreting a file at a different rate without recalculating it, which does shift both pitch and length — that is the speed changer, and it is a separate tool.',
+    a: 'Not here. Resampling recalculates the sample values so the audio occupies the same amount of time at the new rate. What people are usually thinking of is reinterpreting a file at a different rate without recalculating it, which does shift both pitch and length. That is the speed changer, and it is a separate tool.',
   },
   {
     q: 'I chose 96 kHz but the MP3 came out at 48 kHz. Why?',
@@ -55,13 +55,13 @@ const faq = [
       <div class="field">
         <label class="label" for="target-rate">Convert to</label>
         <select class="select" id="target-rate" data-control="rate">
-          <option value="8000">8 kHz — telephone, narrowband VoIP</option>
-          <option value="16000">16 kHz — speech models, wideband voice</option>
-          <option value="22050">22.05 kHz — half of CD, embedded audio</option>
-          <option value="32000">32 kHz — broadcast and DAT long-play</option>
-          <option value="44100" selected>44.1 kHz — CD and music standard</option>
-          <option value="48000">48 kHz — video, film and pro audio</option>
-          <option value="96000">96 kHz — high-resolution production</option>
+          <option value="8000">8 kHz, telephone, narrowband VoIP</option>
+          <option value="16000">16 kHz, speech models, wideband voice</option>
+          <option value="22050">22.05 kHz, half of CD, embedded audio</option>
+          <option value="32000">32 kHz, broadcast and DAT long-play</option>
+          <option value="44100" selected>44.1 kHz. CD and music standard</option>
+          <option value="48000">48 kHz, video, film and pro audio</option>
+          <option value="96000">96 kHz, high-resolution production</option>
         </select>
       </div>
 
@@ -99,7 +99,7 @@ const faq = [
       frequency a recording can represent is exactly half its sample rate. At
       44.1 kHz the ceiling is 22.05 kHz, comfortably above the roughly 20 kHz
       limit of good young hearing. At 8 kHz the ceiling is 4 kHz, which is why a
-      phone call renders "S" and "F" almost identically — the energy that
+      phone call renders "S" and "F" almost identically, the energy that
       distinguishes those consonants lives above 4 kHz and is simply not there.
     </p>
     <p>
@@ -107,8 +107,8 @@ const faq = [
       the audio twice as good; it moves a ceiling that was already above your
       hearing further above it, while doubling the storage and the processing
       cost. Where higher rates genuinely help is during production, because
-      effects that generate new harmonics — distortion, saturation, aggressive
-      compression — have somewhere to put them before they fold back down.
+      effects that generate new harmonics, distortion, saturation, aggressive
+      compression. Have somewhere to put them before they fold back down.
     </p>
 
     <h2>Why the standard rates are the numbers they are</h2>
@@ -134,7 +134,7 @@ const faq = [
     <h2>What downsampling costs, and what this tool does not do</h2>
     <p>
       Lowering the rate is not free. Any content above the new ceiling has to be
-      removed first, and if it is not, it does not vanish — it folds back down
+      removed first, and if it is not, it does not vanish, it folds back down
       into the audible range as inharmonic tones. A shimmering cymbal becomes a
       metallic warble; sibilance becomes grit. Proper sample rate converters run
       a steep low-pass filter before discarding samples, precisely to prevent
@@ -231,7 +231,7 @@ const faq = [
           sourceRate / 2
         )}. Converting up to ${khz(
           rate
-        )} interpolates new samples between the existing ones — it makes the file larger and cannot add detail that was never recorded. Do this only because something downstream demands the higher rate.`;
+        )} interpolates new samples between the existing ones. It makes the file larger and cannot add detail that was never recorded. Do this only because something downstream demands the higher rate.`;
       }
     }
 

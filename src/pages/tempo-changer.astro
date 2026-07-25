@@ -32,7 +32,7 @@ const faq = [
   },
   {
     q: 'Can I use this to match two tracks for a mix?',
-    a: 'Yes, and this is where the BPM box earns its place. Detect or look up both tempos, divide the target by the source, and enter that as the percentage — 128 into 124 is 96.9%. Beat-matching still needs the downbeats aligned afterwards, which is a job for the trimmer, but the tempo will hold across the whole track rather than drifting.',
+    a: 'Yes, and this is where the BPM box earns its place. Detect or look up both tempos, divide the target by the source, and enter that as the percentage, 128 into 124 is 96.9%. Beat-matching still needs the downbeats aligned afterwards, which is a job for the trimmer, but the tempo will hold across the whole track rather than drifting.',
   },
   {
     q: 'Why does the result sometimes sound slightly flangy?',
@@ -114,7 +114,7 @@ const faq = [
       <div class="field">
         <span class="label">
           New length
-          <span class="label__value tnum" data-out="length">—</span>
+          <span class="label__value tnum" data-out="length">·</span>
         </span>
         <span class="hint" data-out="length-hint">Load a file to see the new running time.</span>
       </div>
@@ -133,8 +133,8 @@ const faq = [
     <h2>Why practising along with a recording needs this</h2>
     <p>
       Learning a part by ear from a record is a good way to learn, right up until
-      the passage is faster than your hands. The obvious fix — slow the recording
-      down — used to mean slowing the tape, which drops the pitch with it. A solo
+      the passage is faster than your hands. The obvious fix, slow the recording
+      down. Used to mean slowing the tape, which drops the pitch with it. A solo
       slowed to three quarters speed on tape arrives roughly five semitones flat.
       Now your fingering no longer matches what you are hearing, your ear is
       being trained on the wrong intervals, and you cannot play along on a tuned
@@ -177,7 +177,7 @@ const faq = [
     <h2>Where the limits are</h2>
     <p>
       Stretching is interpolation, and interpolation invents nothing. At moderate
-      ratios — say 75% to 130% — there is very little to invent and the output is
+      ratios (say 75% to 130%) there is very little to invent and the output is
       close to transparent. Push further and the algorithm has to repeat or drop
       an increasing share of the material. On sustained sounds that is harmless.
       On transients it is not: a snare hit stretched across two windows arrives
@@ -185,7 +185,7 @@ const faq = [
     </p>
     <p>
       If you need a very large change and the pitch does not matter, use the
-      speed changer instead — a plain resample is artefact-free at any ratio. If
+      speed changer instead. A plain resample is artefact-free at any ratio. If
       you need the pitch moved and the timing held, that is the pitch shifter.
       This page is for the case in the middle, where the timing is the thing that
       has to change and the key must not.
@@ -236,7 +236,7 @@ const faq = [
         if (lengthHint) {
           lengthHint.textContent =
             percent === 100
-              ? `Unchanged — ${duration(source?.duration ?? 0)}.`
+              ? `Unchanged, ${duration(source?.duration ?? 0)}.`
               : `Was ${duration(source?.duration ?? 0)}.`;
         }
         if (bpmOut) {
@@ -274,7 +274,7 @@ const faq = [
           if (state) {
             state.textContent = auditionBuffer
               ? 'Preview ready. Press play.'
-              : 'Nothing to hear — the tempo is unchanged.';
+              : 'Nothing to hear, the tempo is unchanged.';
           }
         } catch {
           if (state) {

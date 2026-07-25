@@ -6,28 +6,32 @@ import { CATEGORIES, TOOLS, toolsIn } from '../data/tools';
 
 const homeFaq = [
   {
-    q: 'Is it actually free? What’s the catch?',
-    a: 'Free, no catch. Because every tool runs in your browser, there are no processing servers to pay for — static pages cost almost nothing to serve. There is no premium tier, no watermark, no daily limit, and no account to make.',
+    q: 'Is this actually free, or is there a catch?',
+    a: "Actually free. No trial that runs out, no \u201cpro\u201d tier hiding the good stuff, no watermark on your file, no daily limit, no account. You will not be asked for an email. There is genuinely nothing to upgrade to.",
   },
   {
-    q: 'Are my files uploaded anywhere?',
-    a: 'No. Your file is read directly by your browser and processed on your own machine. You can verify this: open your browser’s network tab while using any tool, or switch to airplane mode after the page loads — everything keeps working.',
+    q: 'Does my file get uploaded somewhere?',
+    a: 'Nope. Your browser reads the file straight off your device and does all the work there. You do not have to trust us on this either: open your network tab while you edit, or flip on airplane mode after the page loads. Everything keeps working, because there was never anything on the other end.',
   },
   {
-    q: 'Is there a file size limit?',
-    a: 'No imposed limit — there is no upload, so there is nothing to cap. The practical limit is your device’s memory: roughly 40 minutes of audio at once on a phone, several hours on a desktop. If a file is too large, the tool tells you before trying.',
+    q: 'How big a file can I throw at it?',
+    a: 'There is no limit we set, because there is no upload to cap. The real ceiling is your own device: roughly 40 minutes of audio at once on a phone, a few hours on a laptop. If your file is too big, the tool says so up front instead of dying halfway through.',
   },
   {
-    q: 'What formats can I use?',
-    a: 'MP3, WAV, M4A, AAC, OGG, Opus, FLAC and WebM open directly. WMA, AIFF and other unusual formats work through the converter, which loads a fuller decoder on demand. Video files (MP4, MOV, MKV) work in the video-to-audio tool.',
+    q: 'Which formats work?',
+    a: 'MP3, WAV, M4A, AAC, OGG, Opus, FLAC and WebM all open straight away. WMA, AIFF and other oddballs go through the converter, which grabs a fuller decoder the first time you need it. Video files work too if you just want the audio out of them.',
   },
   {
-    q: 'Do the tools work offline?',
-    a: 'Yes. Once you’ve visited, the site works with no connection — you can install it like an app from your browser’s menu. Only the rarely-needed format converter requires one download the first time you use it.',
+    q: 'Can I use this on my phone?',
+    a: 'Yes, and it is built for it. Every control is thumb-sized, the waveform takes touch drags properly, and the ringtone makers assume you are on the phone you want the ringtone on. It also installs to your home screen if you want it there.',
   },
   {
-    q: 'Why should I trust the “nothing is uploaded” claim?',
-    a: 'Because you don’t have to take our word for it. The claim is checkable in under a minute with your browser’s own developer tools, and the site keeps working with the internet disconnected — something no upload-based service can do.',
+    q: 'Does it work offline?',
+    a: 'Once you have loaded a page, yes. Take it on a plane, use it on hotel wifi that barely works, whatever. The one exception is the format converter, which needs a single download the first time you ask for something unusual.',
+  },
+  {
+    q: 'Why should I believe the no-upload thing?',
+    a: 'Because you can check it in about thirty seconds and you do not need to take our word for anything. Open your browser tools, watch the network, and edit a file. Nothing leaves. Then pull your wifi and keep editing. No site that uploads your audio can do that.',
   },
 ];
 
@@ -64,7 +68,7 @@ const schema = [
 ---
 
 <Base
-  title="ihateaudio — Free Audio Tools That Run in Your Browser"
+  title="ihateaudio: Free Audio Tools That Run in Your Browser"
   description={SITE.description}
   path="/"
   schema={schema}
@@ -72,10 +76,10 @@ const schema = [
   <div class="wrap">
     <section class="hero">
       <div>
-        <h1>Audio editing is miserable. These make it less so.</h1>
+        <h1>Audio editing is miserable. We make it less so.</h1>
         <p class="hero__sub">
-          {TOOLS.length} free tools that run entirely in your browser — nothing is
-          uploaded, nothing to install, nothing to sign up for.
+          {TOOLS.length} tools that run right here in your browser. Drop a file
+          in, get it back fixed. No uploads, no signup, no nonsense.
         </p>
       </div>
       <div class="toolsearch">
@@ -112,7 +116,7 @@ const schema = [
     </div>
 
     <p class="searchempty" data-search-empty hidden>
-      Nothing matched that. Try “trim”, “mp4 to mp3”, “louder” or “ringtone”.
+      Nothing there. Try “trim”, “mp4 to mp3”, “louder” or “ringtone”.
     </p>
 
     {
@@ -151,12 +155,12 @@ const schema = [
   <section class="trust" aria-labelledby="trust-heading">
     <div class="wrap">
       <h2 id="trust-heading">
-        No upload. No account. Check for yourself.
+        Your audio never leaves your laptop.
       </h2>
       <p class="trust__lede">
-        Every tool on this site does its work inside your browser, on your own
-        machine. That is not a promise you have to take on faith — it is
-        something you can verify in under a minute.
+        Every tool here works inside your browser, on your own device. You do
+        not have to take that on faith. It takes about thirty seconds to check,
+        and we would rather you did.
       </p>
 
       <div class="trust__steps">
@@ -164,65 +168,67 @@ const schema = [
           <div class="trust__glyph">
             <Icon name="upload-simple" weight="duotone" size={24} />
           </div>
-          <h3>Drop a file</h3>
+          <h3>Drop your file in</h3>
           <p>
-            It is read straight off your disk into the page. No transfer, no
-            queue, no size cap — a two-hour recording opens as fast as your
-            machine can decode it.
+            It gets read straight off your disk. Nothing to transfer, no queue
+            to wait in, no size cap. A two hour recording opens about as fast as
+            your laptop can read it.
           </p>
         </div>
         <div class="trust__step">
           <div class="trust__glyph">
             <Icon name="sliders-horizontal" weight="duotone" size={24} />
           </div>
-          <h3>Edit it here</h3>
+          <h3>Do the thing</h3>
           <p>
-            The processing uses the audio engine built into your browser — the
-            same one behind web games and video calls. Your machine does the
-            work, so nothing waits on a server.
+            Your browser has had a proper audio engine inside it for years, the
+            same one running web games and video calls. We just gave it a
+            decent set of buttons. Your device does the work, so nothing is
+            waiting on a server somewhere.
           </p>
         </div>
         <div class="trust__step">
           <div class="trust__glyph">
             <Icon name="download-simple" weight="duotone" size={24} />
           </div>
-          <h3>Download the result</h3>
+          <h3>Take it and go</h3>
           <p>
-            The finished file is written by the same page and saved straight to
-            your downloads. Close the tab and every trace of your audio is
-            gone.
+            The finished file is written by the same page and lands in your
+            downloads. Close the tab and every trace of your audio is gone with
+            it. That is the whole lifecycle.
           </p>
         </div>
       </div>
 
       <div class="trust__facts">
         <div class="trust__fact">
-          <strong>Zero uploads</strong>
+          <strong>Zero uploads, checkable</strong>
           <span>
-            Open your browser's network tab while you edit — no request ever
-            carries your file.
+            Watch your network tab while you work. Not one request carries your
+            file anywhere.
           </span>
         </div>
         <div class="trust__fact">
-          <strong>Works in airplane mode</strong>
+          <strong>Fine on airplane wifi</strong>
           <span>
-            Load a tool, disconnect, keep working. No upload service can do
-            that.
+            Load a tool, go offline, keep working. No upload site on earth can
+            pull that off.
           </span>
         </div>
         <div class="trust__fact">
           <strong>Nothing to sign into</strong>
           <span>
-            No accounts exist here, so there is no password, profile or email
-            list to leak.
+            No accounts exist here at all, so there is no password, profile or
+            mailing list to end up somewhere it should not.
           </span>
         </div>
         <div class="trust__fact">
-          <strong>Free because it's cheap</strong>
+          <strong>Built like someone cared</strong>
           <span>
-            No processing servers means almost no running costs — read{' '}
-            <a href="/about">how it works</a>{' '}and{' '}
-            <a href="/privacy">the privacy details</a>.
+            We spent an unreasonable number of hours on things like waveform
+            accuracy so you would never have to think about them.{' '}
+            <a href="/about">What went into it</a>{' '}and{' '}
+            <a href="/privacy">what we do with your data</a>.
           </span>
         </div>
       </div>

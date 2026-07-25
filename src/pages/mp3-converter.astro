@@ -26,7 +26,7 @@ const bitrates = [
 const faq = [
   {
     q: 'What bitrate should I pick?',
-    a: '192 kbps for music is the answer that almost never gets anyone in trouble — the difference from 320 is inaudible on ordinary equipment, and the file is over 40 percent smaller. For pure speech, 96 kbps is plenty and 64 kbps is usable. Go to 320 only when you are archiving and the extra megabytes cost you nothing.',
+    a: '192 kbps for music is the answer that almost never gets anyone in trouble. The difference from 320 is inaudible on ordinary equipment, and the file is over 40 percent smaller. For pure speech, 96 kbps is plenty and 64 kbps is usable. Go to 320 only when you are archiving and the extra megabytes cost you nothing.',
   },
   {
     q: 'Why does my MP3 sound slightly worse than the file I started with?',
@@ -46,7 +46,7 @@ const faq = [
   },
   {
     q: 'Why do MP3s sometimes have a gap at the start of a track?',
-    a: 'The encoder adds padding at the beginning and end of the stream because it works in fixed 1152-sample frames. LAME writes the exact padding amounts into an information tag so a good player can skip them, but many players ignore it. If gapless playback matters — a live album, a DJ mix — M4A or FLAC handles it more reliably.',
+    a: 'The encoder adds padding at the beginning and end of the stream because it works in fixed 1152-sample frames. LAME writes the exact padding amounts into an information tag so a good player can skip them, but many players ignore it. If gapless playback matters (a live album, a DJ mix) M4A or FLAC handles it more reliably.',
   },
 ];
 ---
@@ -91,7 +91,7 @@ const faq = [
       <div class="controls__full">
         <p class="hint">
           MP3 is constant bitrate here, so the size is fixed by the bitrate and
-          the duration alone — a quiet acoustic track and a dense mix at 192 kbps
+          the duration alone. A quiet acoustic track and a dense mix at 192 kbps
           come out identical in size.
         </p>
       </div>
@@ -122,15 +122,15 @@ const faq = [
     <p>
       MP3 compression is built on auditory masking. When two sounds occur close
       together in frequency and one is much louder, the quieter one becomes
-      inaudible — your ear genuinely does not register it. The encoder splits the
+      inaudible. Your ear genuinely does not register it. The encoder splits the
       signal into 576-sample blocks, transforms each into a frequency
       representation, estimates how much noise each band can hide, and allocates
       bits accordingly. Parts of the signal you could not have heard are stored
       coarsely or not at all.
     </p>
     <p>
-      The model breaks down in two well-known places. Sharp transients — a
-      castanet, a rimshot, a plucked harpsichord string — can smear noise
+      The model breaks down in two well-known places. Sharp transients, a
+      castanet, a rimshot, a plucked harpsichord string, can smear noise
       backwards in time across the block that contains them, an artifact called
       pre-echo, audible as a faint whoosh just before the hit. And at low
       bitrates the encoder often applies a low-pass filter, discarding everything

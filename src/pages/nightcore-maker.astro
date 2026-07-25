@@ -8,7 +8,7 @@ const tool = getTool('nightcore-maker');
 const steps = [
   'Drop the song onto the page. It is decoded in the tab, so there is no upload, no queue and no watermark on the way out.',
   'Leave the rate at 1.25x for the classic sound, or pick Subtle or Hyper. The readout tells you how far the pitch has moved and how long the track will run.',
-  'Press play. The preview is the real thing — speeding audio up is cheap enough to render as you go, so what you hear is what downloads.',
+  'Press play. The preview is the real thing. Speeding audio up is cheap enough to render as you go, so what you hear is what downloads.',
   'Adjust until the vocal sits where you want it. Around 1.2x it reads as energetic; by 1.4x it reads as a different singer.',
   'Download as MP3 and drop it straight into your video editor.',
 ];
@@ -16,7 +16,7 @@ const steps = [
 const faq = [
   {
     q: 'Is nightcore just a song played faster?',
-    a: 'Essentially, yes — but faster in the specific sense of a tape or record running quick, so the pitch rises along with the tempo. That coupling is what produces the bright, weightless vocal the style is built on. A tempo increase with the pitch held would give you a rushed version of the original, not nightcore.',
+    a: 'Essentially, yes. But faster in the specific sense of a tape or record running quick, so the pitch rises along with the tempo. That coupling is what produces the bright, weightless vocal the style is built on. A tempo increase with the pitch held would give you a rushed version of the original, not nightcore.',
   },
   {
     q: 'What rate counts as proper nightcore?',
@@ -24,11 +24,11 @@ const faq = [
   },
   {
     q: 'Why did the singer get higher when I only changed the speed?',
-    a: 'Because pitch is just how often the waveform repeats per second. Read the same samples out 25% faster and every cycle finishes 25% sooner, so every frequency in the recording climbs by that same ratio. A 1.25x rate works out to about 3.9 semitones — nearly a major third — for every part at once.',
+    a: 'Because pitch is just how often the waveform repeats per second. Read the same samples out 25% faster and every cycle finishes 25% sooner, so every frequency in the recording climbs by that same ratio. A 1.25x rate works out to about 3.9 semitones (nearly a major third) for every part at once.',
   },
   {
     q: 'How is this different from the "sped up" versions on streaming?',
-    a: 'Usually not much, technically. Most official sped-up edits are the same coupled speed-and-pitch change at a gentler rate, often 1.1x to 1.2x, mixed and mastered afterwards. Nightcore is the older, more extreme version of the same idea, and it carries the visual conventions of its scene with it — anime artwork, a static image, a full track rather than a fifteen second cut.',
+    a: 'Usually not much, technically. Most official sped-up edits are the same coupled speed-and-pitch change at a gentler rate, often 1.1x to 1.2x, mixed and mastered afterwards. Nightcore is the older, more extreme version of the same idea, and it carries the visual conventions of its scene with it. Anime artwork, a static image, a full track rather than a fifteen second cut.',
   },
   {
     q: 'What kind of songs work best?',
@@ -36,7 +36,7 @@ const faq = [
   },
   {
     q: 'Does speeding a track up lose quality?',
-    a: 'The speed change itself does not remove anything — it is straight resampling, and no detail is discarded. The only loss is the usual one from decoding an MP3 and encoding a new one, which is inaudible in a single pass at 192 kbps or higher. Export as WAV if you plan to keep editing afterwards.',
+    a: 'The speed change itself does not remove anything. It is straight resampling, and no detail is discarded. The only loss is the usual one from decoding an MP3 and encoding a new one, which is inaudible in a single pass at 192 kbps or higher. Export as WAV if you plan to keep editing afterwards.',
   },
   {
     q: 'How do I make the opposite version?',
@@ -50,7 +50,7 @@ const faq = [
     <div class="controls">
       <div class="controls__head">
         <span class="controls__title">Nightcore rate</span>
-        <span class="hint">Speed and pitch move together — that is the effect.</span>
+        <span class="hint">Speed and pitch move together, that is the effect.</span>
       </div>
 
       <div class="field controls__full">
@@ -102,7 +102,7 @@ const faq = [
       <div class="field">
         <span class="label">
           New length
-          <span class="label__value tnum" data-out="length">—</span>
+          <span class="label__value tnum" data-out="length">·</span>
         </span>
         <span class="hint" data-out="length-hint">Load a track to see the new running time.</span>
       </div>
@@ -123,8 +123,8 @@ const faq = [
     </p>
     <p>
       For a long stretch of YouTube history that was one of the most reliably
-      popular things you could post. The conventions hardened — anime artwork, a
-      static frame, the full track rather than an excerpt — and the sound spread
+      popular things you could post. The conventions hardened, anime artwork, a
+      static frame, the full track rather than an excerpt, and the sound spread
       well past the eurodance it started with. The recent wave of official
       "sped up" versions on streaming services is the same operation with the
       dial turned down and a mastering engineer involved.
@@ -148,7 +148,7 @@ const faq = [
       altogether.
     </p>
     <p>
-      The other thing that moves is the formants — the fixed resonances of the
+      The other thing that moves is the formants, the fixed resonances of the
       singer's throat and mouth that tell your ear how big the person is. In a
       real voice those stay put when the note changes. Here they climb with
       everything else, and your ear reads the result as a smaller, younger

@@ -6,7 +6,7 @@ import { getTool } from '../data/tools';
 const tool = getTool('bpm-detector');
 
 const steps = [
-  'Drop the track onto the page. Analysis starts as soon as it has decoded — there is no button to press and nothing to download afterwards.',
+  'Drop the track onto the page. Analysis starts as soon as it has decoded. There is no button to press and nothing to download afterwards.',
   'Read the tempo. The figure underneath it tells you in plain words how clear the beat was, which matters more than the number itself.',
   'If the reading looks wrong, drag a selection across a section with a steady, drum-led beat and switch on "Measure the selection only". Intros, breakdowns and applause all confuse the measurement.',
   'Check the half-time and double-time rows before you trust the answer. Autocorrelation cannot tell 87 BPM from 174 BPM, so pick whichever matches how you count the track.',
@@ -23,7 +23,7 @@ const faq = [
   },
   {
     q: 'What counts as a good confidence reading?',
-    a: 'Anything described as high confidence came from a clear, repeating peak and is usually exact on grid-locked electronic music. A fair reading is normally correct within a beat or so. An unclear reading means no single spacing stood out — treat the number as a guess and re-run it on a selected section with obvious percussion.',
+    a: 'Anything described as high confidence came from a clear, repeating peak and is usually exact on grid-locked electronic music. A fair reading is normally correct within a beat or so. An unclear reading means no single spacing stood out. Treat the number as a guess and re-run it on a selected section with obvious percussion.',
   },
   {
     q: 'Can it handle a track whose tempo changes?',
@@ -74,9 +74,7 @@ const readings = [
         data-bpm
         style="font-size:var(--t-display); font-weight:700; line-height:1; letter-spacing:-0.03em"
         aria-live="polite"
-      >
-        —
-      </div>
+      >·</div>
       <span class="hint">beats per minute</span>
       <span class="chip" data-confidence>Measuring</span>
       <p class="hint" data-confidence-text style="max-width:56ch"></p>
@@ -100,9 +98,7 @@ const readings = [
                 <th scope="row" style="font-weight:600">
                   {row.name}
                 </th>
-                <td class="tnum" data-reading={row.id}>
-                  —
-                </td>
+                <td class="tnum" data-reading={row.id}>·</td>
                 <td style="white-space:normal">{row.when}</td>
               </tr>
             ))
@@ -134,7 +130,7 @@ const readings = [
     <h2>How a computer finds a beat</h2>
     <p>
       A beat is not a thing in an audio file. There is no marker in the data
-      saying "kick drum here" — there is only a long list of sample values.
+      saying "kick drum here". There is only a long list of sample values.
       Tempo detection has to infer the pulse from how the energy in those
       samples changes over time.
     </p>
@@ -162,7 +158,7 @@ const readings = [
       Autocorrelation has one structural weakness. If onsets repeat every half
       second, they also repeat every quarter second and every full second, so
       those shifts correlate strongly too. The algorithm has no musical opinion
-      about which one you would call the tempo — all three describe the same
+      about which one you would call the tempo, all three describe the same
       grid. This is known as an octave error, and every tempo detector has it,
       including the ones inside professional DAWs.
     </p>
@@ -226,7 +222,7 @@ const readings = [
       return {
         label: 'Fair confidence',
         brand: false,
-        text: 'The beat is there but not perfectly even — typical of a live take. Expect the figure to be right within a beat or so.',
+        text: 'The beat is there but not perfectly even, typical of a live take. Expect the figure to be right within a beat or so.',
       };
     }
     return {
@@ -254,7 +250,7 @@ const readings = [
       const setReadings = (bpm: number): void => {
         const show = (id: string, value: number): void => {
           const cell = readingCell(id);
-          if (cell) cell.textContent = value > 0 ? value.toFixed(1) : '—';
+          if (cell) cell.textContent = value > 0 ? value.toFixed(1) : ', ';
         };
         show('half', bpm / 2);
         show('main', bpm);
@@ -282,7 +278,7 @@ const readings = [
             const { bpm, confidence } = detectTempo(source);
             const verdict = verdictFor(bpm, confidence);
 
-            if (bpmOut) bpmOut.textContent = bpm > 0 ? bpm.toFixed(1) : '—';
+            if (bpmOut) bpmOut.textContent = bpm > 0 ? bpm.toFixed(1) : ', ';
             if (chip) {
               chip.textContent = verdict.label;
               chip.className = verdict.brand ? 'chip chip--brand' : 'chip';

@@ -142,8 +142,8 @@ const schema = [
 ---
 
 <Base
-  title="Loudness Targets by Platform — LUFS Reference Table"
-  description="Every streaming and broadcast loudness target in one table — Spotify, Apple Music, YouTube, podcasts, EBU R128 — with LUFS and true peak values."
+  title="Loudness Targets by Platform: LUFS Reference Table"
+  description="Every streaming and broadcast loudness target in one table (Spotify, Apple Music, YouTube, podcasts, EBU R128) with LUFS and true peak values."
   path="/loudness-targets"
   schema={schema}
 >
@@ -151,7 +151,7 @@ const schema = [
     <div class="prose" style="margin-bottom: var(--s10)">
       <h1>Loudness targets by platform</h1>
       <p class="toolhead__sub">
-        What every major platform expects, in LUFS and true peak — and what it
+        What every major platform expects, in LUFS and true peak, and what it
         does to your file if you miss.
       </p>
     </div>
@@ -165,7 +165,7 @@ const schema = [
         nothing.
       </p>
       <p>
-        The number that matters is <strong>integrated LUFS</strong> — loudness
+        The number that matters is <strong>integrated LUFS</strong>, loudness
         averaged across the whole programme, weighted for how human hearing
         actually works and gated so that silence between phrases does not drag
         the reading down. It is defined by ITU-R BS.1770, and it is what all of
@@ -234,7 +234,7 @@ const schema = [
       <h2>True peak is not the same as peak</h2>
       <p>
         A digital file stores samples, but playback reconstructs a continuous
-        waveform that passes through them — and that curve can rise higher than
+        waveform that passes through them. And that curve can rise higher than
         any individual sample. A file that shows 0.0 dBFS on a normal peak meter
         can genuinely reach +1.5 dB once a converter or an MP3 encoder
         reconstructs it, which clips.

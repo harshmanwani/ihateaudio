@@ -28,7 +28,7 @@ const faq = [
   },
   {
     q: 'Why is there no quality slider?',
-    a: 'Because there is nothing to trade. FLAC has compression levels from 0 to 8, but they only change how much effort the encoder spends searching for a better prediction — the decoded audio is identical at every level. Level 8 typically saves under one percent over level 5 and takes several times longer, which is why level 5 is the near-universal default.',
+    a: 'Because there is nothing to trade. FLAC has compression levels from 0 to 8, but they only change how much effort the encoder spends searching for a better prediction. The decoded audio is identical at every level. Level 8 typically saves under one percent over level 5 and takes several times longer, which is why level 5 is the near-universal default.',
   },
   {
     q: 'Will FLAC play on my phone and in my car?',
@@ -40,7 +40,7 @@ const faq = [
   },
   {
     q: 'Does FLAC keep tags and cover art?',
-    a: 'The format does — it carries Vorbis comments and embedded pictures, which is one of its advantages over WAV. This tool does not, because it decodes to raw audio and re-encodes, discarding the original container. Re-tag the result afterwards in your music player or a tag editor.',
+    a: 'The format does. It carries Vorbis comments and embedded pictures, which is one of its advantages over WAV. This tool does not, because it decodes to raw audio and re-encodes, discarding the original container. Re-tag the result afterwards in your music player or a tag editor.',
   },
 ];
 ---
@@ -48,13 +48,13 @@ const faq = [
 <ToolPage slug={tool.slug} steps={steps} faq={faq}>
   <ToolShell tool={tool} action="Convert to FLAC">
     <ConversionPanel
-      hint="FLAC size depends on the material — sparse or quiet recordings compress much further than dense ones, so treat the estimate as approximate."
+      hint="FLAC size depends on the material. Sparse or quiet recordings compress much further than dense ones, so treat the estimate as approximate."
     />
 
     <div class="controls">
       <div class="controls__head">
         <span class="controls__title">Lossless output</span>
-        <span class="hint">No bitrate to choose — nothing is discarded.</span>
+        <span class="hint">No bitrate to choose, nothing is discarded.</span>
       </div>
 
       <div class="controls__full">
@@ -93,8 +93,8 @@ const faq = [
       Lossy codecs shrink audio by deciding what you will not miss. FLAC shrinks
       it by noticing that audio is highly predictable from one sample to the
       next. The encoder takes a block of samples, fits a mathematical predictor
-      to them — either a fixed low-order polynomial or a linear predictor with
-      coefficients calculated for that specific block — and then stores only the
+      to them. Either a fixed low-order polynomial or a linear predictor with
+      coefficients calculated for that specific block, and then stores only the
       difference between what the predictor guessed and what actually happened.
     </p>
     <p>
@@ -130,8 +130,7 @@ const faq = [
     <p>
       It is not a repair tool. Everything it does is preservation of what it was
       given, so a FLAC made from a 192 kbps MP3 is a large, faithful copy of a
-      192 kbps MP3. It is not a distribution format for casual sharing either —
-      half of a WAV is still five or six megabytes a minute, which is a poor fit
+      192 kbps MP3. It is not a distribution format for casual sharing either. Half of a WAV is still five or six megabytes a minute, which is a poor fit
       for messaging apps and email.
     </p>
     <p>

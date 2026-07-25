@@ -16,7 +16,7 @@ const steps = [
 const faq = [
   {
     q: 'Why does it barely work on speakers?',
-    a: 'Because both speakers reach both ears. The effect depends on each ear receiving a different signal — one delayed and filtered relative to the other — and on speakers that separation is destroyed by crosstalk before it reaches you. On laptop speakers, where the drivers are centimetres apart, almost nothing survives. Headphones and earbuds keep the two channels isolated, which is the whole requirement.',
+    a: 'Because both speakers reach both ears. The effect depends on each ear receiving a different signal (one delayed and filtered relative to the other) and on speakers that separation is destroyed by crosstalk before it reaches you. On laptop speakers, where the drivers are centimetres apart, almost nothing survives. Headphones and earbuds keep the two channels isolated, which is the whole requirement.',
   },
   {
     q: 'Is there really such a thing as 8D audio?',
@@ -28,7 +28,7 @@ const faq = [
   },
   {
     q: 'Why does the vocal sound thinner or more distant than the original?',
-    a: 'Two reasons. The HRTF filters are not flat — they carve the notches your ear anatomy actually produces, which removes some energy. And the panner uses an inverse distance model, so anything past the reference distance is attenuated. Pulling the distance control back toward 1 recovers most of the level and body.',
+    a: 'Two reasons. The HRTF filters are not flat. They carve the notches your ear anatomy actually produces, which removes some energy. And the panner uses an inverse distance model, so anything past the reference distance is attenuated. Pulling the distance control back toward 1 recovers most of the level and body.',
   },
   {
     q: 'Can I 8D a mono recording?',
@@ -36,7 +36,7 @@ const faq = [
   },
   {
     q: 'How is this different from the stereo widener?',
-    a: 'The widener rescales the difference between the existing left and right channels — it stretches an image that is already there and does not move anything. This creates a moving virtual source and synthesises both channels from scratch through direction-dependent filters. The widener is subtle and mono-safe; this is dramatic and headphone-only.',
+    a: 'The widener rescales the difference between the existing left and right channels. It stretches an image that is already there and does not move anything. This creates a moving virtual source and synthesises both channels from scratch through direction-dependent filters. The widener is subtle and mono-safe; this is dramatic and headphone-only.',
   },
   {
     q: 'Does exporting to MP3 damage the effect?',
@@ -52,7 +52,7 @@ const faq = [
       <div class="note__title">Headphones required</div>
       <p>
         The orbit is created by feeding each ear a different signal. Speakers send
-        both channels to both ears, which cancels most of the effect — on a phone
+        both channels to both ears, which cancels most of the effect, on a phone
         or laptop speaker the result will sound like the volume is wobbling rather
         than like the music is moving around you. Any wired or wireless headphones
         or earbuds will do.
@@ -137,7 +137,7 @@ const faq = [
       uploads where a song appeared to circle the listener's head, and it spread
       because it sounded like a bigger number than 3D. What you download here is
       an ordinary two-channel stereo file. It will play on anything. Nothing has
-      to be decoded, and no special hardware is required — only headphones,
+      to be decoded, and no special hardware is required, only headphones,
       because of how the effect is constructed.
     </p>
     <p>
@@ -152,7 +152,7 @@ const faq = [
     <p>
       Your brain works out where a sound came from using a handful of physical
       cues. A source on your right reaches the right ear a few hundred
-      microseconds earlier than the left — the interaural time difference. It
+      microseconds earlier than the left, the interaural time difference. It
       also arrives louder there, because your head casts an acoustic shadow that
       grows stronger with frequency. And the folds of your outer ear filter
       incoming sound differently depending on the angle it arrives from,
@@ -170,7 +170,7 @@ const faq = [
     <p>
       It matters that this is not the same as ordinary panning. Turning a pan
       knob only changes relative level, and your brain interprets a pure level
-      difference as a sound sitting on a line drawn between your ears — inside
+      difference as a sound sitting on a line drawn between your ears, inside
       your head. Restore the timing and spectral cues and the source escapes the
       skull. That leap from "in my head" to "in the room" is what people are
       reacting to when they call it 8D.

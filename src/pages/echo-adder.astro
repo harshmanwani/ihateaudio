@@ -8,14 +8,14 @@ const tool = getTool('echo-adder');
 const steps = [
   'Drop an audio file onto the page. Your browser decodes it locally, so nothing leaves the machine and there is no queue to wait in.',
   'Start from a preset. Slapback is a single tight repeat, Classic echo is the obvious one, and Dub keeps repeating until the repeats dissolve.',
-  'Set the delay time — the gap between one repeat and the next — then use feedback to decide how many repeats you get. The readout tells you how many will still be audible.',
+  'Set the delay time (the gap between one repeat and the next) then use feedback to decide how many repeats you get. The readout tells you how many will still be audible.',
   'Balance the mix so the repeats sit behind the original rather than competing with it, press play to check, then pick a format and download.',
 ];
 
 const faq = [
   {
     q: 'What is the difference between echo and reverb?',
-    a: 'An echo is a countable number of discrete repeats you can hear individually; reverb is thousands of reflections so dense that they merge into a single wash. The dividing line is roughly 50 milliseconds of separation — below that your hearing fuses the copies with the original, above it you perceive them as separate events. If you want space rather than repeats, use the reverb tool instead.',
+    a: 'An echo is a countable number of discrete repeats you can hear individually; reverb is thousands of reflections so dense that they merge into a single wash. The dividing line is roughly 50 milliseconds of separation. Below that your hearing fuses the copies with the original, above it you perceive them as separate events. If you want space rather than repeats, use the reverb tool instead.',
   },
   {
     q: 'How do I work out the right delay time for a song?',
@@ -31,7 +31,7 @@ const faq = [
   },
   {
     q: 'Can I make the echo bounce between left and right?',
-    a: 'Not here — this is a single mono-position delay line applied to both channels, so the repeats sit where the original sound sits. Ping-pong delay needs two delay lines with crossed feedback paths. If you want movement, run the result through the stereo widener or the 8D tool afterwards.',
+    a: 'Not here. This is a single mono-position delay line applied to both channels, so the repeats sit where the original sound sits. Ping-pong delay needs two delay lines with crossed feedback paths. If you want movement, run the result through the stereo widener or the 8D tool afterwards.',
   },
   {
     q: 'The repeats sound harsh and cluttered. What should I change?',
@@ -39,7 +39,7 @@ const faq = [
   },
   {
     q: 'Is a slapback echo the same as a doubling effect?',
-    a: 'Close, but not identical. Slapback is one repeat at roughly 60 to 120 milliseconds — short enough to sound like part of the original but long enough to hear as a distinct edge, the sound on most 1950s rockabilly vocals. True doubling uses a second performance, or a delay under 30 ms with slight pitch drift, which is thickening rather than an echo.',
+    a: 'Close, but not identical. Slapback is one repeat at roughly 60 to 120 milliseconds. Short enough to sound like part of the original but long enough to hear as a distinct edge, the sound on most 1950s rockabilly vocals. True doubling uses a second performance, or a delay under 30 ms with slight pitch drift, which is thickening rather than an echo.',
   },
 ];
 ---
@@ -173,7 +173,7 @@ const faq = [
       repeats arrive at 40, 16 and 6 percent of the original before dropping
       out of earshot. At 0.8 the series decays so slowly that a dozen and a half
       repeats remain audible, which is why dub engineers ride this one control
-      like an instrument. The tool stops at 0.85 on purpose — feed back the full
+      like an instrument. The tool stops at 0.85 on purpose, feed back the full
       signal and the loop never loses energy, so the level climbs on every pass
       until the file clips.
     </p>
@@ -191,7 +191,7 @@ const faq = [
     </p>
     <p>
       For that, work from the tempo. One beat lasts 60 divided by the BPM, in
-      seconds — 500 milliseconds at 120 BPM. Set the delay to that and the
+      seconds, 500 milliseconds at 120 BPM. Set the delay to that and the
       repeats land on the beat; halve it and they land on the offbeats; use
       three quarters of it and you get the dotted-eighth pattern that makes a
       delay feel like it is pulling against the groove instead of reinforcing
@@ -201,7 +201,7 @@ const faq = [
 
     <h2>Keeping the repeats out of the way</h2>
     <p>
-      The mix control is not really a loudness control — it is a depth control.
+      The mix control is not really a loudness control, it is a depth control.
       Repeats at a high mix push the original backward, because your hearing
       uses the ratio of direct to delayed sound to judge distance. If the effect
       is meant to be a texture rather than a feature, 20 to 35 percent puts the
@@ -348,7 +348,7 @@ const faq = [
         const tail = current.delay * count;
         note.textContent =
           count === 0
-            ? 'No repeats — feedback is off, so you get the original with a single delayed copy.'
+            ? 'No repeats. Feedback is off, so you get the original with a single delayed copy.'
             : `About ${count} audible repeat${count === 1 ? '' : 's'}, trailing off roughly ` +
               `${tail.toFixed(1)} seconds after each sound.`;
       };

@@ -15,7 +15,7 @@ const steps = [
 const faq = [
   {
     q: 'Which of the three methods should I use?',
-    a: 'Equal parts when the total matters more than the boundaries — splitting a 60-minute file into four 15-minute uploads, for example. Fixed length when a platform imposes a hard cap, such as a 10-minute limit. Silence when the recording has real structure in it, like separate questions in an interview or tracks separated by applause.',
+    a: 'Equal parts when the total matters more than the boundaries. Splitting a 60-minute file into four 15-minute uploads, for example. Fixed length when a platform imposes a hard cap, such as a 10-minute limit. Silence when the recording has real structure in it, like separate questions in an interview or tracks separated by applause.',
   },
   {
     q: 'The silence mode found no gaps, or only one. Why?',
@@ -23,11 +23,11 @@ const faq = [
   },
   {
     q: 'Can I split a continuous DJ mix into individual tracks?',
-    a: 'By length, yes. By silence, no — a beat-matched mix is specifically engineered to have no gaps, so there is nothing for the detector to find. The same applies to a live album with applause between songs, since applause is far too loud to read as silence. For those, find the transitions by ear in the trimmer instead.',
+    a: 'By length, yes. By silence, no. A beat-matched mix is specifically engineered to have no gaps, so there is nothing for the detector to find. The same applies to a live album with applause between songs, since applause is far too loud to read as silence. For those, find the transitions by ear in the trimmer instead.',
   },
   {
     q: 'How are the pieces named?',
-    a: 'Each takes the original filename plus "-part-1", "-part-2" and so on. When there are ten or more, the numbers are zero-padded — "part-01" through "part-12" — so your file manager and your media player sort them in the right order instead of putting part 10 immediately after part 1.',
+    a: 'Each takes the original filename plus "-part-1", "-part-2" and so on. When there are ten or more, the numbers are zero-padded ("part-01" through "part-12") so your file manager and your media player sort them in the right order instead of putting part 10 immediately after part 1.',
   },
   {
     q: 'Is anything lost at the cut points?',
@@ -35,7 +35,7 @@ const faq = [
   },
   {
     q: 'Can I download all the parts at once?',
-    a: 'Each part has its own button, so it is one click per file. Browsers deliberately make bulk downloads awkward — most will show a permission prompt after the second or third file in quick succession. Allow it once and the rest go through.',
+    a: 'Each part has its own button, so it is one click per file. Browsers deliberately make bulk downloads awkward. Most will show a permission prompt after the second or third file in quick succession. Allow it once and the rest go through.',
   },
   {
     q: 'I wanted to split the left and right channels apart, not the timeline.',
@@ -193,8 +193,8 @@ const faq = [
     <h2>Three ways to divide one file</h2>
     <p>
       Splitting audio is the rare editing job where the interesting decision is not
-      <em>how</em> to cut but <em>where</em>. The cut itself is trivial — copy a range
-      of samples into a new file — so the three methods here differ only in how the
+      <em>how</em> to cut but <em>where</em>. The cut itself is trivial, copy a range
+      of samples into a new file. So the three methods here differ only in how the
       boundaries are chosen, and each answers a different question.
     </p>
     <p>
@@ -213,7 +213,7 @@ const faq = [
       notice a breath and long enough that individual zero crossings in a normal
       waveform do not register as silence. A run of consecutive quiet windows becomes
       a candidate gap, and it only counts if it lasts at least the minimum length you
-      set — which is what stops a two-second pause between speakers from being
+      set. Which is what stops a two-second pause between speakers from being
       confused with the tenth-of-a-second beat between words.
     </p>
     <p>
@@ -224,8 +224,8 @@ const faq = [
       rather than fragments.
     </p>
     <p>
-      Threshold is the control that matters. It is in dBFS — decibels relative to full
-      scale — so 0 is the maximum a digital file can hold and every real level is
+      Threshold is the control that matters. It is in dBFS, decibels relative to full
+      scale. So 0 is the maximum a digital file can hold and every real level is
       negative. Quiet room tone lands near -50, a hissy phone recording nearer -35, a
       properly noise-floored studio take below -60. If you get no cuts, your threshold
       is below your room tone; raise it until the count looks plausible.
@@ -237,7 +237,7 @@ const faq = [
       because the samples are copied rather than reprocessed. That means the parts
       reassemble exactly: run them back through the joiner in order and you get the
       original file, provided you exported losslessly on the way out. Export to MP3
-      and each part picks up one generation of encoding — the same single generation a
+      and each part picks up one generation of encoding, the same single generation a
       normal MP3 export would add, not one per part.
     </p>
     <p>
@@ -331,7 +331,7 @@ const faq = [
             : `${fmtDuration(shortest)} to ${fmtDuration(longest)} each`;
 
         const crowded =
-          count > 20 ? ' That is a lot of separate downloads — your browser may ask permission part way through.' : '';
+          count > 20 ? ' That is a lot of separate downloads. Your browser may ask permission part way through.' : '';
 
         planText.textContent =
           `${count} part${count === 1 ? '' : 's'}, ${sizes}. ` +

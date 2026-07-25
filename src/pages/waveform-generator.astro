@@ -7,7 +7,7 @@ const tool = getTool('waveform-generator');
 
 const steps = [
   'Drop an audio file onto the page. The waveform is drawn from the decoded samples, not from a preview image, so the shape is the real shape of the recording.',
-  'Pick a size. The presets cover the shapes people actually need — a wide banner, a square post, a full video frame — and you can type any dimensions you like instead.',
+  'Pick a size. The presets cover the shapes people actually need (a wide banner, a square post, a full video frame) and you can type any dimensions you like instead.',
   'Choose bars, filled or line, then set the two colours. Turn on the transparent background if the image is going to sit on top of something else.',
   'The preview updates as you change things and is the exact image you get. When it looks right, click Download PNG.',
 ];
@@ -15,7 +15,7 @@ const steps = [
 const faq = [
   {
     q: 'What size should I export?',
-    a: 'Match the place it is going. 1600 × 400 suits a page header or a podcast banner, 1080 × 1080 is a square social post, and 1920 × 1080 is a full video frame for an editor. Export at the final display size or larger — enlarging a small PNG afterwards produces visibly soft edges, while scaling a large one down looks fine.',
+    a: 'Match the place it is going. 1600 × 400 suits a page header or a podcast banner, 1080 × 1080 is a square social post, and 1920 × 1080 is a full video frame for an editor. Export at the final display size or larger. Enlarging a small PNG afterwards produces visibly soft edges, while scaling a large one down looks fine.',
   },
   {
     q: 'Is the transparent background really transparent?',
@@ -31,7 +31,7 @@ const faq = [
   },
   {
     q: 'What is the difference between the three styles?',
-    a: 'Bars draw one rounded column per slice with a gap between them — the familiar look from audio apps, and the most legible at small sizes. Filled draws a single solid shape through every peak, which reads better at large sizes and in print. Line traces only the upper envelope with a stroke, which is the lightest and works well over a photograph or a video.',
+    a: 'Bars draw one rounded column per slice with a gap between them. The familiar look from audio apps, and the most legible at small sizes. Filled draws a single solid shape through every peak, which reads better at large sizes and in print. Line traces only the upper envelope with a stroke, which is the lightest and works well over a photograph or a video.',
   },
   {
     q: 'How large can the image be?',
@@ -39,16 +39,16 @@ const faq = [
   },
   {
     q: 'Can I animate it or make a video from it?',
-    a: 'Not here — this tool produces a single still PNG. It is the right starting point for one, though: export at your video resolution with a transparent background, drop it into your editor, and animate a mask or a playhead over it there.',
+    a: 'Not here. This tool produces a single still PNG. It is the right starting point for one, though: export at your video resolution with a transparent background, drop it into your editor, and animate a mask or a playhead over it there.',
   },
 ];
 
 const presets = [
-  { value: '1600x400', label: '1600 × 400 — banner' },
-  { value: '1080x1080', label: '1080 × 1080 — square post' },
-  { value: '1920x1080', label: '1920 × 1080 — video frame' },
-  { value: '1200x630', label: '1200 × 630 — link preview' },
-  { value: '800x200', label: '800 × 200 — small strip' },
+  { value: '1600x400', label: '1600 × 400, banner' },
+  { value: '1080x1080', label: '1080 × 1080, square post' },
+  { value: '1920x1080', label: '1920 × 1080, video frame' },
+  { value: '1200x630', label: '1200 × 630, link preview' },
+  { value: '800x200', label: '800 × 200, small strip' },
   { value: 'custom', label: 'Custom size' },
 ];
 ---
@@ -161,8 +161,8 @@ const presets = [
     <h2>What a waveform image is showing you</h2>
     <p>
       A waveform picture is not the audio drawn small. There are far more
-      samples in a recording than there are pixels across an image — a
-      three-minute stereo track holds roughly sixteen million of them — so
+      samples in a recording than there are pixels across an image, a
+      three-minute stereo track holds roughly sixteen million of them, so
       every column has to summarise thousands of samples at once.
     </p>
     <p>
@@ -194,8 +194,7 @@ const presets = [
       same audio at 1600 × 400 becomes a thin ribbon, which reads as
       decorative. Neither is better, but they are different pictures, so choose
       the shape before you fuss over the colours. If the image is going into a
-      video, match the video's frame size exactly and let the editor place it —
-      that avoids a resample step that would blur the bars.
+      video, match the video's frame size exactly and let the editor place it. That avoids a resample step that would blur the bars.
     </p>
 
     <h2>Bars, filled and line</h2>
