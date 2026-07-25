@@ -676,7 +676,23 @@ export const TOOLS: Tool[] = [
     icon: 'heartbeat',
     icon3d: true,
     keywords: ['bpm tempo finder beats per minute what bpm song speed detect'],
-    related: ['tempo-changer', 'speed-changer', 'loudness-meter'],
+    related: ['key-finder', 'tempo-changer', 'speed-changer', 'loudness-meter'],
+    instant: true,
+  },
+  {
+    slug: 'key-finder',
+    name: 'Key Finder',
+    title: 'Key Finder: What Key Is This Song In? Free Online',
+    description:
+      'Find the musical key of any song, with the Camelot code for DJ software and a confidence figure. Runs in your browser, nothing uploaded, no signup.',
+    tagline: "Drop a track in and find out what key it is in.",
+    short: "Work out the musical key of a track, and its Camelot code.",
+    category: 'utility',
+    icon: 'music-notes-simple',
+    keywords: [
+      'key finder what key is this song musical key detector camelot harmonic mixing key detection song key major minor',
+    ],
+    related: ['bpm-detector', 'pitch-shifter', 'acapella-extractor', 'loudness-meter'],
     instant: true,
   },
   {

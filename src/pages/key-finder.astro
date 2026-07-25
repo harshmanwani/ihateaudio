@@ -1,0 +1,309 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('key-finder');
+
+const steps = [
+  'Drop the track in. Nothing is uploaded and there is nothing to download first — this is ordinary arithmetic, not a model, so it starts working immediately.',
+  'Read the key. You get the name musicians use, the Camelot code DJ software wants, and a confidence figure.',
+  'Check the second-place key when confidence is low. Some music genuinely sits between two readings, and the tool says so rather than picking one and sounding certain.',
+  'Look at the note chart underneath if something seems off. It shows which notes the track actually spends its time on, which usually explains the answer immediately.',
+];
+
+const faq = [
+  {
+    q: 'How does it work out the key?',
+    a: 'In two steps. First it folds the whole track down onto the twelve notes of the scale, ignoring which octave each one was in, which gives a profile of how much time the music spends on each note. Then it compares that profile against the twenty-four possible keys using a set of reference profiles from a well-known listening experiment: people were played a key, then rated how well each note fitted it. The key whose reference profile best matches your track wins.',
+  },
+  {
+    q: 'Why does it say low confidence?',
+    a: 'Because the top two candidates scored almost the same, which is a real property of the music rather than a failure. The commonest case is a relative major and minor pair, like C major and A minor, which contain exactly the same seven notes. Nothing in the note profile separates them; only where the music comes to rest does, and that is not something a note histogram can see. When confidence is low, look at the second-place key and use your ears.',
+  },
+  {
+    q: 'What is the Camelot code for?',
+    a: 'It is the notation DJ software uses to make harmonic mixing quick. Keys are laid out on a wheel numbered 1 to 12, with A for minor and B for major, arranged so that anything adjacent sounds good together: the same number with the other letter, or one step round the wheel. So 8A mixes happily with 8B, 7A and 9A. It carries exactly the same information as the key name, in a form you can act on without thinking.',
+  },
+  {
+    q: 'It got the key wrong.',
+    a: 'The usual causes are worth knowing. A track that changes key partway through gets one answer for the whole thing, and that answer is a blend of both. Heavily percussive music with little tonal content gives the analysis very little to work with. And a piece using a mode rather than a straight major or minor scale — Dorian, Mixolydian, plenty of folk and jazz — will be reported as whichever major or minor key shares its notes, because those are the only twenty-four answers available.',
+  },
+  {
+    q: 'Does the tempo affect it?',
+    a: 'No, and neither does the arrangement. The analysis only looks at which pitches are present and for how long, so a slow ballad and a fast remix of the same song give the same key. If you want the tempo as well, the BPM detector is the tool next to this one.',
+  },
+  {
+    q: 'Should I trust this for mixing a set?',
+    a: 'For most electronic and pop material, yes, and the confidence figure tells you when to double check. Where it is worth being careful is anything with a key change, anything modal, and tracks that are mostly drums. A quick listen against a reference tone settles it, and the note chart usually shows you what confused it.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell tool={tool} stage={false} exportBar={false}>
+    <div class="controls controls--single">
+      <div class="controls__head">
+        <span class="controls__title">Key</span>
+        <span class="hint">
+          Measured from the notes in the recording. No upload, no model to fetch.
+        </span>
+      </div>
+
+      <div class="keyout controls__full" data-key-out hidden>
+        <div class="keyout__headline">
+          <div class="keyout__main">
+            <span class="keyout__label">Key</span>
+            <span class="keyout__value" data-key-name>—</span>
+          </div>
+          <div class="keyout__main">
+            <span class="keyout__label">Camelot</span>
+            <span class="keyout__value tnum" data-key-camelot>—</span>
+          </div>
+          <div class="keyout__main">
+            <span class="keyout__label">Confidence</span>
+            <span class="keyout__value tnum" data-key-confidence>—</span>
+          </div>
+        </div>
+
+        <p class="keyout__second" data-key-second></p>
+
+        <div class="keyout__chart">
+          <span class="keyout__label">Notes in this track</span>
+          <div class="chroma" data-chroma></div>
+        </div>
+      </div>
+    </div>
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>What a key actually is</h2>
+    <p>
+      A key is not a property of any single sound; it is a pattern of expectation
+      built up over time. When a piece keeps returning to the same note, and the
+      chords around it keep resolving toward that note, listeners come to hear it as
+      home. Everything else is heard in relation to it — some notes as stable, some
+      as leaning, some as clearly outside.
+    </p>
+    <p>
+      That is why key detection works by counting rather than by listening for
+      anything in particular. A piece in D major spends more time on D, F♯ and A than
+      on anything else, not because the composer decided to but because that is what
+      being in D major consists of. Add up which notes a recording dwells on and the
+      shape of the key falls out of the total.
+    </p>
+
+    <h2>Why relative keys are genuinely ambiguous</h2>
+    <p>
+      C major and A minor use exactly the same seven notes. Not similar notes — the
+      same ones. Any method that works by counting note occurrences therefore cannot
+      tell them apart, because there is nothing to count that differs.
+    </p>
+    <p>
+      What separates them is where the music rests: which chord it starts on, which
+      one it ends on, which one feels like arrival. That is a matter of structure and
+      timing rather than of pitch content, and it is why a low confidence figure here
+      is honest rather than evasive. The reference profiles help, because listeners
+      do weight the tonic and the third differently in major and minor, but on music
+      that hovers between the two the margin is small and this tool says so.
+    </p>
+
+    <h2>Getting a reliable reading</h2>
+    <p>
+      Analyse a section rather than a whole track when the piece modulates. A song
+      that starts in E minor and lifts to F♯ minor for the last chorus has no single
+      key, and averaging the two produces an answer belonging to neither. Trim to one
+      section and run it again.
+    </p>
+    <p>
+      If the track is mostly percussion, take the part with the most tonal content.
+      Drums are broadband noise and contribute roughly equally to every note bucket,
+      which flattens the profile and leaves less for the correlation to work with.
+    </p>
+    <p>
+      For a track with a strong vocal over a sparse arrangement, running the acapella
+      extractor first and analysing the backing can help — a lead vocal slides
+      between pitches far more than an instrument does, and that smearing shows up in
+      the note profile as energy on notes nobody actually played.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<style>
+  .keyout {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s5);
+  }
+
+  .keyout__headline {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s8);
+  }
+
+  .keyout__main {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s1);
+  }
+
+  .keyout__label {
+    font-size: var(--t-small);
+    color: var(--ink-2);
+  }
+
+  /* The answer is the reason the page exists, so it is set at display size. This
+     is one number people came for, not a dashboard. */
+  .keyout__value {
+    font-size: clamp(1.75rem, 1.2rem + 2vw, 2.5rem);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.1;
+    color: var(--ink);
+  }
+
+  .keyout__second {
+    font-size: var(--t-ui);
+    color: var(--ink-2);
+    margin: 0;
+    max-width: var(--prose);
+  }
+
+  .keyout__chart {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s2);
+  }
+
+  .chroma {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 3px;
+    align-items: end;
+    height: 92px;
+  }
+
+  :global(.chroma__bar) {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+    align-items: center;
+    gap: var(--s1);
+    height: 100%;
+  }
+
+  :global(.chroma__fill) {
+    width: 100%;
+    border-radius: var(--r-sm) var(--r-sm) 0 0;
+    background: var(--cat-soft);
+    min-height: 2px;
+    transition: height var(--dur) var(--ease);
+  }
+
+  /* The notes that belong to the detected key are filled; the rest are outlined.
+     That is what turns the chart from decoration into an explanation — you can see
+     at a glance whether the track really sits in the scale it was assigned. */
+  :global(.chroma__bar[data-in-key='true'] .chroma__fill) {
+    background: var(--cat-vivid);
+  }
+
+  :global(.chroma__bar[data-tonic='true'] .chroma__fill) {
+    background: var(--cat);
+  }
+
+  :global(.chroma__name) {
+    font-size: 11px;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums;
+  }
+
+  :global(.chroma__bar[data-tonic='true'] .chroma__name) {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    :global(.chroma__fill) {
+      transition: none;
+    }
+  }
+</style>
+
+<script>
+  import { createTool } from '../lib/tool';
+  import { camelot, detectKey, NOTE_NAMES } from '../lib/audio/key';
+
+  /** Semitone offsets of the notes in a major and a natural minor scale. */
+  const MAJOR_SCALE = [0, 2, 4, 5, 7, 9, 11];
+  const MINOR_SCALE = [0, 2, 3, 5, 7, 8, 10];
+
+  createTool({
+    suffix: 'key',
+    // Analysis only, so no waveform stage. Hiding the export bar is a ToolShell
+    // prop rather than a runtime option, and it is set on the component above.
+    stage: false,
+
+    onReady(ctx, runtime) {
+      const root = runtime.root;
+      const out = root.querySelector<HTMLElement>('[data-key-out]');
+      const nameEl = root.querySelector<HTMLElement>('[data-key-name]');
+      const camelotEl = root.querySelector<HTMLElement>('[data-key-camelot]');
+      const confidenceEl = root.querySelector<HTMLElement>('[data-key-confidence]');
+      const secondEl = root.querySelector<HTMLElement>('[data-key-second]');
+      const chromaEl = root.querySelector<HTMLElement>('[data-chroma]');
+
+      const result = detectKey(ctx.buffer);
+      const { best, runnerUp, confidence, chroma } = result;
+
+      if (nameEl) nameEl.textContent = best.name;
+      if (camelotEl) camelotEl.textContent = camelot(best.tonic, best.mode);
+      if (confidenceEl) confidenceEl.textContent = `${Math.round(confidence * 100)}%`;
+
+      if (secondEl) {
+        // Below about a third, the two candidates are close enough that naming the
+        // runner-up is the useful thing to do rather than a footnote.
+        secondEl.textContent =
+          confidence < 0.34
+            ? `This one is close. ${runnerUp.name} scored almost as well, and if the two are a ` +
+              'relative pair they share every note — only where the music comes to rest tells them apart.'
+            : `Next closest was ${runnerUp.name}.`;
+      }
+
+      if (chromaEl) {
+        const scale = best.mode === 'major' ? MAJOR_SCALE : MINOR_SCALE;
+        const inKey = new Set(scale.map((step) => (best.tonic + step) % 12));
+        const peak = Math.max(...Array.from(chroma));
+
+        chromaEl.innerHTML = '';
+        for (let note = 0; note < 12; note += 1) {
+          const bar = document.createElement('div');
+          bar.className = 'chroma__bar';
+          bar.dataset.inKey = String(inKey.has(note));
+          bar.dataset.tonic = String(note === best.tonic);
+
+          const fill = document.createElement('div');
+          fill.className = 'chroma__fill';
+          // Scaled to the loudest note rather than to 1, or every bar is a stub.
+          const share = peak > 0 ? (chroma[note] ?? 0) / peak : 0;
+          fill.style.height = `${Math.max(2, share * 100)}%`;
+
+          const label = document.createElement('span');
+          label.className = 'chroma__name';
+          label.textContent = NOTE_NAMES[note]!;
+
+          bar.append(fill, label);
+          bar.title = `${NOTE_NAMES[note]}: ${Math.round(share * 100)}% of the loudest note`;
+          chromaEl.append(bar);
+        }
+      }
+
+      if (out) out.hidden = false;
+    },
+
+    // Nothing to export; the reading is on the page.
+    process(ctx) {
+      return ctx.buffer;
+    },
+  });
+</script>
