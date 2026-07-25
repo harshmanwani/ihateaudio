@@ -6,8 +6,9 @@ of a Worker later for the PostHog proxy.
 
 ## What you have to do by hand
 
-Six things. Nothing else in this list is optional if you want the analytics and
-the search data to work.
+Four things left. The analytics ids and the domain are already done; what
+remains is the Pages project itself, Search Console, and mail for the support
+address.
 
 ### 1. Cloudflare Pages project
 
@@ -20,8 +21,10 @@ Connect the repo and set:
 | Build output directory | `dist` |
 | Node version | `22` (set `NODE_VERSION=22` as a build variable) |
 
-The build runs `astro check`, regenerates the app icons and launch images from
-`src/assets/logo.svg`, builds the site, then renders the 42 social cards. It
+The build regenerates the app icons and launch images from
+`src/assets/logo.svg`, runs `astro check`, builds the site, then renders the 42
+social cards. Generation comes first because `Base.astro` imports the generated
+`splash-links.html`, so a clean clone fails the check step otherwise. It
 needs Chromium, which the Pages image already has because Playwright is a dev
 dependency; if a build ever fails on a missing browser, add
 `npx playwright install --with-deps chromium` to the build command.
