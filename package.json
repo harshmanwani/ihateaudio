@@ -10,8 +10,8 @@
     "postinstall": "node scripts/sync-ffmpeg-core.mjs",
     "dev": "astro dev",
     "prebuild": "node scripts/sync-ffmpeg-core.mjs",
-    "build": "astro check && tsc -p worker && astro build && node scripts/check-csp.mjs",
-    "build:fast": "astro build",
+    "build": "node scripts/check-registry.mjs && astro check && tsc -p worker && astro build && node scripts/check-csp.mjs",
+    "build:fast": "node scripts/check-registry.mjs && astro build",
     "preview": "astro preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -27,7 +27,8 @@
     "deploy": "npm run build && wrangler deploy",
     "dev:worker": "npm run build && wrangler dev",
     "csp": "node scripts/check-csp.mjs",
-    "ffmpeg:upload": "node scripts/upload-ffmpeg-core.mjs"
+    "ffmpeg:upload": "node scripts/upload-ffmpeg-core.mjs",
+    "registry": "node scripts/check-registry.mjs"
   },
   "dependencies": {
     "@breezystack/lamejs": "^1.2.7",
