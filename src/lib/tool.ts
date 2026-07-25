@@ -29,6 +29,7 @@ import {
   MEDIA_ACCEPT,
 } from './files';
 import { timecode, filesize, outputName, duration as fmtDuration } from './format';
+import { track, durationBucket } from './track';
 
 export interface Selection {
   start: number;
@@ -102,6 +103,10 @@ export class ToolRuntime {
   private detachDrop: (() => void) | null = null;
   private previewBuffer: AudioBuffer | null = null;
   private lastOutput: { blob: Blob; name: string } | null = null;
+  /** Last playhead position, so a zoom change can reposition it. */
+  private playTime = 0;
+  /** Suppresses selection and marker drags while a two-finger pinch is live. */
+  private pinching = false;
 
   // Cached elements — every tool page renders the same skeleton.
   private el: {
@@ -112,6 +117,11 @@ export class ToolRuntime {
     stage: HTMLElement | null;
     canvas: HTMLCanvasElement | null;
     canvasWrap: HTMLElement | null;
+    ruler: HTMLCanvasElement | null;
+    rulerTrack: HTMLElement | null;
+    map: HTMLElement | null;
+    minimap: HTMLCanvasElement | null;
+    zoomLevel: HTMLElement | null;
     playhead: HTMLElement | null;
     handleStart: HTMLElement | null;
     handleEnd: HTMLElement | null;
@@ -145,6 +155,11 @@ export class ToolRuntime {
       stage: $(root, '[data-stage]'),
       canvas: $<HTMLCanvasElement>(root, '[data-canvas]'),
       canvasWrap: $(root, '[data-canvas-wrap]'),
+      ruler: $<HTMLCanvasElement>(root, '[data-ruler]'),
+      rulerTrack: $(root, '[data-ruler-track]'),
+      map: $(root, '[data-map]'),
+      minimap: $<HTMLCanvasElement>(root, '[data-minimap]'),
+      zoomLevel: $(root, '[data-zoom-fit]'),
       playhead: $(root, '[data-playhead]'),
       handleStart: $(root, '[data-handle="start"]'),
       handleEnd: $(root, '[data-handle="end"]'),
@@ -191,6 +206,7 @@ export class ToolRuntime {
     this.setupTransport();
     this.setupKeyboard();
     this.setupMarkers();
+    this.setupFloatingExport();
 
     // A file handed over by the previous tool loads with no upload step.
     const handed = claimHandoff();
@@ -319,6 +335,13 @@ export class ToolRuntime {
 
       this.config.onReady?.(this.context(), this);
       this.refreshPreview();
+
+      track('file_loaded', {
+        files: files.length,
+        length: durationBucket(decoded.reduce((sum, b) => sum + b.duration, 0)),
+        channels: decoded[0].numberOfChannels,
+        rate: decoded[0].sampleRate,
+      });
     } catch (err) {
       this.setBusy(false);
       const audioErr = toAudioError(err);
@@ -359,8 +382,16 @@ export class ToolRuntime {
     const { canvas } = this.el;
     if (!canvas) return;
 
-    if (!this.waveform) this.waveform = new Waveform(canvas);
+    if (!this.waveform) {
+      this.waveform = new Waveform(canvas, {
+        ruler: this.el.ruler,
+        minimap: this.el.minimap,
+        onViewChange: () => this.onViewChange(),
+      });
+      this.setupZoom();
+    }
     this.waveform.setBuffer(this.buffers[0]);
+    this.onViewChange();
 
     // Replay the draw-in animation on each new file.
     canvas.removeAttribute('data-enter');
@@ -416,6 +447,261 @@ export class ToolRuntime {
     });
   }
 
+  /**
+   * On narrow screens the export row follows you down the page, but only once
+   * the waveform has scrolled out of sight. Pinning it unconditionally put it
+   * over the transport while both were on screen, which swapped a scroll for a
+   * covered play button.
+   */
+  private setupFloatingExport(): void {
+    const bar = this.root.querySelector<HTMLElement>('.export');
+    const anchor = this.el.stage ?? this.el.drop;
+    if (!bar || !anchor || typeof IntersectionObserver === 'undefined') return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        bar.dataset.float = String(!entries[0].isIntersecting);
+      },
+      { threshold: 0 }
+    );
+    observer.observe(anchor);
+  }
+
+  // ---------- zoom ----------
+
+  /**
+   * Zoom and pan.
+   *
+   * Each surface owns exactly one gesture, which is the only way a canvas with
+   * this many overlapping affordances stays predictable:
+   *
+   * - the waveform draws selections and drops cut markers,
+   * - the ruler seeks (the trimmer has no other way to move the playhead,
+   *   because clicking the waveform there starts a selection),
+   * - the overview strip pans,
+   * - modifier-scroll and pinch zoom, plain scroll still belongs to the page.
+   */
+  private setupZoom(): void {
+    const wave = this.waveform;
+    const wrap = this.el.canvasWrap;
+    if (!wave) return;
+
+    const zoomStep = 1.8;
+
+    this.root.querySelector('[data-zoom-in]')?.addEventListener('click', () => {
+      wave.zoomBy(zoomStep, wave.anchorFor(this.playTime));
+    });
+    this.root.querySelector('[data-zoom-out]')?.addEventListener('click', () => {
+      wave.zoomBy(1 / zoomStep, wave.anchorFor(this.playTime));
+    });
+    this.root.querySelector('[data-zoom-fit]')?.addEventListener('click', () => {
+      wave.zoomToFit();
+    });
+    this.root
+      .querySelector('[data-zoom-selection]')
+      ?.addEventListener('click', () => wave.zoomToRegion(this.selection));
+
+    // Scroll. Modifier-scroll zooms at the pointer; a trackpad pinch arrives as
+    // ctrl+wheel, so the same branch covers both. Horizontal intent pans. Plain
+    // vertical scroll is left alone: hijacking the page scroll over a tall
+    // element is the single most hostile thing an editor can do.
+    wrap?.addEventListener(
+      'wheel',
+      (event) => {
+        if (event.ctrlKey || event.metaKey || event.altKey) {
+          event.preventDefault();
+          const factor = Math.exp(-event.deltaY * 0.0022);
+          wave.zoomBy(factor, wave.timeAt(event.clientX));
+          return;
+        }
+        const horizontal = Math.abs(event.deltaX) > Math.abs(event.deltaY);
+        if (!horizontal && !event.shiftKey) return;
+        if (wave.isFullyZoomedOut()) return;
+        event.preventDefault();
+        const delta = horizontal ? event.deltaX : event.deltaY;
+        wave.panBy(delta * wave.secondsPerPixel());
+      },
+      { passive: false }
+    );
+
+    // Pinch. Tracked through touch events rather than pointer events so the
+    // one-finger selection drag above keeps working untouched; it just steps
+    // aside while `pinching` is set.
+    let pinchSpan = 0;
+    let pinchAnchor = 0;
+    const distance = (touches: TouchList): number =>
+      Math.abs(touches[0].clientX - touches[1].clientX);
+
+    wrap?.addEventListener('touchstart', (event) => {
+      if (event.touches.length !== 2) return;
+      this.pinching = true;
+      pinchSpan = Math.max(1, distance(event.touches));
+      pinchAnchor = wave.timeAt(
+        (event.touches[0].clientX + event.touches[1].clientX) / 2
+      );
+    });
+
+    wrap?.addEventListener(
+      'touchmove',
+      (event) => {
+        if (!this.pinching || event.touches.length !== 2) return;
+        event.preventDefault();
+        const now = Math.max(1, distance(event.touches));
+        wave.zoomBy(now / pinchSpan, pinchAnchor);
+        pinchSpan = now;
+      },
+      { passive: false }
+    );
+
+    const endPinch = (event: TouchEvent): void => {
+      if (event.touches.length < 2) this.pinching = false;
+    };
+    wrap?.addEventListener('touchend', endPinch);
+    wrap?.addEventListener('touchcancel', endPinch);
+
+    this.setupRuler();
+    this.setupMinimap();
+    this.setupZoomKeys();
+  }
+
+  /** Click or drag the ruler to move the playhead. */
+  private setupRuler(): void {
+    const track = this.el.rulerTrack;
+    if (!track) return;
+
+    track.addEventListener('pointerdown', (event) => {
+      if (!this.waveform || this.buffers.length === 0) return;
+      event.preventDefault();
+      track.setPointerCapture(event.pointerId);
+      track.dataset.grabbed = 'true';
+
+      const seek = (clientX: number): void => {
+        this.player?.seek(this.waveform!.timeAt(clientX));
+      };
+      seek(event.clientX);
+
+      const move = (moveEvent: PointerEvent): void => seek(moveEvent.clientX);
+      const up = (): void => {
+        delete track.dataset.grabbed;
+        track.removeEventListener('pointermove', move);
+        track.removeEventListener('pointerup', up);
+        track.removeEventListener('pointercancel', up);
+      };
+
+      track.addEventListener('pointermove', move);
+      track.addEventListener('pointerup', up);
+      track.addEventListener('pointercancel', up);
+    });
+  }
+
+  /** Drag anywhere on the overview to bring that part of the file into view. */
+  private setupMinimap(): void {
+    const map = this.el.minimap;
+    if (!map) return;
+
+    map.addEventListener('pointerdown', (event) => {
+      const wave = this.waveform;
+      if (!wave || this.buffers.length === 0) return;
+      event.preventDefault();
+      map.setPointerCapture(event.pointerId);
+      map.dataset.grabbed = 'true';
+
+      const go = (clientX: number): void => wave.centreOn(wave.minimapTimeAt(clientX));
+      go(event.clientX);
+
+      const move = (moveEvent: PointerEvent): void => go(moveEvent.clientX);
+      const up = (): void => {
+        delete map.dataset.grabbed;
+        map.removeEventListener('pointermove', move);
+        map.removeEventListener('pointerup', up);
+        map.removeEventListener('pointercancel', up);
+      };
+
+      map.addEventListener('pointermove', move);
+      map.addEventListener('pointerup', up);
+      map.addEventListener('pointercancel', up);
+    });
+  }
+
+  private setupZoomKeys(): void {
+    this.root.addEventListener('keydown', (event) => {
+      const wave = this.waveform;
+      if (!wave || this.buffers.length === 0) return;
+      // Never hijack typing, and never fight a handle that has already acted.
+      const target = event.target as HTMLElement;
+      if (target.matches('input, select, textarea')) return;
+      if (event.defaultPrevented) return;
+
+      const page = wave.span * 0.25;
+
+      switch (event.key) {
+        case '+':
+        case '=':
+          wave.zoomBy(1.8, wave.anchorFor(this.playTime));
+          break;
+        case '-':
+        case '_':
+          wave.zoomBy(1 / 1.8, wave.anchorFor(this.playTime));
+          break;
+        case '0':
+          wave.zoomToFit();
+          break;
+        case 's':
+        case 'S':
+          if (!this.config.selection) return;
+          wave.zoomToRegion(this.selection);
+          break;
+        case 'ArrowLeft':
+          if (wave.isFullyZoomedOut()) return;
+          wave.panBy(-page);
+          break;
+        case 'ArrowRight':
+          if (wave.isFullyZoomedOut()) return;
+          wave.panBy(page);
+          break;
+        default:
+          return;
+      }
+
+      event.preventDefault();
+    });
+  }
+
+  /**
+   * Everything positioned in percentages has to move when the viewport does:
+   * the handles, the cut markers, the dimming masks and the playhead.
+   */
+  private onViewChange(): void {
+    const wave = this.waveform;
+    if (!wave) return;
+
+    const label = this.el.zoomLevel;
+    if (label) {
+      const level = wave.zoomLevel();
+      // One decimal only when it says something: "1.0x" is noise, "2.4x" is not.
+      const shown =
+        level < 9.95 ? String(Math.round(level * 10) / 10) : String(Math.round(level));
+      label.textContent = `${shown}×`;
+      label.dataset.zoomed = String(!wave.isFullyZoomedOut());
+    }
+
+    const map = this.el.map;
+    if (map) map.hidden = wave.isFullyZoomedOut();
+
+    this.root.querySelector('[data-zoom-in]')?.toggleAttribute(
+      'disabled',
+      wave.isFullyZoomedIn()
+    );
+    this.root.querySelector('[data-zoom-out]')?.toggleAttribute(
+      'disabled',
+      wave.isFullyZoomedOut()
+    );
+
+    this.renderSelection();
+    this.placeMarkers();
+    this.renderPlayhead(this.playTime, false);
+  }
+
   private setPlayButton(playing: boolean): void {
     const btn = this.el.play;
     if (!btn) return;
@@ -427,12 +713,21 @@ export class ToolRuntime {
     if (pause) pause.style.display = playing ? '' : 'none';
   }
 
-  private renderPlayhead(seconds: number): void {
+  private renderPlayhead(seconds: number, follow = true): void {
     const { playhead, time } = this.el;
     const buffer = this.previewBuffer ?? this.buffers[0];
+    this.playTime = seconds;
+
+    // Zoomed in, the playhead runs off the edge within a second or two. Paging
+    // the view to keep up is the difference between zoom being usable during
+    // playback and being something you have to undo first.
+    if (follow) this.waveform?.followPlayhead(seconds);
+
     if (playhead && this.waveform && buffer) {
-      playhead.dataset.visible = 'true';
-      playhead.style.left = `${(seconds / buffer.duration) * 100}%`;
+      const pct = this.waveform.positionOf(seconds);
+      const visible = pct >= 0 && pct <= 100;
+      playhead.dataset.visible = String(visible);
+      if (visible) playhead.style.left = `${pct}%`;
     }
     if (time) {
       const total = buffer?.duration ?? 0;
@@ -496,6 +791,7 @@ export class ToolRuntime {
     // Drag on empty canvas draws a fresh selection.
     canvasWrap.addEventListener('pointerdown', (event) => {
       if ((event.target as HTMLElement).closest('[data-handle]')) return;
+      if (this.pinching || !event.isPrimary) return;
       if (!this.waveform) return;
       event.preventDefault();
       canvasWrap.setPointerCapture(event.pointerId);
@@ -614,6 +910,27 @@ export class ToolRuntime {
     return out;
   }
 
+  /**
+   * Moves the existing marker handles to match the viewport.
+   *
+   * Separate from `renderMarkers` on purpose: panning fires on every frame of a
+   * drag, and rebuilding the DOM at 60fps would drop the handle out from under
+   * the pointer and reset focus.
+   */
+  private placeMarkers(): void {
+    const layer = this.el.markers;
+    const wave = this.waveform;
+    if (!layer || !wave) return;
+
+    layer.querySelectorAll<HTMLElement>('.stage__marker').forEach((handle) => {
+      const time = this.markers[Number(handle.dataset.index)];
+      if (time === undefined) return;
+      const pct = wave.positionOf(time);
+      handle.style.left = `${pct}%`;
+      handle.dataset.offscreen = String(pct < 0 || pct > 100);
+    });
+  }
+
   private renderMarkers(): void {
     const layer = this.el.markers;
     if (!layer || !this.waveform) return;
@@ -623,7 +940,9 @@ export class ToolRuntime {
     this.markers.forEach((time, index) => {
       const handle = document.createElement('div');
       handle.className = 'stage__marker';
-      handle.style.left = `${this.waveform?.positionOf(time) ?? 0}%`;
+      const pct = this.waveform?.positionOf(time) ?? 0;
+      handle.style.left = `${pct}%`;
+      handle.dataset.offscreen = String(pct < 0 || pct > 100);
       handle.tabIndex = 0;
       handle.setAttribute('role', 'slider');
       handle.setAttribute('aria-label', `Cut point ${index + 1}`);
@@ -668,6 +987,7 @@ export class ToolRuntime {
 
       const handle = target.closest<HTMLElement>('.stage__marker');
       if (!handle) return;
+      if (this.pinching || !event.isPrimary) return;
 
       event.preventDefault();
       event.stopPropagation();
@@ -751,26 +1071,32 @@ export class ToolRuntime {
 
     const startPct = this.waveform.positionOf(this.selection.start);
     const endPct = this.waveform.positionOf(this.selection.end);
+    const clamp = (value: number): number => Math.min(100, Math.max(0, value));
 
+    // A handle scrolled out of the viewport is hidden rather than pinned to the
+    // edge: a handle sitting at 0% that does not correspond to the selection
+    // start would be a lie you could then drag.
     if (handleStart) {
       handleStart.style.left = `${startPct}%`;
+      handleStart.dataset.offscreen = String(startPct < 0 || startPct > 100);
       handleStart.setAttribute('aria-valuenow', this.selection.start.toFixed(2));
       const tip = handleStart.querySelector('[data-tip]');
       if (tip) tip.textContent = timecode(this.selection.start);
     }
     if (handleEnd) {
       handleEnd.style.left = `${endPct}%`;
+      handleEnd.dataset.offscreen = String(endPct < 0 || endPct > 100);
       handleEnd.setAttribute('aria-valuenow', this.selection.end.toFixed(2));
       const tip = handleEnd.querySelector('[data-tip]');
       if (tip) tip.textContent = timecode(this.selection.end);
     }
     if (maskLeft) {
       maskLeft.style.left = '0';
-      maskLeft.style.width = `${startPct}%`;
+      maskLeft.style.width = `${clamp(startPct)}%`;
     }
     if (maskRight) {
-      maskRight.style.left = `${endPct}%`;
-      maskRight.style.width = `${100 - endPct}%`;
+      maskRight.style.left = `${clamp(endPct)}%`;
+      maskRight.style.width = `${100 - clamp(endPct)}%`;
     }
 
     this.waveform.setRegion(this.selection);
@@ -799,7 +1125,7 @@ export class ToolRuntime {
       .then((buffer) => {
         this.previewBuffer = buffer;
         this.player?.setBuffer(buffer);
-        this.waveform?.setBuffer(buffer);
+        this.waveform?.setBuffer(buffer, true);
         if (this.config.selection) this.player?.setRegion(this.selection);
       })
       .catch(() => {
@@ -948,6 +1274,8 @@ export class ToolRuntime {
     this.lastOutput = { blob, name };
     this.markReady();
     this.showChain();
+
+    track('export_done', { format: spec.id, bitrate: this.bitrate() });
   }
 
   private async deliverMany(outputs: NamedOutput[]): Promise<void> {
@@ -977,6 +1305,8 @@ export class ToolRuntime {
 
     this.clearProgress();
     this.markReady();
+
+    track('export_done', { format: spec.id, parts: outputs.length });
   }
 
   private resultRow(name: string, blob: Blob): HTMLElement {
@@ -1063,6 +1393,10 @@ export class ToolRuntime {
     if (!status) return;
 
     const fix = error instanceof AudioError ? error.fix : 'Try reloading the page.';
+    // The error code, never the message: messages can contain a filename.
+    track('tool_error', {
+      code: error instanceof AudioError ? error.code : 'unknown',
+    });
     status.innerHTML = `
       <div class="note note--error" role="alert">
         <div class="note__body">

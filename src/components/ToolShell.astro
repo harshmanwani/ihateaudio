@@ -56,7 +56,8 @@ const formats = video
   : 'MP3 · WAV · M4A · AAC · OGG · FLAC and more';
 ---
 
-<div class="tool" data-tool data-slug={tool.slug}>
+<!-- data-cat on the root, so every control inside can reach the family hue. -->
+<div class="tool" data-tool data-slug={tool.slug} data-cat={tool.category}>
   <!--
     Empty state: the stage itself, waiting.
 
@@ -116,6 +117,22 @@ const formats = video
     {
       stage && (
         <div class="stage" data-stage>
+          {/*
+            The ruler is also the pan handle. Dragging the waveform itself is
+            already spoken for by selection and marker gestures, so the scale
+            strip is where "move along the file" lives — the same division a
+            DAW makes, and it means no gesture has two meanings.
+          */}
+          <div
+            class="stage__ruler"
+            data-ruler-track
+            role="button"
+            tabindex="-1"
+            aria-hidden="true"
+          >
+            <canvas data-ruler />
+          </div>
+
           <div class="stage__canvas-wrap" data-canvas-wrap>
             <canvas data-canvas aria-label="Audio waveform" role="img" />
 
@@ -160,6 +177,14 @@ const formats = video
             )}
 
             <div class="stage__playhead" data-playhead />
+          </div>
+
+          {/*
+            The overview only appears once you are zoomed in, because at 1x it
+            would be a second copy of the waveform directly under the first.
+          */}
+          <div class="stage__map" data-map hidden>
+            <canvas data-minimap aria-hidden="true" />
           </div>
 
           <div class="transport">
@@ -208,6 +233,63 @@ const formats = video
 
             <div class="transport__time tnum" data-time>0:00.00 <span>/ 0:00.00</span></div>
             <div class="transport__spacer" />
+
+            <p class="transport__keys" aria-hidden="true">
+              <kbd>Space</kbd> play
+              <span>·</span>
+              <kbd>⌥</kbd>scroll zoom
+              {markers && (
+                <>
+                  <span>·</span>
+                  double-click to cut
+                </>
+              )}
+            </p>
+
+            <div class="zoomer" role="group" aria-label="Zoom">
+              <button
+                type="button"
+                class="transport__btn"
+                data-zoom-out
+                aria-label="Zoom out"
+                title="Zoom out (-)"
+              >
+                <Icon name="magnifying-glass-minus" size={16} />
+              </button>
+
+              {/* The readout is the fit button: the number tells you where you
+                  are and clicking it puts you back. */}
+              <button
+                type="button"
+                class="zoomer__level tnum"
+                data-zoom-fit
+                title="Fit the whole file (0)"
+              >
+                1&#215;
+              </button>
+
+              <button
+                type="button"
+                class="transport__btn"
+                data-zoom-in
+                aria-label="Zoom in"
+                title="Zoom in (+)"
+              >
+                <Icon name="magnifying-glass-plus" size={16} />
+              </button>
+
+              {selection && (
+                <button
+                  type="button"
+                  class="transport__btn"
+                  data-zoom-selection
+                  aria-label="Zoom to the selection"
+                  title="Zoom to the selection (S)"
+                >
+                  <Icon name="crop" size={16} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
       )

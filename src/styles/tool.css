@@ -1,26 +1,30 @@
 /* The tool workspace: dropzone, dark stage, transport, controls, export, chaining. */
 
-/* Spacing rhythm, not a uniform stack.
-   A flat 16px between every panel gave the workspace no grouping, so the
-   file header, the waveform, the settings and the export read as four equal
-   strangers. The file header belongs *to* the waveform (8px), the settings are
-   a separate movement (24px), and the export is the end of the sequence
-   (32px). The gaps carry the structure. */
+/* Three movements, not a stack of cards.
+   Four panels with identical surface, border and radius read as four equal
+   strangers, which is exactly how the workspace used to look. So the page is
+   built from three things instead: the instrument (one dark object: file
+   header, ruler, waveform, overview, transport), the settings (open on the
+   page, no chrome of their own) and the commit row. The gaps carry the
+   grouping, and the parts of the instrument have no gaps between them at all. */
 .tool {
   display: flex;
   flex-direction: column;
   gap: var(--s6);
 }
 
-.tool > .filebar + .stage,
-.tool > .filebar + .drop {
-  margin-top: calc(var(--s6) - var(--s2));
+/* The file header is the instrument's own top edge, so the flex gap between
+   them is cancelled and the two share one rounded outline. */
+.tool > .filebar:has(+ .stage),
+.tool > .filebar:has(+ .drop) {
+  border-radius: var(--r-lg) var(--r-lg) 0 0;
 }
 
-.tool > .stage + .controls,
-.tool > .stage + [data-results],
-.tool > .stage + .convert {
-  margin-top: var(--s1);
+.tool > .filebar + .stage,
+.tool > .filebar + .drop {
+  margin-top: calc(var(--s6) * -1);
+  border-top: 1px solid var(--stage-line);
+  border-radius: 0 0 var(--r-lg) var(--r-lg);
 }
 
 .tool > .export {
@@ -221,21 +225,20 @@ body[data-dragging='true'] .drop-overlay {
   display: flex;
 }
 
-/* ---------- File header ---------- */
+/* ---------- File header: the instrument's top edge ---------- */
 
 .filebar {
   display: flex;
   align-items: center;
   gap: var(--s3);
   padding: var(--s3) var(--s4);
-  background: var(--surface);
-  border: 1px solid var(--line);
+  background: var(--stage-2);
   border-radius: var(--r-lg);
   min-width: 0;
 }
 
 .filebar__icon {
-  color: var(--brand);
+  color: var(--wave);
   flex: none;
 }
 
@@ -247,6 +250,7 @@ body[data-dragging='true'] .drop-overlay {
 .filebar__name {
   font-size: var(--t-ui);
   font-weight: 600;
+  color: var(--stage-ink);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -254,8 +258,22 @@ body[data-dragging='true'] .drop-overlay {
 
 .filebar__meta {
   font-size: var(--t-small);
-  color: var(--ink-2);
+  color: var(--stage-ink-2);
   font-variant-numeric: tabular-nums;
+}
+
+/* Sitting on the dark header, the ghost button needs stage colours. */
+.filebar .btn--ghost {
+  color: var(--stage-ink-2);
+}
+
+.filebar .btn--ghost:hover:not(:disabled) {
+  background: color-mix(in oklch, var(--stage-ink) 12%, transparent);
+  color: var(--stage-ink);
+}
+
+.filebar .btn--ghost:focus-visible {
+  outline-color: var(--wave);
 }
 
 /* ---------- Stage: the dark workspace ---------- */
@@ -268,18 +286,29 @@ body[data-dragging='true'] .drop-overlay {
   -webkit-user-select: none;
 }
 
+/* The scale strip. Same background as the waveform so the two read as one
+   window, separated only by the tick marks and a hairline. Click or drag it to
+   move the playhead: on a tool with selection handles, clicking the waveform
+   draws a selection, so this is the only place seeking can live. */
 .stage__ruler {
-  height: 22px;
-  background: var(--stage-2);
-  border-bottom: 1px solid var(--stage-line);
   position: relative;
-  font-size: var(--t-micro);
-  color: var(--stage-ink-2);
+  height: 24px;
+  border-bottom: 1px solid var(--stage-line);
+  cursor: col-resize;
+  touch-action: none;
+  transition: background-color var(--dur-micro) var(--ease);
 }
 
+.stage__ruler:hover,
+.stage__ruler[data-grabbed='true'] {
+  background: color-mix(in oklch, var(--stage-ink) 6%, transparent);
+}
+
+/* Taller than it was, and it grows with the viewport: 180px was enough to see
+   a shape but not enough to judge one. */
 .stage__canvas-wrap {
   position: relative;
-  height: 180px;
+  height: clamp(172px, 27vh, 268px);
   touch-action: pan-y;
   cursor: crosshair;
 }
@@ -292,6 +321,40 @@ body[data-dragging='true'] .drop-overlay {
   width: 100%;
   height: 100%;
   display: block;
+}
+
+/* ---------- Overview strip ----------
+
+   Only rendered while zoomed in. At 1x it would be a second, smaller copy of
+   the waveform sitting directly beneath the first one. */
+
+.stage__map {
+  position: relative;
+  height: 40px;
+  border-top: 1px solid var(--stage-line);
+  cursor: grab;
+  touch-action: none;
+  /* Fades and lifts rather than growing from zero height. Animating height made
+     the canvas inside measure 0 on its first frame, and there was nothing to
+     trigger a repaint once it had grown. */
+  animation: map-in var(--dur) var(--ease);
+}
+
+.stage__map canvas[data-grabbed='true'] {
+  cursor: grabbing;
+}
+
+@keyframes map-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stage__map {
+    animation: none;
+  }
 }
 
 /* The "it worked" moment — bars grow from the centreline once, on decode */
@@ -450,18 +513,30 @@ body[data-dragging='true'] .drop-overlay {
   }
 }
 
+/* Quiet until wanted. Solid amber chips on every cut point turned a waveform
+   with four markers into a row of labels with some audio behind it. */
 .stage__marker-tip {
   position: absolute;
   top: 4px;
   padding: 2px var(--s2);
   border-radius: var(--r-sm);
-  background: var(--playhead);
-  color: var(--stage);
+  background: color-mix(in oklch, var(--stage) 78%, transparent);
+  color: var(--playhead);
   font-size: var(--t-micro);
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   pointer-events: none;
+  transition:
+    background-color var(--dur-micro) var(--ease),
+    color var(--dur-micro) var(--ease);
+}
+
+.stage__marker:hover .stage__marker-tip,
+.stage__marker:focus-within .stage__marker-tip,
+.stage__marker[data-grabbed='true'] .stage__marker-tip {
+  background: var(--playhead);
+  color: var(--stage);
 }
 
 .stage__marker-x {
@@ -495,6 +570,14 @@ body[data-dragging='true'] .drop-overlay {
   .stage__marker-x {
     opacity: 1;
   }
+}
+
+/* Scrolled out of the viewport. Hidden rather than pinned to the edge: a handle
+   parked at 0% that does not correspond to the selection start is a lie you
+   could then drag. */
+.stage__handle[data-offscreen='true'],
+.stage__marker[data-offscreen='true'] {
+  display: none;
 }
 
 /* Dimmed regions outside the selection */
@@ -580,16 +663,129 @@ body[data-dragging='true'] .drop-overlay {
   min-width: var(--s2);
 }
 
-/* ---------- Controls ---------- */
+/* ---------- Zoom ---------- */
+
+.zoomer {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex: none;
+  padding-left: var(--s2);
+  border-left: 1px solid var(--stage-line);
+}
+
+/* The readout is the fit button. One control: the number says where you are,
+   pressing it puts you back, and that beats a separate "reset" nobody finds. */
+.zoomer__level {
+  min-width: 46px;
+  height: 34px;
+  padding-inline: var(--s2);
+  border: 0;
+  border-radius: var(--r-md);
+  background: none;
+  color: var(--stage-ink-2);
+  font-size: var(--t-small);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-micro) var(--ease),
+    color var(--dur-micro) var(--ease);
+}
+
+.zoomer__level[data-zoomed='true'] {
+  color: var(--wave);
+  background: color-mix(in oklch, var(--wave) 14%, transparent);
+}
+
+.zoomer__level:hover {
+  color: var(--stage-ink);
+}
+
+.zoomer__level[data-zoomed='true']:hover {
+  background: color-mix(in oklch, var(--wave) 24%, transparent);
+}
+
+.zoomer__level:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 1px;
+}
+
+@media (pointer: coarse) {
+  .zoomer__level {
+    height: 44px;
+  }
+}
+
+/* Shortcut hints. Desktop only: they name keys and a scroll modifier, neither
+   of which a phone has. */
+.transport__keys {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--t-micro);
+  color: var(--stage-ink-2);
+  white-space: nowrap;
+}
+
+.transport__keys span {
+  opacity: 0.5;
+}
+
+.transport__keys kbd {
+  font: inherit;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: color-mix(in oklch, var(--stage-ink) 12%, transparent);
+  color: var(--stage-ink);
+}
+
+@media (hover: hover) and (min-width: 900px) {
+  .transport__keys {
+    display: flex;
+  }
+}
+
+/* Narrow: the zoom group cannot fit beside the transport buttons, so instead of
+   letting it wrap into a ragged second line it becomes a deliberate second row
+   with its own rule. */
+@media (max-width: 620px) {
+  .transport {
+    row-gap: 0;
+  }
+
+  .transport__spacer {
+    display: none;
+  }
+
+  .transport__time {
+    margin-left: auto;
+  }
+
+  .zoomer {
+    width: 100%;
+    justify-content: flex-end;
+    margin-top: var(--s2);
+    padding: var(--s2) 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--stage-line);
+  }
+}
+
+/* ---------- Controls: the settings, open on the page ----------
+
+   No surface, no border, no radius. The old grey card put the one part of the
+   page that differs per tool inside the most generic container on the site, and
+   stacked it against three near-identical siblings. What replaces the chrome is
+   space and a real heading: a hairline above, a heading at h3 scale carrying the
+   family colour, and enough room between fields to see the grouping. */
 
 .controls {
   display: grid;
-  gap: var(--s4) var(--s6);
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  padding: var(--s5);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
+  gap: var(--s6) var(--s8);
+  grid-template-columns: repeat(auto-fit, minmax(236px, 1fr));
+  padding-top: var(--s6);
+  border-top: 1px solid var(--line);
 }
 
 .controls--single {
@@ -603,15 +799,32 @@ body[data-dragging='true'] .drop-overlay {
 .controls__head {
   grid-column: 1 / -1;
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--s3);
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: var(--s1);
+  margin-bottom: calc(var(--s2) * -1);
 }
 
 .controls__title {
-  font-size: var(--t-ui);
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  font-size: var(--t-h3);
   font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+/* The family colour, on the one element that names what this tool does. */
+.controls__title::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 3px;
+  background: var(--cat-vivid, var(--brand));
+}
+
+.controls__head .hint {
+  padding-left: calc(9px + var(--s3));
 }
 
 .hint {
@@ -620,21 +833,39 @@ body[data-dragging='true'] .drop-overlay {
   line-height: 1.5;
 }
 
-/* ---------- Export bar ---------- */
+/* A row of related switches reads better banded together than as loose
+   checkboxes floating in the grid. */
+.controls__row {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--s3) var(--s6);
+  align-items: center;
+}
+
+@media (max-width: 560px) {
+  .controls {
+    gap: var(--s5);
+  }
+}
+
+/* ---------- Commit row ----------
+
+   The last movement, and the only one that leaves with something. It earns
+   emphasis from the weight of the button and the rule above it rather than from
+   another panel: this is a row of choices ending in an action, not a container. */
 
 .export {
   display: flex;
   align-items: flex-end;
   gap: var(--s4);
   flex-wrap: wrap;
-  padding: var(--s5);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
+  padding-top: var(--s5);
+  border-top: 1px solid var(--line);
 }
 
 .export__field {
-  min-width: 130px;
+  min-width: 132px;
   flex: 0 1 auto;
 }
 
@@ -647,19 +878,42 @@ body[data-dragging='true'] .drop-overlay {
   font-size: var(--t-small);
   color: var(--ink-2);
   font-variant-numeric: tabular-nums;
-  padding-bottom: var(--s2);
+  padding-bottom: var(--s3);
+}
+
+/* Below this width the settings push the button off screen, and hunting for the
+   one button that does the thing is the worst moment in any web tool. So it
+   follows you down — but only once the waveform has scrolled away. Sticking it
+   unconditionally parked it over the transport at rest, which traded a scroll
+   for a covered play button. `data-float` is set by the runtime from an
+   IntersectionObserver on the stage. */
+@media (max-width: 900px) {
+  .export[data-float='true'] {
+    position: sticky;
+    bottom: 0;
+    z-index: var(--z-sticky);
+    padding: var(--s4) var(--gutter);
+    margin-inline: calc(var(--gutter) * -1);
+    background: color-mix(in oklch, var(--bg) 92%, transparent);
+    backdrop-filter: blur(8px);
+    box-shadow: 0 -6px 16px -10px oklch(0.19 0.013 156 / 0.35);
+  }
 }
 
 @media (max-width: 560px) {
   .export {
-    flex-direction: column;
     align-items: stretch;
+  }
+  .export__field {
+    flex: 1 1 120px;
+    min-width: 0;
   }
   .export .btn {
     width: 100%;
   }
   .export__size {
     padding-bottom: 0;
+    align-self: center;
   }
 }
 
@@ -781,10 +1035,8 @@ body[data-dragging='true'] .drop-overlay {
   display: flex;
   flex-direction: column;
   gap: var(--s4);
-  padding: var(--s5);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
+  padding-top: var(--s6);
+  border-top: 1px solid var(--line);
 }
 
 .convert__row {

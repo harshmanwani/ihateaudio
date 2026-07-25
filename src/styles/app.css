@@ -385,6 +385,10 @@
   color: var(--ink-2);
   cursor: pointer;
   min-height: 30px;
+  /* "Keep selection" wrapping to two lines inside a 236px grid column made the
+     whole control twice as tall as its neighbours. The group wraps; a label
+     inside it does not. */
+  white-space: nowrap;
   transition:
     background-color var(--dur-micro) var(--ease),
     color var(--dur-micro) var(--ease);

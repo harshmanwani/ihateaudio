@@ -408,30 +408,53 @@ export interface WaveformData {
  */
 export function computeWaveform(
   buffer: AudioBuffer,
-  columns: number
+  columns: number,
+  fromSample = 0,
+  toSample = buffer.length
 ): WaveformData {
   const width = Math.max(1, Math.floor(columns));
   const peaks = new Float32Array(width * 2);
   const rms = new Float32Array(width);
   const channels = buffer.numberOfChannels;
-  const length = buffer.length;
+
+  const first = Math.max(0, Math.min(buffer.length - 1, Math.floor(fromSample)));
+  const last = Math.max(first + 1, Math.min(buffer.length, Math.ceil(toSample)));
+  const span = last - first;
 
   // Hoist channel references: getChannelData is a getter, and calling it
   // inside the sample loop dominates the profile on long files.
   const data: Float32Array[] = [];
   for (let c = 0; c < channels; c += 1) data.push(buffer.getChannelData(c));
 
-  const perColumn = length / width;
+  const perColumn = span / width;
 
   for (let x = 0; x < width; x += 1) {
-    const start = Math.floor(x * perColumn);
+    const start = first + Math.floor(x * perColumn);
     // The last column absorbs any rounding remainder so no sample is skipped.
-    const end = x === width - 1 ? length : Math.min(length, Math.floor((x + 1) * perColumn));
+    const end =
+      x === width - 1 ? last : Math.min(last, first + Math.floor((x + 1) * perColumn));
 
     let min = 0;
     let max = 0;
     let sumSquares = 0;
     let count = 0;
+
+    // Zoomed in far enough that a column covers less than one sample, every
+    // column still has to report something: read the sample it lands on rather
+    // than leaving a gap where an empty range would.
+    if (end <= start) {
+      const i = Math.min(last - 1, start);
+      for (let c = 0; c < channels; c += 1) {
+        const v = data[c][i];
+        if (v < min) min = v;
+        if (v > max) max = v;
+        sumSquares += v * v;
+      }
+      peaks[x * 2] = min;
+      peaks[x * 2 + 1] = max;
+      rms[x] = Math.sqrt(sumSquares / channels);
+      continue;
+    }
 
     for (let c = 0; c < channels; c += 1) {
       const channel = data[c];

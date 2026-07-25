@@ -12,23 +12,28 @@
 }
 
 :root {
+  /* The green sits at hue 156, not 162. At 162 it resolved to #005d3d — a
+     teal-leaning pine that read as dull and almost black. 156 with more chroma
+     lands on #007038: unmistakably green, still serious. Every neutral is
+     tinted toward the same hue so the greys never fight the brand. */
+
   /* Page surfaces */
   --bg: oklch(1 0 0);
-  --surface: oklch(0.976 0.004 162);
-  --surface-2: oklch(0.955 0.005 162);
-  --line: oklch(0.912 0.006 162);
-  --line-strong: oklch(0.84 0.008 162);
+  --surface: oklch(0.976 0.005 156);
+  --surface-2: oklch(0.955 0.006 156);
+  --line: oklch(0.912 0.007 156);
+  --line-strong: oklch(0.84 0.009 156);
 
   /* Ink ramp — --ink-3 is the floor, nothing lighter carries text */
-  --ink: oklch(0.19 0.012 162);
-  --ink-2: oklch(0.455 0.012 162);
-  --ink-3: oklch(0.545 0.01 162);
+  --ink: oklch(0.19 0.013 156);
+  --ink-2: oklch(0.455 0.013 156);
+  --ink-3: oklch(0.545 0.011 156);
 
-  /* Brand + state */
-  --brand: oklch(0.42 0.095 162);
-  --brand-hover: oklch(0.355 0.095 162);
-  --brand-soft: oklch(0.958 0.022 162);
-  --brand-ring: oklch(0.42 0.095 162 / 0.3);
+  /* Brand + state. 6.24:1 on white, so it still carries body text. */
+  --brand: oklch(0.47 0.135 156);
+  --brand-hover: oklch(0.4 0.12 156);
+  --brand-soft: oklch(0.955 0.032 156);
+  --brand-ring: oklch(0.47 0.135 156 / 0.32);
   --accent: oklch(0.7 0.155 62);
   --accent-soft: oklch(0.965 0.03 62);
   --accent-ink: oklch(0.3 0.09 62);
@@ -40,34 +45,38 @@
      `strong` is text-safe (borders, hovers, links); `vivid` is the icon
      colour — brighter and more chromatic, because a glyph can carry far more
      saturation than text without breaking anything; `soft` fills the chip.
-     Lightness and chroma are held constant across families so none shouts. */
-  --cat-cut: oklch(0.44 0.1 162);
-  --cat-cut-vivid: oklch(0.56 0.14 162);
-  --cat-cut-soft: oklch(0.945 0.038 162);
-  --cat-convert: oklch(0.44 0.1 245);
-  --cat-convert-vivid: oklch(0.56 0.16 245);
-  --cat-convert-soft: oklch(0.945 0.032 245);
-  --cat-volume: oklch(0.44 0.1 62);
-  --cat-volume-vivid: oklch(0.6 0.14 62);
-  --cat-volume-soft: oklch(0.95 0.05 80);
-  --cat-speed: oklch(0.44 0.1 300);
-  --cat-speed-vivid: oklch(0.56 0.17 300);
-  --cat-speed-soft: oklch(0.945 0.035 300);
-  --cat-effects: oklch(0.44 0.1 350);
-  --cat-effects-vivid: oklch(0.58 0.18 350);
-  --cat-effects-soft: oklch(0.95 0.03 350);
-  --cat-utility: oklch(0.44 0.1 210);
-  --cat-utility-vivid: oklch(0.56 0.13 210);
-  --cat-utility-soft: oklch(0.945 0.035 210);
+     Lightness and chroma are held constant across families so none shouts.
+     Verified: every `strong` clears 6:1 on white and 5.3:1 on its own soft. */
+  --cat-cut: oklch(0.47 0.125 156);
+  --cat-cut-vivid: oklch(0.6 0.165 156);
+  --cat-cut-soft: oklch(0.945 0.045 156);
+  --cat-convert: oklch(0.47 0.125 245);
+  --cat-convert-vivid: oklch(0.6 0.165 245);
+  --cat-convert-soft: oklch(0.945 0.038 245);
+  --cat-volume: oklch(0.47 0.125 62);
+  --cat-volume-vivid: oklch(0.64 0.165 62);
+  --cat-volume-soft: oklch(0.95 0.055 80);
+  --cat-speed: oklch(0.47 0.125 300);
+  --cat-speed-vivid: oklch(0.6 0.185 300);
+  --cat-speed-soft: oklch(0.945 0.04 300);
+  --cat-effects: oklch(0.47 0.125 350);
+  --cat-effects-vivid: oklch(0.62 0.19 350);
+  --cat-effects-soft: oklch(0.95 0.036 350);
+  --cat-utility: oklch(0.47 0.125 210);
+  --cat-utility-vivid: oklch(0.6 0.145 210);
+  --cat-utility-soft: oklch(0.945 0.04 210);
 
   /* Stage — the dark workspace */
-  --stage: oklch(0.168 0.014 162);
-  --stage-2: oklch(0.232 0.014 162);
-  --stage-line: oklch(0.3 0.014 162);
-  --stage-ink: oklch(0.93 0.006 162);
-  --stage-ink-2: oklch(0.66 0.008 162);
-  --wave: oklch(0.735 0.13 162);
-  --wave-dim: oklch(0.4 0.045 162);
+  --stage: oklch(0.168 0.015 156);
+  --stage-2: oklch(0.232 0.015 156);
+  --stage-line: oklch(0.3 0.015 156);
+  --stage-ink: oklch(0.93 0.007 156);
+  --stage-ink-2: oklch(0.66 0.009 156);
+  /* The waveform can carry far more chroma than any text: it is the one thing
+     on the page whose whole job is to be looked at. 10:1 against the stage. */
+  --wave: oklch(0.775 0.175 156);
+  --wave-deep: oklch(0.62 0.15 156);
+  --wave-dim: oklch(0.44 0.055 156);
   --playhead: oklch(0.85 0.16 62);
 
   /* Type */
@@ -128,7 +137,11 @@
 
   /* Layout */
   --content: 1120px;
-  --prose: 68ch;
+  /* Measured, not assumed. `ch` is the advance of "0", and Instrument Sans draws
+     a wide zero at 0.666em while its average lowercase character is 0.517em. So
+     68ch was rendering about 88 characters a line, well past the point where the
+     eye loses its place on the return sweep. 56ch measures ~72. */
+  --prose: 56ch;
   --gutter: 20px;
 }
 
