@@ -77,6 +77,21 @@ which of the two stems is listed first and which is returned to the export bar.
 Reverting the mount restores the tool to +18.55 dB and a clean pass, which
 confirms the panel is the cause without explaining it.
 
-Worth trying: mounting the panel with the stems in the same order as the vocal
-remover (instrumental first), which would isolate whether ordering matters at all;
-and moving the mount after the return value is handed back rather than before it.
+**Correction.** Reverting the mount was not the fix it appeared to be. With the
+revert deployed and confirmed live — the page serves no `data-stem-panel` at all —
+the extractor still times out against production, while passing locally at
++18.55 dB. So the mixer is not the cause, or not the only one, and the local pass
+after reverting was misleading rather than diagnostic.
+
+What is actually known:
+
+- It passed against production before any of this work (+18.55 dB, 45s).
+- It passes locally now, consistently.
+- It times out against production now, consistently, with the mixer absent.
+- The vocal remover, same model and same code path, passes against production in
+  the same run.
+
+That last point is the useful one: whatever this is, it is specific to this page
+and survives removing the only thing that distinguished it. The next step is to
+watch a production run with the console attached rather than inferring from the
+harness, which is the one thing not yet done.
