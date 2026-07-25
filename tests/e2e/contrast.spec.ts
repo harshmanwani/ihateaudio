@@ -83,6 +83,19 @@ test.describe('contrast (AA)', () => {
     'equalizer', 'loudness-meter', 'voice-recorder', 'waveform-generator',
     'audio-joiner', 'ringtone-maker', 'bpm-detector', 'stereo-to-mono'];
 
+  // The empty state is the dark stage and is what every first visit sees, so
+  // it is audited separately — the loaded-state tests below hide it.
+  for (const slug of ['audio-trimmer', 'audio-joiner', 'video-to-audio']) {
+    test(`/${slug} empty state passes AA on the dark stage`, async ({ page }) => {
+      await page.goto(`/${slug}`);
+      await expect(page.locator('[data-drop]')).toBeVisible();
+
+      const result = (await page.evaluate(AUDIT)) as AuditResult;
+      expect(result.tested).toBeGreaterThan(20);
+      expect(result.fails, JSON.stringify(result.fails, null, 1)).toEqual([]);
+    });
+  }
+
   for (const slug of sample) {
     const tool = TOOLS.find((t) => t.slug === slug);
     if (!tool) continue;

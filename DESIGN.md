@@ -181,8 +181,11 @@ and error**. Focus is a 2px `--brand` ring at 2px offset, never removed.
 
 - **Button** — `solid` (brand fill), `quiet` (surface fill, 1px line), `ghost` (text only),
   `danger`. Heights 32/36/44px; 44px is the mobile default so touch targets pass.
-- **Dropzone** — the empty state teaches: supported formats, the privacy line, a "try a
-  sample" affordance so the tool is explorable with no file.
+- **Dropzone** — the stage itself, waiting. The empty state is the same dark window the
+  waveform will draw into: a centerline marks where audio will appear, and the strip
+  along the bottom (formats + privacy) sits exactly where the transport will be.
+  Dropping a file fills the window it landed on; the page never swaps layouts. Never a
+  dashed grey rectangle — that is the single most templated element in this category.
 - **Stage** — dark panel: ruler, waveform canvas, selection region, playhead, transport.
 - **Transport** — play/pause, skip to selection edges, loop toggle, timecode, zoom.
 - **Control row** — labelled sliders and number inputs with unit suffixes; every slider has

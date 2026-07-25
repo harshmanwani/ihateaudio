@@ -1,7 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import Icon from '../components/Icon.astro';
-import { SITE, PRIVACY_LINE } from '../consts';
+import { SITE } from '../consts';
 import { CATEGORIES, TOOLS, toolsIn } from '../data/tools';
 
 const schema = [
@@ -37,29 +37,21 @@ const schema = [
     <section class="hero">
       <h1>Audio editing is miserable. These make it less so.</h1>
       <p class="hero__sub">
-        {TOOLS.length} free tools that run entirely inside your browser. No upload,
-        no account, no ads, no watermark, no file size limit. Drop a file and it
-        just works.
+        {TOOLS.length} free tools that run entirely in your browser — nothing is
+        uploaded, nothing to install, nothing to sign up for.
       </p>
-      <div class="hero__meta">
-        <span class="privacy">
-          <Icon name="shield-check" size={16} />
-          {PRIVACY_LINE}
-        </span>
+      <div class="toolsearch">
+        <Icon name="magnifying-glass" size={18} />
+        <input
+          class="input"
+          type="search"
+          id="tool-search"
+          placeholder={`Search ${TOOLS.length} tools…`}
+          aria-label="Search tools"
+          autocomplete="off"
+        />
       </div>
     </section>
-
-    <div class="toolsearch" style="margin-bottom: var(--s10)">
-      <Icon name="magnifying-glass" size={18} />
-      <input
-        class="input"
-        type="search"
-        id="tool-search"
-        placeholder={`Search ${TOOLS.length} tools…`}
-        aria-label="Search tools"
-        autocomplete="off"
-      />
-    </div>
 
     <p class="searchempty" data-search-empty hidden>
       Nothing matched that. Try “trim”, “convert”, “louder” or “ringtone”.
@@ -81,10 +73,7 @@ const schema = [
                 data-tile
                 data-search={`${tool.name} ${tool.short} ${tool.slug}`.toLowerCase()}
               >
-                <span class="tile__top">
-                  <Icon name={tool.icon} size={18} class="tile__icon" />
-                  <span class="tile__name">{tool.name}</span>
-                </span>
+                <span class="tile__name">{tool.name}</span>
                 <span class="tile__desc">{tool.short}</span>
               </a>
             ))}

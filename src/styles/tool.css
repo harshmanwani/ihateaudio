@@ -6,64 +6,162 @@
   gap: var(--s4);
 }
 
-/* ---------- Dropzone ---------- */
+/* ---------- Dropzone: the stage, waiting ----------
+
+   The empty state is the same dark window the waveform draws into. The
+   centerline marks where audio will appear; the bottom strip sits where the
+   transport will be. Dropping a file fills the window it landed on — the page
+   never swaps layouts. */
 
 .drop {
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: var(--s3);
-  min-height: 260px;
-  padding: var(--s8) var(--s5);
-  text-align: center;
-  background: var(--surface);
-  border: 2px dashed var(--line-strong);
+  background: var(--stage);
   border-radius: var(--r-lg);
-  transition:
-    border-color var(--dur) var(--ease),
-    background-color var(--dur) var(--ease),
-    transform var(--dur) var(--ease);
+  overflow: hidden;
+  cursor: pointer;
+  transition: box-shadow var(--dur) var(--ease);
 }
 
 .drop[data-armed='true'] {
-  border-color: var(--brand);
-  background: var(--brand-soft);
-  transform: translateY(-2px);
+  box-shadow: inset 0 0 0 2px var(--wave);
 }
 
-.drop__icon {
-  color: var(--ink-3);
-  transition: color var(--dur) var(--ease);
+.drop:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
 }
 
-.drop[data-armed='true'] .drop__icon {
-  color: var(--brand);
+/* Mirrors .stage__canvas-wrap: this is where the waveform will be. */
+.drop__body {
+  display: flex;
+  align-items: center;
+  gap: var(--s5);
+  min-height: 212px;
+  padding-inline: var(--s5);
+}
+
+/* The waveform centerline, interrupted by the invitation. */
+.drop__line {
+  flex: 1;
+  height: 1px;
+  background: var(--stage-line);
+  transition: background-color var(--dur) var(--ease);
+}
+
+.drop[data-armed='true'] .drop__line {
+  background: var(--wave);
+}
+
+.drop__center {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s2);
+  text-align: center;
+  padding-block: var(--s6);
 }
 
 .drop__title {
   font-size: var(--t-lead);
   font-weight: 600;
+  color: var(--stage-ink);
+  transition: color var(--dur) var(--ease);
+}
+
+.drop[data-armed='true'] .drop__title {
+  color: var(--wave);
 }
 
 .drop__hint {
   font-size: var(--t-small);
-  color: var(--ink-2);
-  max-width: 46ch;
+  color: var(--stage-ink-2);
 }
 
-.drop__actions {
+.drop__btn {
+  margin-top: var(--s3);
+  height: 40px;
+  padding-inline: var(--s5);
+  border: 0;
+  border-radius: var(--r-md);
+  background: var(--wave);
+  color: var(--stage);
+  font-size: var(--t-ui);
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color var(--dur-micro) var(--ease),
+    transform var(--dur-micro) var(--ease);
+}
+
+.drop__btn:hover {
+  background: color-mix(in oklch, var(--wave) 82%, white);
+}
+
+.drop__btn:active {
+  transform: translateY(1px);
+}
+
+.drop__btn:focus-visible {
+  outline: 2px solid var(--wave);
+  outline-offset: 2px;
+}
+
+@media (pointer: coarse) {
+  .drop__btn {
+    height: 44px;
+  }
+}
+
+/* Pre-echoes the transport strip that appears once a file is loaded. */
+.drop__meta {
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--s4);
   flex-wrap: wrap;
-  gap: var(--s2);
-  justify-content: center;
+  padding: var(--s3) var(--s4);
+  background: var(--stage-2);
+  border-top: 1px solid var(--stage-line);
 }
 
 .drop__formats {
   font-size: var(--t-micro);
-  color: var(--ink-3);
+  color: var(--stage-ink-2);
   letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.drop__privacy {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  font-size: var(--t-micro);
+  color: var(--stage-ink-2);
+}
+
+.drop__privacy svg {
+  color: var(--wave);
+  flex: none;
+}
+
+@media (max-width: 560px) {
+  .drop__body {
+    min-height: 190px;
+    justify-content: center;
+  }
+
+  /* At phone widths the flanking segments shrink to orphan dashes — the
+     content owns the full window instead. */
+  .drop__line {
+    display: none;
+  }
+
+  .drop__meta {
+    justify-content: center;
+    text-align: center;
+  }
 }
 
 .drop input[type='file'] {

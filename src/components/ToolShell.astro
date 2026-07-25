@@ -49,12 +49,19 @@ const defaultDropTitle = multiple
     : 'Drop an audio file here';
 
 const formats = video
-  ? 'MP4, MOV, MKV, WEBM, AVI, MP3, WAV, M4A, OGG, FLAC and more'
-  : 'MP3, WAV, M4A, AAC, OGG, OPUS, FLAC, WMA, AIFF and more';
+  ? 'MP4 · MOV · MKV · WEBM · MP3 · WAV and more'
+  : 'MP3 · WAV · M4A · AAC · OGG · FLAC and more';
 ---
 
 <div class="tool" data-tool data-slug={tool.slug}>
-  <!-- Empty state. Teaches the interface rather than just saying "no file". -->
+  <!--
+    Empty state: the stage itself, waiting.
+
+    The drop target is the same dark window the waveform will draw into — a
+    centerline marks where the audio will appear, and the strip along the
+    bottom sits exactly where the transport will be. Dropping a file fills the
+    window it lands on; nothing about the page rearranges.
+  -->
   <div
     class="drop"
     data-drop
@@ -63,22 +70,26 @@ const formats = video
     tabindex="0"
     aria-label={defaultDropTitle}
   >
-    <Icon name="upload-simple" size={36} class="drop__icon" />
-    <div class="drop__title">{dropTitle ?? defaultDropTitle}</div>
-    <p class="drop__hint">
-      {dropHint ?? 'Or click to browse. You can also paste a file from your clipboard.'}
-    </p>
-    <div class="drop__actions">
-      <button type="button" class="btn btn--solid btn--lg" data-browse>
-        <Icon name="upload-simple" size={18} />
-        Choose file{multiple ? 's' : ''}
-      </button>
+    <div class="drop__body">
+      <span class="drop__line" aria-hidden="true"></span>
+      <div class="drop__center">
+        <div class="drop__title">{dropTitle ?? defaultDropTitle}</div>
+        <p class="drop__hint">
+          {dropHint ?? 'or paste one from your clipboard'}
+        </p>
+        <button type="button" class="drop__btn" data-browse>
+          Choose file{multiple ? 's' : ''}
+        </button>
+      </div>
+      <span class="drop__line" aria-hidden="true"></span>
     </div>
-    <p class="drop__formats">{formats}</p>
-    <p class="privacy">
-      <Icon name="shield-check" size={15} />
-      {PRIVACY_LINE}
-    </p>
+    <div class="drop__meta">
+      <span class="drop__formats">{formats}</span>
+      <span class="drop__privacy">
+        <Icon name="shield-check" size={14} />
+        {PRIVACY_LINE}
+      </span>
+    </div>
     <input type="file" data-file-input tabindex="-1" aria-hidden="true" />
   </div>
 

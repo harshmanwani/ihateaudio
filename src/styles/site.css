@@ -179,13 +179,6 @@
   line-height: 1.55;
 }
 
-.toolhead__tags {
-  display: flex;
-  gap: var(--s2);
-  flex-wrap: wrap;
-  margin-top: var(--s1);
-}
-
 /* Content sections beneath the tool */
 
 .toolbody {
@@ -326,8 +319,7 @@
 /* ---------- Homepage ---------- */
 
 .hero {
-  padding-block: var(--s20) var(--s12);
-  max-width: 22ch;
+  padding-block: var(--s16) var(--s12);
 }
 
 .hero h1 {
@@ -335,6 +327,8 @@
   line-height: 1.08;
   letter-spacing: -0.025em;
   font-weight: 700;
+  /* Sized in its own ch so the measure tracks the display size. */
+  max-width: 24ch;
 }
 
 .hero__sub {
@@ -345,17 +339,13 @@
   line-height: 1.55;
 }
 
-.hero__meta {
-  margin-top: var(--s6);
-  display: flex;
-  gap: var(--s5);
-  flex-wrap: wrap;
+.hero .toolsearch {
+  margin-top: var(--s8);
 }
 
 @media (max-width: 640px) {
   .hero {
-    padding-block: var(--s12) var(--s8);
-    max-width: none;
+    padding-block: var(--s10) var(--s8);
   }
 }
 
@@ -410,48 +400,39 @@
   margin-top: calc(var(--s6) * -1 + var(--s2));
 }
 
+/* An index, not a card wall: 39 near-identical bordered tiles read as
+   template output, and the chrome slows scanning. Typography does the work;
+   the hover tint supplies the affordance. */
 .grid {
   display: grid;
-  gap: var(--s3);
-  grid-template-columns: repeat(auto-fit, minmax(232px, 1fr));
+  gap: var(--s1) var(--s8);
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
 }
 
 .tile {
   display: flex;
   flex-direction: column;
-  gap: var(--s2);
-  padding: var(--s4);
-  background: var(--bg);
-  border: 1px solid var(--line);
-  border-radius: var(--r-lg);
+  gap: 2px;
+  padding: var(--s3);
+  margin-inline: calc(var(--s3) * -1);
+  border-radius: var(--r-md);
   text-decoration: none;
   color: var(--ink);
-  transition:
-    border-color var(--dur) var(--ease),
-    background-color var(--dur) var(--ease),
-    transform var(--dur) var(--ease);
+  transition: background-color var(--dur-micro) var(--ease);
 }
 
 .tile:hover {
-  border-color: var(--brand);
   background: var(--brand-soft);
-  transform: translateY(-2px);
-}
-
-.tile__top {
-  display: flex;
-  align-items: center;
-  gap: var(--s2);
-}
-
-.tile__icon {
-  color: var(--brand);
-  flex: none;
 }
 
 .tile__name {
   font-size: var(--t-ui);
   font-weight: 600;
+  transition: color var(--dur-micro) var(--ease);
+}
+
+.tile:hover .tile__name {
+  color: var(--brand);
 }
 
 .tile__desc {
