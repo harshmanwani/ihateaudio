@@ -8,7 +8,7 @@ import { getTool } from '../data/tools';
 const tool = getTool('stem-splitter');
 
 const steps = [
-  'Drop the song in, then tick the stems you actually want. Each one is a separate 28 MB network and a separate pass over the audio, so asking for two instead of four halves both the download and the wait.',
+  'Drop the song in, then tick the stems you actually want. Each one is a separate 28 MB AI model and a separate pass over the audio, so asking for two instead of four halves both the download and the wait.',
   'Trim first if you only need part of the track. The tool works on whatever is loaded, and separating one chorus takes a fraction of the time of a whole song.',
   'Press Split. The stems are produced one after another and the progress counter tells you which one is running.',
   'When it finishes you get a mixer: play everything together, mute a part, or solo one to hear it alone. Judge the split by ear before you download anything, then take individual stems, or a mix of whatever balance you set.',
@@ -77,8 +77,8 @@ const faq = [
 
       <AiSetup
         bytes={0}
-        what="Each stem is its own 28 MB network. Only the ones you tick are fetched, and they are kept afterwards."
-        speed="Expect roughly the length of the track per stem."
+        what="Each part you tick is a separate 28 MB download, saved afterwards so it only happens once. They are AI models that have learned what a voice, drums or a bass sound like on their own, and they run on your device rather than on a server."
+        speed="Expect about the length of the song for each part you picked."
       />
 
       <StemPanel />

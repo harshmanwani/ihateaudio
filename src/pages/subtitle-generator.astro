@@ -8,7 +8,7 @@ import { getTool } from '../data/tools';
 const tool = getTool('subtitle-generator');
 
 const steps = [
-  'Drop the audio or the video file in. Video works directly — the audio is pulled out of it and the video itself is never uploaded or altered.',
+  'Drop the audio or the video file in. Video works directly: the audio is pulled out of it and the video itself is never uploaded or altered.',
   'Press Generate. Whisper listens in overlapping windows and records when each phrase starts and stops, which is what turns a transcript into subtitles.',
   'Check the cues in the list. Timing is where automatic subtitles go wrong, and the two things worth scanning for are cues that overlap and cues that flash past too quickly to read.',
   'Download SRT for almost anything, or VTT for the web. Both contain the same cues; the formats differ only in punctuation and a header line.',
@@ -65,8 +65,8 @@ const faq = [
 
       <AiSetup
         bytes={tool.modelBytes ?? 0}
-        what="It is Whisper, OpenAI's speech recognition model, served from this domain rather than from Hugging Face. It is shared with the transcriber."
-        speed="Generation then runs several times faster than real time."
+        what="It is an AI model that listens to speech and writes down what it hears, and it runs on your device rather than on a server. It is the same one the audio transcriber uses."
+        speed="Making the subtitles is quick: a ten minute file takes a couple of minutes."
       />
 
       <div class="controls__full cues" data-cues hidden>

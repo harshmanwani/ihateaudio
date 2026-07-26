@@ -8,7 +8,7 @@ import { getTool } from '../data/tools';
 const tool = getTool('audio-transcriber');
 
 const steps = [
-  'Drop the recording in. The first run fetches Whisper, about 41 MB, once — after that this works with no internet at all.',
+  'Drop the recording in. The first run downloads the AI model, about 41 MB, once. After that this works with no internet at all.',
   'Press Transcribe. The model listens in thirty-second windows with a little overlap, so words are not cut in half at the joins.',
   'Read it, and fix what needs fixing. Names, jargon and acronyms are where every speech recogniser struggles, and it is faster to correct four words than to retype four hundred.',
   'Copy it to the clipboard or download it as a text file. If you want timings rather than prose, the subtitle generator produces the same transcript as SRT.',
@@ -69,8 +69,8 @@ const faq = [
 
       <AiSetup
         bytes={tool.modelBytes ?? 0}
-        what="It is Whisper, OpenAI's speech recognition model, served from this domain rather than from Hugging Face."
-        speed="Transcription then runs several times faster than real time."
+        what="It is an AI model that listens to speech and writes down what it hears, and it runs on your device rather than on a server. It is the same one the subtitle generator uses."
+        speed="Transcribing is quick: a ten minute recording takes a couple of minutes."
       />
 
       {/* The shared export bar is an audio-format picker, which is meaningless when

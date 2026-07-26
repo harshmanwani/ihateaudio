@@ -8,7 +8,7 @@ import { getTool } from '../data/tools';
 const tool = getTool('vocal-remover');
 
 const steps = [
-  'Drop the song onto the page. The first time you use this it fetches a 64 MB model, once, and keeps it — after that the tool works with the wifi off.',
+  'Drop the song onto the page. The first time you use this it downloads a 64 MB AI model, once, and keeps it. After that the tool works with the wifi off.',
   'Press Separate. A neural network goes through the track in chunks and the progress bar counts them, so you can see how long is left rather than guessing.',
   'Listen before you commit. You get both halves as a small mixer: play them together, mute the vocal to check it is properly gone rather than merely quieter, or solo it to hear exactly what was taken out.',
   'Pick a format and download. Choose WAV if this is going into an editor; MP3 is fine if it is going straight into a video or a karaoke night.',
@@ -63,8 +63,8 @@ const faq = [
 
       <AiSetup
         bytes={tool.modelBytes ?? 0}
-        what="It is the separation network itself, and it is served from this domain rather than a third party."
-        speed="Separation then runs at roughly real time, so a four-minute song takes a few minutes."
+        what="It is an AI model that has learned to tell a singing voice apart from the instruments behind it, and it runs on your device rather than on a server. It is the same one the acapella extractor uses."
+        speed="Separating takes about as long as the song itself, so a four minute track takes roughly four minutes."
       />
 
       {/* Both halves come out of the one pass, so the panel below always shows

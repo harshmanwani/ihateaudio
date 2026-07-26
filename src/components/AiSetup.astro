@@ -32,7 +32,11 @@ const { bytes, what, speed } = Astro.props;
 const megabytes = bytes >= 1024 * 1024 ? Math.round(bytes / (1024 * 1024)) : 0;
 ---
 
-<div class="setup" data-ai-setup hidden>
+{/* controls__full because this always sits inside the .controls grid, whose
+    columns are auto-fit at a 236px minimum — without it the panel lands in one
+    column, and the honest "39 MB, once" figure that is the entire point of the
+    offer wraps a word per line behind a button that overlaps it. */}
+<div class="setup controls__full" data-ai-setup hidden>
   {/* Offer state: nothing fetched yet. */}
   <div class="setup__offer" data-ai-offer hidden>
     <span class="setup__mark" aria-hidden="true">
@@ -42,7 +46,7 @@ const megabytes = bytes >= 1024 * 1024 ? Math.round(bytes / (1024 * 1024)) : 0;
       <p class="setup__title">
         {megabytes > 0
           ? `This tool needs a ${megabytes} MB download, once`
-          : 'This tool runs a neural network on your machine'}
+          : 'This tool uses AI that runs on your device'}
       </p>
       <p class="setup__body">
         {what}
@@ -50,8 +54,8 @@ const megabytes = bytes >= 1024 * 1024 ? Math.round(bytes / (1024 * 1024)) : 0;
           megabytes > 0 && (
             <>
               {' '}
-              It is kept on your device afterwards, so this happens once and then the
-              tool works offline forever.
+              It is saved afterwards, so this only happens once, and from then on the
+              tool works even with no internet.
             </>
           )
         }
@@ -80,7 +84,8 @@ const megabytes = bytes >= 1024 * 1024 ? Math.round(bytes / (1024 * 1024)) : 0;
       <div class="setup__bar" data-ai-bar></div>
     </div>
     <p class="setup__body setup__note" data-ai-hint>
-      One time only. Nothing is uploaded — this is the model coming down to you.
+      One time only. Nothing is being uploaded: this is the AI model downloading to
+      your device.
     </p>
   </div>
 
@@ -88,8 +93,8 @@ const megabytes = bytes >= 1024 * 1024 ? Math.round(bytes / (1024 * 1024)) : 0;
   <p class="setup__ready" data-ai-ready hidden>
     <Icon name="check-circle" weight="fill" size={16} />
     <span
-      >Model ready on this device. Works offline, and nothing you load here leaves the
-      browser.</span
+      >The AI is ready on your device. It works with no internet, and nothing you open
+      here leaves your browser.</span
     >
   </p>
 </div>
