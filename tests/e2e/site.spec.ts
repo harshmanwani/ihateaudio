@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { TOOLS } from '../../src/data/tools';
+import { TOOLS, CATEGORIES } from '../../src/data/tools';
 import { FFMPEG_CORE_VERSION } from '../../src/lib/audio/ffmpeg-version';
 
 const STATIC_PAGES = ['/', '/loudness-targets', '/audio-formats', '/about', '/privacy'];
@@ -184,19 +184,26 @@ test.describe('navigation', () => {
   });
 
   test('category pills filter the grid', async ({ page }) => {
+    // Counted from the registry rather than written down here. Both numbers were
+    // hardcoded, and adding the AI studio category silently broke this rather
+    // than failing on the thing that actually changed.
+    const effects = TOOLS.filter((tool) => tool.category === 'effects').length;
+
     await page.goto('/');
     await page.click('[data-filter="effects"]');
 
     // Only the effects section remains.
     await expect(page.locator('[data-category]:not([hidden])')).toHaveCount(1);
-    await expect(page.locator('[data-tile]:not([hidden])')).toHaveCount(5);
+    await expect(page.locator('[data-tile]:not([hidden])')).toHaveCount(effects);
     await expect(page.locator('[data-filter="effects"]')).toHaveAttribute(
       'aria-pressed',
       'true'
     );
 
     await page.click('[data-filter="all"]');
-    await expect(page.locator('[data-category]:not([hidden])')).toHaveCount(6);
+    await expect(page.locator('[data-category]:not([hidden])')).toHaveCount(
+      CATEGORIES.length
+    );
   });
 
   test('the all-tools menu lists every tool from any page', async ({ page }) => {
