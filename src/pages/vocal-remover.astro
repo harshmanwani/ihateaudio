@@ -9,7 +9,7 @@ const tool = getTool('vocal-remover');
 
 const steps = [
   'Drop the song onto the page. The first time you use this it downloads a 64 MB AI model, once, and keeps it. After that the tool works with the wifi off.',
-  'Press Separate. A neural network goes through the track in chunks and the progress bar counts them, so you can see how long is left rather than guessing.',
+  'Press Separate. The AI model goes through the track in chunks and the progress bar counts them, so you can see how long is left rather than guessing.',
   'Listen before you commit. You get both halves as a small mixer: play them together, mute the vocal to check it is properly gone rather than merely quieter, or solo it to hear exactly what was taken out.',
   'Pick a format and download. Choose WAV if this is going into an editor; MP3 is fine if it is going straight into a video or a karaoke night.',
 ];
@@ -17,11 +17,11 @@ const steps = [
 const faq = [
   {
     q: 'How good is this compared with the paid sites?',
-    a: 'It uses the same class of model. This is UVR-MDX-NET-Inst_HQ_3, one of the best openly available separation networks, and it is the model a lot of the paid services are quietly running too. On a controlled test — a known instrumental with a known voice mixed over it — it recovered the backing at about 14 dB signal-to-distortion, which is the range where a listener stops noticing the vocal is missing rather than noticing it was removed. What you do not get here is a server farm, so it takes minutes rather than seconds.',
+    a: 'It uses the same class of model. This is UVR-MDX-NET-Inst_HQ_3, one of the best openly available separation models, and it is the one a lot of the paid services are quietly running too. On a controlled test (a known instrumental with a known voice mixed over it) it recovered the backing at about 14 dB signal-to-distortion, which is the range where a listener stops noticing the vocal is missing rather than noticing it was removed. What you do not get here is a server farm, so it takes minutes rather than seconds.',
   },
   {
     q: 'Why does it take a few minutes?',
-    a: 'Because it runs on your computer instead of ours. The network does roughly one second of arithmetic per second of audio per processor core, so a four-minute song is a few minutes of work. A paid service feels faster because it is running on a machine with a large GPU and charging you for the privilege. The trade here is time for money and privacy, and on a laptop plugged in it is a reasonable trade.',
+    a: 'Because it runs on your device instead of ours. The model does roughly one second of arithmetic per second of audio per processor core, so a four-minute song is a few minutes of work. A paid service feels faster because it is running on a machine with a large GPU and charging you for the privilege. The trade here is time for money and privacy, and on a laptop plugged in it is a reasonable trade.',
   },
   {
     q: 'Is my music uploaded anywhere?',
@@ -29,7 +29,7 @@ const faq = [
   },
   {
     q: 'There is still a bit of vocal left in quiet parts.',
-    a: 'That is the normal failure mode and it is worth knowing why. The model works on the spectrogram, deciding for each moment and each frequency how much belongs to the voice. Where a vocal sits alone over a sparse arrangement there is little to mask it and separation is clean. Where it is buried under a dense mix at the same frequencies — a loud chorus with layered guitars — the model has to guess, and what it leaves behind is usually a faint ghost rather than an audible line. Reverb tails are the hardest case of all, because the room the voice was recorded in is smeared across the whole mix.',
+    a: 'That is the normal failure mode and it is worth knowing why. The model works on the spectrogram, deciding for each moment and each frequency how much belongs to the voice. Where a vocal sits alone over a sparse arrangement there is little to mask it and separation is clean. Where it is buried under a dense mix at the same frequencies (a loud chorus with layered guitars) the model has to guess, and what it leaves behind is usually a faint ghost rather than an audible line. Reverb tails are the hardest case of all, because the room the voice was recorded in is smeared across the whole mix.',
   },
   {
     q: 'Can I get the vocals instead?',
@@ -41,7 +41,7 @@ const faq = [
   },
   {
     q: 'It says it ran out of memory.',
-    a: 'A long track needs a lot of room: the audio is held as 32-bit floats at 44.1 kHz, and separation needs the original, the output and the working spectrograms all at once. An hour-long file can want a couple of gigabytes. Close other tabs, or trim the section you actually need first — separating a three-minute excerpt is both faster and far lighter than separating a DJ set.',
+    a: 'A long track needs a lot of room: the audio is held as 32-bit floats at 44.1 kHz, and separation needs the original, the output and the working spectrograms all at once. An hour-long file can want a couple of gigabytes. Close other tabs, or trim the section you actually need first: separating a three-minute excerpt is both faster and far lighter than separating a DJ set.',
   },
   {
     q: 'Why is the file bigger than the one I put in?',
@@ -56,7 +56,7 @@ const faq = [
       <div class="controls__head">
         <span class="controls__title">Separation</span>
         <span class="hint">
-          Runs on your machine. Expect roughly the length of the track, less if you
+          Runs on your device. Expect roughly the length of the track, less if you
           have cores to spare.
         </span>
       </div>
@@ -81,7 +81,7 @@ const faq = [
       A mix is a sum. Once a voice and a guitar have been added together into one
       waveform, no amount of arithmetic recovers the originals, because an infinite
       number of pairs add up to the same total. So separation is not undoing the
-      mix — it is a guess, made by a network that has been shown several thousand
+      mix: it is a guess, made by an AI model that has been shown several thousand
       songs where both the mix and the separate parts were known, and has learned
       what a voice tends to look like when it is drawn as a picture of frequency
       against time.
@@ -92,7 +92,7 @@ const faq = [
       an image: time along one axis, pitch up the other, brightness for energy. In
       that image a sung note is a stack of horizontal lines that wobble together,
       a drum is a vertical smear, a bass note is a thick band near the bottom. The
-      network's whole job is to look at that image and decide, for every point in
+      model's whole job is to look at that image and decide, for every point in
       it, what fraction belongs to the voice. Then the picture is turned back into
       sound.
     </p>

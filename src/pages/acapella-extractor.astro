@@ -7,9 +7,9 @@ import { getTool } from '../data/tools';
 const tool = getTool('acapella-extractor');
 
 const steps = [
-  'Drop the song in. If you have already used the vocal remover on this device there is nothing to download, because the two tools share one AI model and it is already here.',
-  'Press Extract. The network reads the whole track in chunks, working out which part of every moment is voice, and the counter tells you how far along it is.',
-  'Play it back before downloading. Solo the vocal to hear it alone — an isolated vocal is the hardest thing to get right, so listen for cymbal bleed and reverb tails rather than assuming.',
+  'Drop the song in. If you have already used the vocal remover on your device there is nothing to download, because the two tools share one AI model and it is already here.',
+  'Press Extract. The AI model reads the whole track in chunks, working out which part of every moment is voice, and the counter tells you how far along it is.',
+  'Play it back before downloading. Solo the vocal to hear it alone: an isolated vocal is the hardest thing to get right, so listen for cymbal bleed and reverb tails rather than assuming.',
   'Download as WAV if this is going into a DAW. It is the format that will not add a second layer of artefacts on top of the separation.',
 ];
 
@@ -36,7 +36,7 @@ const faq = [
   },
   {
     q: 'Will this work on speech rather than singing?',
-    a: 'Less well than you would hope. The model was trained on music, so it has learned what a sung voice over instruments looks like. A podcast with background music does get separated, but a purpose-built denoiser is better at that job — try the noise remover, which is built for pulling a voice out of a noisy room rather than out of an arrangement.',
+    a: 'Less well than you would hope. The model was trained on music, so it has learned what a sung voice over instruments looks like. A podcast with background music does get separated, but a purpose-built denoiser is better at that job. Try the noise remover, which is built for pulling a voice out of a noisy room rather than out of an arrangement.',
   },
 ];
 ---

@@ -17,11 +17,11 @@ const steps = [
 const faq = [
   {
     q: 'How long does this actually take?',
-    a: 'Roughly the length of the track for each stem you ask for, on one processor core. Four stems from a four-minute song is therefore something like a quarter of an hour on a laptop, and less if your browser can use several cores. This is the honest cost of it running on your machine rather than on a rented GPU, and it is why the stems are individually selectable — most people want the drums or the bass, not all four.',
+    a: 'Roughly the length of the track for each stem you ask for, on one processor core. Four stems from a four-minute song is therefore something like a quarter of an hour on a laptop, and less if your browser can use several cores. This is the honest cost of it running on your device rather than on a rented GPU, and it is why the stems are individually selectable: most people want the drums or the bass, not all four.',
   },
   {
     q: 'Why do the four stems not add back up to the original?',
-    a: 'Two reasons, and the first is intentional. Each of these networks reads only part of the frequency range: the bass model looks below about 5.5 kHz, because that is where bass lives and the resolution is better spent there, and the "other" model stops around 11 kHz. Anything above those limits is not in any stem. The second reason is that the four models were trained separately and never had to agree with each other, so they overlap and disagree at the edges. Summing them gets you close to the original, not exactly to it.',
+    a: 'Two reasons, and the first is intentional. Each of these models reads only part of the frequency range: the bass model looks below about 5.5 kHz, because that is where bass lives and the resolution is better spent there, and the "other" model stops around 11 kHz. Anything above those limits is not in any stem. The second reason is that the four models were trained separately and never had to agree with each other, so they overlap and disagree at the edges. Summing them gets you close to the original, not exactly to it.',
   },
   {
     q: 'Which stems are worth it for what?',
@@ -29,15 +29,15 @@ const faq = [
   },
   {
     q: 'Can I get the guitar on its own?',
-    a: 'Not with these models. Four-stem separation is a standard from a research benchmark, and "other" is the bucket everything else falls into. Networks that isolate a specific instrument exist but are trained per instrument and would be another download each, for a result that is markedly less reliable than the four here.',
+    a: 'Not with these models. Four-stem separation is a standard from a research benchmark, and "other" is the bucket everything else falls into. Models that isolate a specific instrument exist but are trained per instrument and would be another download each, for a result that is markedly less reliable than the four here.',
   },
   {
     q: 'It ran out of memory partway through.',
-    a: 'Four stems means holding four full-length results plus the original plus the working spectrograms. On a long track that adds up fast, and the bass model is the hungriest of the four because its transform is the largest. Ask for fewer stems at a time — they are cached individually, so you can do drums now and bass later without re-downloading anything — or trim the track first.',
+    a: 'Four stems means holding four full-length results plus the original plus the working spectrograms. On a long track that adds up fast, and the bass model is the hungriest of the four because its transform is the largest. Ask for fewer stems at a time (they are cached individually, so you can do drums now and bass later without re-downloading anything) or trim the track first.',
   },
   {
     q: 'Are these the same models the research papers use?',
-    a: 'Yes. This is the KUIELab four-stem set from the Music Demixing Challenge, and each stem uses the transform size it was trained with, which differs per stem: 6144 for vocals, 4096 for drums, 16384 for bass and 8192 for "other". Those were confirmed here by measurement rather than assumed, because a wrong transform size does not fail — it just quietly separates worse.',
+    a: 'Yes. This is the KUIELab four-stem set from the Music Demixing Challenge, and each stem uses the transform size it was trained with, which differs per stem: 6144 for vocals, 4096 for drums, 16384 for bass and 8192 for "other". Those were confirmed here by measurement rather than assumed, because a wrong transform size does not fail: it just quietly separates worse.',
   },
 ];
 ---
@@ -48,7 +48,7 @@ const faq = [
       <div class="controls__head">
         <span class="controls__title">Stems</span>
         <span class="hint">
-          One network and one pass per stem. Pick only what you need — it is the
+          One AI model and one pass per stem. Pick only what you need: it is the
           difference between minutes and a quarter of an hour.
         </span>
       </div>
@@ -94,7 +94,7 @@ const faq = [
     </p>
     <p>
       What this produces is an estimate of those recordings, reconstructed from the
-      finished mix by a network that has learned what drums and bass and voices tend
+      finished mix by an AI model that has learned what drums and bass and voices tend
       to look like. It is genuinely useful and it is not the same object. If you are
       remixing something officially, ask for the real stems. If you are learning a
       bassline, building a mashup, practising along, or working out what a
@@ -103,10 +103,10 @@ const faq = [
 
     <h2>Why the frequency limits matter more here than elsewhere</h2>
     <p>
-      Each of these networks reads a fixed number of frequency bands, and because
+      Each of these models reads a fixed number of frequency bands, and because
       the transform size differs per stem, so does the ceiling. Bass is analysed
-      with a very long window, which buys excellent frequency resolution down low —
-      exactly what you need to tell a bass note from a kick drum — at the cost of
+      with a very long window, which buys excellent frequency resolution down low
+      (exactly what you need to tell a bass note from a kick drum) at the cost of
       only covering the bottom quarter of the spectrum. Nothing above roughly
       5.5 kHz appears in the bass stem, which is fine, because nothing you want
       from a bass lives up there.
@@ -126,7 +126,7 @@ const faq = [
     </p>
     <p>
       Separate a section rather than a whole track when you can. It is not only
-      faster — the result is identical, because the models work in short chunks and
+      faster: the result is identical, because the models work in short chunks and
       have no memory of the wider song, so there is nothing to lose by cutting first.
     </p>
     <p>

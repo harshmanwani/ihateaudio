@@ -29,7 +29,7 @@ const faq = [
   },
   {
     q: 'It invented a sentence that nobody said.',
-    a: 'That is a known and slightly unsettling behaviour called hallucination, and it happens most in silence. Whisper was trained on speech, so when it is handed a passage with no speech in it — a long pause, background hum, music — it sometimes produces the most probable thing a person might have said instead. Running the silence remover over the recording first genuinely helps, because it deletes the passages where there is nothing to transcribe.',
+    a: 'That is a known and slightly unsettling behaviour called hallucination, and it happens most in silence. Whisper was trained on speech, so when it is handed a passage with no speech in it (a long pause, background hum, music) it sometimes produces the most probable thing a person might have said instead. Running the silence remover over the recording first genuinely helps, because it deletes the passages where there is nothing to transcribe.',
   },
   {
     q: 'Two people are talking and it runs their words together.',
@@ -52,7 +52,8 @@ const faq = [
       <div class="controls__head">
         <span class="controls__title">Transcription</span>
         <span class="hint">
-          English, running on your machine. Several times faster than real time.
+          English, running on your device. A ten minute recording takes a couple of
+          minutes.
         </span>
       </div>
 
@@ -111,7 +112,7 @@ const faq = [
       quantity of audio paired with its transcript, and what it learned is closer to
       translation: given this stretch of sound, what text most probably accompanies
       it. That is why it punctuates, capitalises and spells out numbers without
-      being told to — those were in the transcripts it learned from.
+      being told to: those were in the transcripts it learned from.
     </p>
     <p>
       It also explains the model's characteristic strength and its characteristic

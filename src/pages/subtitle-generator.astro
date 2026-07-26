@@ -17,11 +17,11 @@ const steps = [
 const faq = [
   {
     q: 'SRT or VTT?',
-    a: 'SRT if you are unsure. It is the older and more widely understood format, and YouTube, Premiere, Resolve, VLC and every social platform accept it. VTT is the format HTML video wants, so use it if the subtitles are going into a <track> element on a web page. The cues are identical either way — VTT adds a WEBVTT header and writes the fractional second with a full stop where SRT uses a comma.',
+    a: 'SRT if you are unsure. It is the older and more widely understood format, and YouTube, Premiere, Resolve, VLC and every social platform accept it. VTT is the format HTML video wants, so use it if the subtitles are going into a <track> element on a web page. The cues are identical either way: VTT adds a WEBVTT header and writes the fractional second with a full stop where SRT uses a comma.',
   },
   {
     q: 'How accurate is the timing?',
-    a: 'Good enough to read along with, and not frame-accurate. Whisper produces timings by emitting timestamp tokens as it goes, at a resolution of about twenty milliseconds, and it is more confident about where speech starts than where it stops. In practice cues tend to land slightly early and run slightly long, which is the forgiving direction — a subtitle appearing a moment early is barely noticeable, while one appearing late is immediately wrong.',
+    a: 'Good enough to read along with, and not frame-accurate. Whisper produces timings by emitting timestamp tokens as it goes, at a resolution of about twenty milliseconds, and it is more confident about where speech starts than where it stops. In practice cues tend to land slightly early and run slightly long, which is the forgiving direction: a subtitle appearing a moment early is barely noticeable, while one appearing late is immediately wrong.',
   },
   {
     q: 'The cues are too long to read.',
@@ -100,8 +100,8 @@ const faq = [
       That design has a consequence worth knowing. Because the timestamps are
       predictions rather than measurements, they are influenced by what the model
       expects speech to look like, not only by what it heard. Cues therefore drift a
-      little on unusual material — very fast speech, heavy accents, overlapping
-      voices — in the same way the words do. When a transcript is accurate the
+      little on unusual material (very fast speech, heavy accents, overlapping
+      voices) in the same way the words do. When a transcript is accurate the
       timings almost always are too, and when the words start going wrong the timings
       go with them.
     </p>
@@ -316,7 +316,7 @@ const faq = [
           const time = document.createElement('span');
           time.className = 'cue__time';
           time.textContent = `${timecode(segment.start)} → ${timecode(segment.end)}`;
-          if (isTight) time.title = `About ${Math.round(cps)} characters a second — too quick to read`;
+          if (isTight) time.title = `About ${Math.round(cps)} characters a second, too quick to read`;
 
           const text = document.createElement('span');
           text.className = 'cue__text';

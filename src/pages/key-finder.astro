@@ -6,7 +6,7 @@ import { getTool } from '../data/tools';
 const tool = getTool('key-finder');
 
 const steps = [
-  'Drop the track in. Nothing is uploaded and there is nothing to download first — this is ordinary arithmetic, not a model, so it starts working immediately.',
+  'Drop the track in. Nothing is uploaded and there is nothing to download first: this is ordinary arithmetic, not a model, so it starts working immediately.',
   'Read the key. You get the name musicians use, the Camelot code DJ software wants, and a confidence figure.',
   'Check the second-place key when confidence is low. Some music genuinely sits between two readings, and the tool says so rather than picking one and sounding certain.',
   'Look at the note chart underneath if something seems off. It shows which notes the track actually spends its time on, which usually explains the answer immediately.',
@@ -27,7 +27,7 @@ const faq = [
   },
   {
     q: 'It got the key wrong.',
-    a: 'The usual causes are worth knowing. A track that changes key partway through gets one answer for the whole thing, and that answer is a blend of both. Heavily percussive music with little tonal content gives the analysis very little to work with. And a piece using a mode rather than a straight major or minor scale — Dorian, Mixolydian, plenty of folk and jazz — will be reported as whichever major or minor key shares its notes, because those are the only twenty-four answers available.',
+    a: 'The usual causes are worth knowing. A track that changes key partway through gets one answer for the whole thing, and that answer is a blend of both. Heavily percussive music with little tonal content gives the analysis very little to work with. And a piece using a mode rather than a straight major or minor scale (Dorian, Mixolydian, plenty of folk and jazz) will be reported as whichever major or minor key shares its notes, because those are the only twenty-four answers available.',
   },
   {
     q: 'Does the tempo affect it?',
@@ -82,7 +82,7 @@ const faq = [
       A key is not a property of any single sound; it is a pattern of expectation
       built up over time. When a piece keeps returning to the same note, and the
       chords around it keep resolving toward that note, listeners come to hear it as
-      home. Everything else is heard in relation to it — some notes as stable, some
+      home. Everything else is heard in relation to it: some notes as stable, some
       as leaning, some as clearly outside.
     </p>
     <p>
@@ -95,7 +95,7 @@ const faq = [
 
     <h2>Why relative keys are genuinely ambiguous</h2>
     <p>
-      C major and A minor use exactly the same seven notes. Not similar notes — the
+      C major and A minor use exactly the same seven notes. Not similar notes: the
       same ones. Any method that works by counting note occurrences therefore cannot
       tell them apart, because there is nothing to count that differs.
     </p>
@@ -122,7 +122,7 @@ const faq = [
     </p>
     <p>
       For a track with a strong vocal over a sparse arrangement, running the acapella
-      extractor first and analysing the backing can help — a lead vocal slides
+      extractor first and analysing the backing can help: a lead vocal slides
       between pitches far more than an instrument does, and that smearing shows up in
       the note profile as energy on notes nobody actually played.
     </p>
@@ -266,7 +266,7 @@ const faq = [
         secondEl.textContent =
           confidence < 0.34
             ? `This one is close. ${runnerUp.name} scored almost as well, and if the two are a ` +
-              'relative pair they share every note — only where the music comes to rest tells them apart.'
+              'relative pair they share every note, and only where the music comes to rest tells them apart.'
             : `Next closest was ${runnerUp.name}.`;
       }
 
