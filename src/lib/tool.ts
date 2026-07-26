@@ -108,12 +108,19 @@ export class ToolRuntime {
   /** Suppresses selection and marker drags while a two-finger pinch is live. */
   private pinching = false;
 
+  /** Pending removal of the error card, so a fast second failure can cancel it. */
+  private alertTimer: number | null = null;
+
   // Cached elements — every tool page renders the same skeleton.
   private el: {
     drop: HTMLElement | null;
     input: HTMLInputElement | null;
     workspace: HTMLElement | null;
     status: HTMLElement | null;
+    alert: HTMLElement | null;
+    alertTitle: HTMLElement | null;
+    alertFix: HTMLElement | null;
+    alertClose: HTMLButtonElement | null;
     stage: HTMLElement | null;
     canvas: HTMLCanvasElement | null;
     canvasWrap: HTMLElement | null;
@@ -152,6 +159,10 @@ export class ToolRuntime {
       input: $<HTMLInputElement>(root, '[data-file-input]'),
       workspace: $(root, '[data-workspace]'),
       status: $(root, '[data-status]'),
+      alert: $(root, '[data-alert]'),
+      alertTitle: $(root, '[data-alert-title]'),
+      alertFix: $(root, '[data-alert-fix]'),
+      alertClose: $<HTMLButtonElement>(root, '[data-alert-close]'),
       stage: $(root, '[data-stage]'),
       canvas: $<HTMLCanvasElement>(root, '[data-canvas]'),
       canvasWrap: $(root, '[data-canvas-wrap]'),
@@ -199,6 +210,7 @@ export class ToolRuntime {
 
     this.el.download?.addEventListener('click', () => void this.run());
     this.el.reset?.addEventListener('click', () => this.reset());
+    this.el.alertClose?.addEventListener('click', () => this.hideAlert());
     this.el.format?.addEventListener('change', () => this.onFormatChange());
     this.el.quality?.addEventListener('change', () => this.updateSize());
 
@@ -344,6 +356,9 @@ export class ToolRuntime {
       });
     } catch (err) {
       this.setBusy(false);
+      // The error is its own surface now, so it no longer overwrites the reading
+      // bar on its way in — a file that failed must not leave one mid-progress.
+      this.clearProgress();
       const audioErr = toAudioError(err);
       if (audioErr.code !== 'cancelled') this.showError(audioErr);
     }
@@ -1386,29 +1401,49 @@ export class ToolRuntime {
 
   private clearStatus(): void {
     if (this.el.status) this.el.status.innerHTML = '';
+    this.hideAlert();
+  }
+
+  private hideAlert(): void {
+    const card = this.el.alert;
+    if (!card || card.hidden) return;
+    card.removeAttribute('data-in');
+    // Long enough for the fade to finish, short enough that the next failure is
+    // never waiting behind the last one's exit.
+    this.alertTimer = window.setTimeout(() => {
+      card.hidden = true;
+      this.alertTimer = null;
+    }, 220);
   }
 
   showError(error: AudioError | Error): void {
-    const status = this.el.status;
-    if (!status) return;
+    const card = this.el.alert;
+    if (!card) return;
+
+    // Both entry points clear the status first, so a failure that arrives inside
+    // the fade-out would otherwise be hidden by the previous card's exit.
+    if (this.alertTimer !== null) {
+      window.clearTimeout(this.alertTimer);
+      this.alertTimer = null;
+    }
 
     const fix = error instanceof AudioError ? error.fix : 'Try reloading the page.';
     // The error code, never the message: messages can contain a filename.
     track('tool_error', {
       code: error instanceof AudioError ? error.code : 'unknown',
     });
-    status.innerHTML = `
-      <div class="note note--error" role="alert">
-        <div class="note__body">
-          <div class="note__title"></div>
-          <div data-fix></div>
-        </div>
-      </div>`;
+
     // textContent, never innerHTML — error text can contain a filename.
-    const title = status.querySelector('.note__title');
-    const body = status.querySelector('[data-fix]');
-    if (title) title.textContent = error.message;
-    if (body) body.textContent = fix;
+    if (this.el.alertTitle) this.el.alertTitle.textContent = error.message;
+    if (this.el.alertFix) this.el.alertFix.textContent = fix;
+
+    card.hidden = false;
+    // Flush layout so the transition has a start state, then flip in the same
+    // task rather than waiting for a frame. Processing long files is exactly when
+    // someone switches tabs, and a backgrounded tab produces no frames — an
+    // rAF here would leave the card at zero opacity until they came back.
+    void card.offsetWidth;
+    card.setAttribute('data-in', 'true');
   }
 
   showNote(message: string, kind: 'info' | 'warn' = 'info'): void {

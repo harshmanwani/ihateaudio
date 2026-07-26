@@ -331,8 +331,10 @@ test.describe('DSP tools produce output', () => {
       expect(download.size, `${slug} produced an empty file`).toBeGreaterThan(1000);
       expect(download.name).toMatch(/\.(mp3|wav|m4a|ogg|opus|flac)$/);
 
-      // No error should have been raised along the way.
-      await expect(page.locator('[role="alert"]')).toHaveCount(0);
+      // No error should have been raised along the way. The card is always in
+      // the DOM so the live region is there to announce into, so the question is
+      // whether it was ever shown, not whether it exists.
+      await expect(page.locator('[role="alert"]')).toBeHidden();
     });
   }
 });

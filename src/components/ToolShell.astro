@@ -97,8 +97,31 @@ const formats = video
     <input type="file" data-file-input tabindex="-1" aria-hidden="true" />
   </div>
 
-  <!-- Status: progress, errors and notices all render here. -->
+  <!-- Status: progress and notices render here, next to the file they concern. -->
   <div data-status aria-live="polite"></div>
+
+  {/*
+    Failures do not render here, they come to the user.
+
+    Same reasoning as the install card: a corner card, not a band in the flow.
+    The status region sits directly under the dropzone, and by the time anything
+    can fail there is a waveform, a control panel and an export bar between it
+    and the button that was actually pressed — so the message landed thousands of
+    pixels above the only person who needed to read it. Fixed also means the tool
+    does not jump downwards at the exact moment something went wrong.
+  */}
+  <div class="alert" data-alert role="alert" hidden>
+    <span class="alert__mark" aria-hidden="true">
+      <Icon name="warning-circle" weight="fill" size={20} />
+    </span>
+    <div class="alert__body">
+      <p class="alert__title" data-alert-title></p>
+      <p class="alert__fix" data-alert-fix></p>
+    </div>
+    <button type="button" class="alert__close" data-alert-close aria-label="Dismiss">
+      <Icon name="x" size={15} />
+    </button>
+  </div>
 
   <div class="tool" data-workspace hidden>
     <div class="filebar">

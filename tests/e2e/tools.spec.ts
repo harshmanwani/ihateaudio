@@ -248,6 +248,103 @@ test.describe('failure paths', () => {
       timeout: 15_000,
     });
   });
+
+  // The failure is only designed if it is seen. Every action button on these
+  // pages sits below the fold once a file is loaded, so an error rendered up by
+  // the dropzone is an error reported to nobody.
+  test('a failure is in view even when the action pressed was below the fold', async ({
+    page,
+  }) => {
+    await page.goto('/audio-trimmer');
+    await dropGeneratedAudio(page, { seconds: 5 });
+    await waitForWorkspace(page);
+
+    await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+    const scrolled = await page.evaluate(() => window.scrollY);
+    expect(scrolled, 'the page must actually be scrolled for this to mean anything')
+      .toBeGreaterThan(300);
+
+    await page.evaluate(() => {
+      const junk = new Uint8Array(4096).fill(0x41);
+      const file = new File([junk], 'broken.mp3', { type: 'audio/mpeg' });
+      const input = document.querySelector<HTMLInputElement>('[data-file-input]');
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+      input!.files = transfer.files;
+      input!.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+
+    const alert = page.locator('[role="alert"]');
+    await expect(alert).toBeVisible({ timeout: 20_000 });
+
+    // toBeVisible only means "rendered with a box" — it passes for something a
+    // thousand pixels above the viewport, which is the whole bug.
+    const box = await alert.evaluate((el) => {
+      const rect = el.getBoundingClientRect();
+      return {
+        top: rect.top,
+        bottom: rect.bottom,
+        height: window.innerHeight,
+        width: window.innerWidth,
+        right: rect.right,
+      };
+    });
+
+    expect(box.top).toBeGreaterThanOrEqual(0);
+    expect(box.bottom).toBeLessThanOrEqual(box.height + 1);
+    expect(box.right).toBeLessThanOrEqual(box.width + 1);
+
+    // And it must not have shoved the tool down the page to get there.
+    expect(await page.evaluate(() => window.scrollY)).toBe(scrolled);
+  });
+});
+
+test.describe('AI setup panel', () => {
+  // The panel is a direct child of the .controls grid, whose columns are
+  // auto-fit at a 236px minimum. Without an explicit full-row span it lands in
+  // a single column, and the honest "39 MB, once" copy that is the whole point
+  // of the panel wraps one word per line next to a button that overlaps it.
+  for (const path of [
+    '/subtitle-generator',
+    '/audio-transcriber',
+    '/vocal-remover',
+    '/acapella-extractor',
+    '/stem-splitter',
+  ]) {
+    test(`${path} offers the download across the full controls width`, async ({
+      page,
+      isMobile,
+    }) => {
+      test.skip(isMobile, 'The grid is a single column on phones, so there is no bug to catch');
+
+      await page.setViewportSize({ width: 1440, height: 900 });
+      await page.goto(path);
+
+      // The panel is wired in onReady, so it does not exist until a file has
+      // decoded — which is also the only state anyone ever sees it in.
+      await dropGeneratedAudio(page, { seconds: 5 });
+      await waitForWorkspace(page);
+
+      await expect(page.locator('[data-ai-offer]')).toBeVisible({ timeout: 15_000 });
+
+      const measured = await page.evaluate(() => {
+        const panel = document.querySelector('[data-ai-setup]')!.getBoundingClientRect();
+        const grid = document.querySelector('.controls')!.getBoundingClientRect();
+        const title = document.querySelector('.setup__title')!;
+        const style = getComputedStyle(title);
+        return {
+          panel: panel.width,
+          grid: grid.width,
+          titleHeight: title.getBoundingClientRect().height,
+          lineHeight: parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.5,
+        };
+      });
+
+      expect(measured.panel).toBeGreaterThan(measured.grid - 2);
+      // One line at 1440px. Six words stacked vertically is the symptom.
+      expect(Math.round(measured.titleHeight / measured.lineHeight)).toBe(1);
+    });
+  }
 });
 
 test.describe('accessibility', () => {

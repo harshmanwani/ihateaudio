@@ -526,6 +526,121 @@
   color: var(--ink-2);
 }
 
+/* ---------- Alert: the failure path, delivered ----------
+
+   The error card, floating. Same shape and entrance as the install card because
+   it is the same job — reach the eye from wherever the page is scrolled without
+   pushing the tool around — and the same colour language as `.note--error`
+   because it is still an error, not a new component.
+
+   No auto-dismiss: this carries what failed and the concrete next step, and a
+   message that removes itself before it has been read is a spinner with extra
+   steps. It clears on the next load, the next run, or the close button. */
+
+.alert {
+  position: fixed;
+  z-index: var(--z-alert);
+  right: var(--s5);
+  bottom: var(--s5);
+  width: min(400px, calc(100vw - var(--s6)));
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+  padding: var(--s4);
+  background: var(--danger-soft);
+  border: 1px solid color-mix(in oklch, var(--danger) 22%, transparent);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-modal);
+  color: var(--danger-ink);
+  opacity: 0;
+  transform: translateY(12px) scale(0.98);
+  transition:
+    opacity var(--dur-panel) var(--ease-expo),
+    transform var(--dur-panel) var(--ease-expo);
+}
+
+.alert[data-in='true'] {
+  opacity: 1;
+  transform: none;
+}
+
+.alert__mark {
+  flex: none;
+  margin-top: 1px;
+  color: var(--danger);
+}
+
+.alert__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.alert__title {
+  font-size: var(--t-ui);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* Not a lighter grey. Fading this against a tinted card is what turns the "here
+   is what to do next" line into decoration that fails AA; the hierarchy comes
+   from size and weight instead. */
+.alert__fix {
+  margin-top: 2px;
+  font-size: var(--t-small);
+  line-height: 1.5;
+  color: var(--danger-ink);
+  text-wrap: pretty;
+}
+
+.alert__close {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: var(--r-full);
+  background: none;
+  color: color-mix(in oklch, var(--danger-ink) 80%, transparent);
+  cursor: pointer;
+  transition:
+    background-color var(--dur-micro) var(--ease),
+    color var(--dur-micro) var(--ease);
+}
+
+.alert__close:hover {
+  background: color-mix(in oklch, var(--danger) 12%, transparent);
+  color: var(--danger-ink);
+}
+
+/* The glyph stays 26px; the target under a thumb does not. */
+@media (pointer: coarse) {
+  .alert__close::after {
+    content: '';
+    position: absolute;
+    inset: -9px;
+  }
+}
+
+/* Phone: full width along the bottom edge, clear of the home indicator. */
+@media (max-width: 560px) {
+  .alert {
+    right: var(--s3);
+    left: var(--s3);
+    bottom: calc(var(--s3) + env(safe-area-inset-bottom));
+    width: auto;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .alert {
+    transition: opacity var(--dur) var(--ease);
+    transform: none;
+  }
+}
+
 /* ---------- Progress ---------- */
 
 .progress {

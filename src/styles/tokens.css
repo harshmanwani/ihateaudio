@@ -137,6 +137,9 @@
   --z-overlay: 300;
   --z-modal: 400;
   --z-toast: 500;
+  /* Above toast, because the one thing that must never be covered by an install
+     invitation is the reason the tool just failed. */
+  --z-alert: 600;
 
   /* Motion */
   --dur-micro: 120ms;

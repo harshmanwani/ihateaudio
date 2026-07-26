@@ -31,7 +31,7 @@ test.describe('ffmpeg tier', () => {
     const [download] = await getDownloads(page);
     expect(download.name).toMatch(/\.m4a$/);
     expect(download.size).toBeGreaterThan(2000);
-    await expect(page.locator('[role="alert"]')).toHaveCount(0);
+    await expect(page.locator('[role="alert"]')).toBeHidden();
   });
 
   test('produces an M4R ringtone', async ({ page, isMobile }) => {
