@@ -1,6 +1,7 @@
 ---
 import ToolPage from '../layouts/ToolPage.astro';
 import ToolShell from '../components/ToolShell.astro';
+import RunAction from '../components/RunAction.astro';
 import { getTool } from '../data/tools';
 
 const tool = getTool('tempo-changer');
@@ -9,7 +10,7 @@ const steps = [
   'Drop the track you want to work on onto the page. It is decoded locally, so a rehearsal recording or an unreleased mix never leaves your machine.',
   'Set the tempo as a percentage of the original. 100% is untouched, 75% is three quarters of the original speed, 120% is a fifth faster.',
   'If you know the tempo of the recording, type it into the BPM box. The tool then tells you the beats per minute you will actually be playing at.',
-  'Click Preview the tempo to render it and listen. Time-stretching is too expensive to redo on every drag, so it runs when you ask for it.',
+  'Click Preview the tempo to render it. The result appears as its own player below the controls; time-stretching is too expensive to redo on every drag, so it runs when you ask for it.',
   'Download the result, or loop a section first with the trimmer if you only need one difficult bar.',
 ];
 
@@ -119,13 +120,13 @@ const faq = [
         <span class="hint" data-out="length-hint">Load a file to see the new running time.</span>
       </div>
 
-      <div class="field controls__full">
-        <span class="label">Audition</span>
-        <button type="button" class="btn btn--quiet" data-audition>Preview the tempo</button>
-        <span class="hint" data-out="state">
-          The player holds the original until you render a preview.
-        </span>
-      </div>
+      <RunAction
+        mode="preview"
+        label="Preview the tempo"
+        busy="Stretching"
+        hint="Time-stretching is heavy, so it runs when you ask rather than on every drag. Downloading works either way."
+        done="Rendered. The stretched version has its own player below; the original stays above."
+      />
     </div>
   </ToolShell>
 
@@ -199,7 +200,6 @@ const faq = [
   import { clamp, duration, pct } from '../lib/format';
 
   let source: AudioBuffer | null = null;
-  let auditionBuffer: AudioBuffer | null = null;
   let wired = false;
 
   function percentOf(): number {
@@ -209,10 +209,10 @@ const faq = [
   const tool = createTool({
     suffix: 'tempo',
     defaultFormat: 'mp3',
+    previewLabel: 'Stretched',
 
     onReady(ctx, runtime) {
       source = ctx.buffer;
-      auditionBuffer = null;
 
       const root = runtime.root;
       const range = root.querySelector<HTMLInputElement>('[data-control="tempo"]');
@@ -222,8 +222,6 @@ const faq = [
       const bpmOut = root.querySelector<HTMLElement>('[data-out="bpm"]');
       const length = root.querySelector<HTMLElement>('[data-out="length"]');
       const lengthHint = root.querySelector<HTMLElement>('[data-out="length-hint"]');
-      const state = root.querySelector<HTMLElement>('[data-out="state"]');
-      const button = root.querySelector<HTMLButtonElement>('[data-audition]');
       const presets = root.querySelectorAll<HTMLButtonElement>('[data-preset]');
       if (!range) return;
 
@@ -251,39 +249,10 @@ const faq = [
         });
       };
 
-      const invalidate = (): void => {
-        paint();
-        if (auditionBuffer) {
-          auditionBuffer = null;
-          runtime.refreshPreview();
-        }
-        if (state) state.textContent = 'Settings changed. Render the preview again to hear them.';
-      };
-
-      const audition = async (): Promise<void> => {
-        if (!source || !button) return;
-        button.dataset.loading = 'true';
-        if (state) state.textContent = 'Stretching…';
-        // Yield so the spinner paints before the stretch blocks the thread.
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        try {
-          const multiplier = percentOf() / 100;
-          auditionBuffer =
-            Math.abs(multiplier - 1) < 0.001 ? null : changeTempo(source, multiplier);
-          runtime.refreshPreview();
-          if (state) {
-            state.textContent = auditionBuffer
-              ? 'Preview ready. Press play.'
-              : 'Nothing to hear, the tempo is unchanged.';
-          }
-        } catch {
-          if (state) {
-            state.textContent = 'The preview could not be rendered. Downloading still works.';
-          }
-        } finally {
-          delete button.dataset.loading;
-        }
-      };
+      // Rendering, its progress, its failures and the stale state all belong to
+      // the run panel now, which shares one implementation with process() below
+      // instead of a second copy of the render here.
+      const invalidate = (): void => paint();
 
       if (wired) {
         paint();
@@ -319,14 +288,10 @@ const faq = [
         });
       });
 
-      button?.addEventListener('click', () => void audition());
 
       paint();
     },
 
-    preview(ctx) {
-      return auditionBuffer ?? ctx.buffer;
-    },
 
     async process(ctx) {
       const percent = percentOf();

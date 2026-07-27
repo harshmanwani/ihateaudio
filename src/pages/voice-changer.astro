@@ -1,6 +1,7 @@
 ---
 import ToolPage from '../layouts/ToolPage.astro';
 import ToolShell from '../components/ToolShell.astro';
+import RunAction from '../components/RunAction.astro';
 import { getTool } from '../data/tools';
 
 const tool = getTool('voice-changer');
@@ -9,7 +10,7 @@ const steps = [
   'Drop a recording onto the page. A voice note, a take from your phone, anything your browser can decode. It stays on your device.',
   'Choose a preset. The line underneath says what it does to the sound and whether it changes the length of the recording.',
   'Add a manual pitch shift if the preset alone is not enough. It runs after the preset, so you can push Telephone lower or lift Radio slightly.',
-  'Press Preview to render the chain and listen to it in the player. Pitch shifting is heavy, so it runs when you ask rather than on every change.',
+  'Press Preview to render the chain. The result appears as its own player below the controls; pitch shifting is heavy, so it runs when you ask rather than on every change.',
   'Download the result. The filename records the preset you used, so a robot version saves as recording-robot.mp3.',
 ];
 
@@ -99,13 +100,13 @@ const faq = [
         </div>
       </div>
 
-      <div class="field controls__full">
-        <span class="label">Audition</span>
-        <button type="button" class="btn btn--quiet" data-audition>Preview the voice</button>
-        <span class="hint" data-out="state">
-          The player holds the original until you render a preview.
-        </span>
-      </div>
+      <RunAction
+        mode="preview"
+        label="Preview the voice"
+        busy="Rendering the chain"
+        hint="The chain is heavy to render, so it runs when you ask rather than on every change. Downloading works either way."
+        done="Rendered. The changed voice has its own player below; the original stays above."
+      />
     </div>
   </ToolShell>
 
@@ -198,8 +199,6 @@ const faq = [
   /** Presets that run a WSOLA stretch, which is what makes a render slow. */
   const HEAVY = new Set(['deeper', 'higher']);
 
-  let source: AudioBuffer | null = null;
-  let auditionBuffer: AudioBuffer | null = null;
   let wired = false;
 
   function presetOf(): string {
@@ -261,10 +260,9 @@ const faq = [
   const tool = createTool({
     suffix: 'voice',
     defaultFormat: 'mp3',
+    previewLabel: 'Changed',
 
-    onReady(ctx, runtime) {
-      source = ctx.buffer;
-      auditionBuffer = null;
+    onReady(_ctx, runtime) {
 
       const root = runtime.root;
       const preset = root.querySelector<HTMLSelectElement>('[data-control="preset"]');
@@ -272,8 +270,6 @@ const faq = [
       const num = root.querySelector<HTMLInputElement>('[data-control="pitch-num"]');
       const note = root.querySelector<HTMLElement>('[data-out="preset-note"]');
       const pitchOut = root.querySelector<HTMLElement>('[data-out="pitch"]');
-      const state = root.querySelector<HTMLElement>('[data-out="state"]');
-      const button = root.querySelector<HTMLButtonElement>('[data-audition]');
       if (!range) return;
 
       const paint = (): void => {
@@ -286,38 +282,10 @@ const faq = [
         if (note) note.textContent = NOTES[presetOf()] ?? '';
       };
 
-      const invalidate = (): void => {
-        paint();
-        if (auditionBuffer) {
-          auditionBuffer = null;
-          runtime.refreshPreview();
-        }
-        if (state) state.textContent = 'Settings changed. Render the preview again to hear them.';
-      };
-
-      const audition = async (): Promise<void> => {
-        if (!source || !button) return;
-        button.dataset.loading = 'true';
-        if (state) {
-          state.textContent =
-            HEAVY.has(presetOf()) || Math.abs(manualPitch()) >= 0.5
-              ? 'Rendering. Pitch shifting takes a moment…'
-              : 'Rendering…';
-        }
-        // Yield so the spinner paints before any synchronous stretch starts.
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        try {
-          auditionBuffer = await render(source);
-          runtime.refreshPreview();
-          if (state) state.textContent = 'Preview ready. Press play.';
-        } catch {
-          if (state) {
-            state.textContent = 'The preview could not be rendered. Downloading still works.';
-          }
-        } finally {
-          delete button.dataset.loading;
-        }
-      };
+      // Rendering, its progress, its failures and the stale state all belong to
+      // the run panel now, which shares one implementation with process() below
+      // instead of a second copy of the render here.
+      const invalidate = (): void => paint();
 
       if (wired) {
         paint();
@@ -344,14 +312,10 @@ const faq = [
         paint();
       });
 
-      button?.addEventListener('click', () => void audition());
 
       paint();
     },
 
-    preview(ctx) {
-      return auditionBuffer ?? ctx.buffer;
-    },
 
     async process(ctx) {
       const heavy = HEAVY.has(presetOf()) || Math.abs(manualPitch()) >= 0.5;

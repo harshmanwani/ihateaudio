@@ -1,6 +1,7 @@
 ---
 import ToolPage from '../layouts/ToolPage.astro';
 import ToolShell from '../components/ToolShell.astro';
+import RunAction from '../components/RunAction.astro';
 import { getTool } from '../data/tools';
 
 const tool = getTool('slowed-reverb');
@@ -8,7 +9,7 @@ const tool = getTool('slowed-reverb');
 const steps = [
   'Drop the song onto the page. It is read straight off your device. Nothing is uploaded, so there is no queue and no watermark.',
   'Pick a preset, or drag the Intensity slider. One knob moves the slowdown and the reverb together, which is how the two settings actually behave in this style.',
-  'Press Preview to render it, then play it back. Listen to a chorus rather than the intro, because that is where too much reverb shows up first.',
+  'Press Preview to render it, then play the result below the controls. Listen to a chorus rather than the intro, because that is where too much reverb shows up first.',
   'Open Advanced if you want to separate the two: speed on its own, reverb amount on its own, and how long the tail rings for.',
   'Download as MP3. The file is named song-slowed-reverb.mp3, ready to drop straight into a video editor.',
 ];
@@ -99,11 +100,13 @@ const faq = [
         <span class="hint" data-out="drop">The pitch comes down with the speed.</span>
       </div>
 
-      <div class="field">
-        <span class="label">Audition</span>
-        <button type="button" class="btn btn--quiet" data-audition>Preview</button>
-        <span class="hint" data-out="state">Rendering the first preview…</span>
-      </div>
+      <RunAction
+        mode="preview"
+        label="Preview"
+        busy="Rendering"
+        hint="Slowing and reverberating a whole track is heavy, so it runs when you ask. Downloading works either way."
+        done="Rendered. The slowed version has its own player below; the original stays above."
+      />
 
       <div class="field controls__full">
         <button
@@ -283,7 +286,6 @@ const faq = [
   const PRE_DELAY = 0.03;
 
   let source: AudioBuffer | null = null;
-  let auditionBuffer: AudioBuffer | null = null;
   let wired = false;
 
   function speedOf(): number {
@@ -311,10 +313,10 @@ const faq = [
   const tool = createTool({
     suffix: 'slowed-reverb',
     defaultFormat: 'mp3',
+    previewLabel: 'Slowed + reverb',
 
     onReady(ctx, runtime) {
       source = ctx.buffer;
-      auditionBuffer = null;
 
       const root = runtime.root;
       const q = <T extends HTMLElement>(selector: string): T | null =>
@@ -335,9 +337,7 @@ const faq = [
       const decayOut = q('[data-out="decay"]');
       const lengthOut = q('[data-out="length"]');
       const dropOut = q('[data-out="drop"]');
-      const state = q('[data-out="state"]');
 
-      const button = q<HTMLButtonElement>('[data-audition]');
       const advancedBtn = q<HTMLButtonElement>('[data-advanced]');
       const advancedPanel = q('[data-advanced-panel]');
       const presets = root.querySelectorAll<HTMLButtonElement>('[data-preset]');
@@ -384,9 +384,9 @@ const faq = [
         });
       };
 
-      const stale = (): void => {
-        if (state) state.textContent = 'Settings changed. Press Preview to hear them.';
-      };
+      // The run panel handles the stale state itself now, so this is only here
+      // because derive() and the bindings below call it.
+      const stale = (): void => {};
 
       /** The macro knob: one intensity value writes all three parameters. */
       const derive = (): void => {
@@ -399,25 +399,6 @@ const faq = [
         if (decayNum) decayNum.value = decay.value;
         paint();
         stale();
-      };
-
-      const audition = async (): Promise<void> => {
-        if (!source || !button) return;
-        button.dataset.loading = 'true';
-        if (state) state.textContent = 'Rendering…';
-        // Yield so the spinner paints before the resample takes the thread.
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        try {
-          auditionBuffer = await render(source);
-          runtime.refreshPreview();
-          if (state) state.textContent = 'Preview ready. Press play.';
-        } catch {
-          if (state) {
-            state.textContent = 'The preview could not be rendered. Downloading still works.';
-          }
-        } finally {
-          delete button.dataset.loading;
-        }
       };
 
       const bind = (
@@ -471,17 +452,15 @@ const faq = [
           if (advancedPanel) advancedPanel.toggleAttribute('hidden', open);
         });
 
-        button?.addEventListener('click', () => void audition());
       }
 
       paint();
       // Drop a file and the slowed version is waiting — that is the whole tool.
-      void audition();
+      // The only page that renders unasked, which is why it drives the run panel
+      // directly rather than leaving it on its button.
+      void runtime.analyze();
     },
 
-    preview(ctx) {
-      return auditionBuffer ?? ctx.buffer;
-    },
 
     async process(ctx) {
       ctx.progress(0.1);
