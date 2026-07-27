@@ -54,6 +54,20 @@ const faq = [
         <span class="hint">The pitch is held throughout. Only the timing moves.</span>
       </div>
 
+      {/*
+        What the percentage costs, and where it starts to cost quality.
+
+        Holding the pitch is not free the way resampling is: the audio is cut
+        into windows and relaid at a new spacing, so the further from 100% you
+        go, the more material has to be repeated or dropped, and eventually that
+        is audible as a flutter on sustained notes. Where "eventually" falls
+        depends on the material, which is why there are two bands rather than one
+        — speech tolerates far more than a dense mix with sharp transients.
+      */}
+      <div class="stretch controls__full" data-stretch-panel>
+        <canvas class="stretch__canvas" data-stretch aria-hidden="true"></canvas>
+      </div>
+
       <div class="field controls__full">
         <label class="label" for="tempo">
           Tempo
@@ -194,6 +208,26 @@ const faq = [
   </Fragment>
 </ToolPage>
 
+<style>
+  .stretch {
+    padding: var(--s4);
+    border-radius: var(--r-md);
+    background: var(--stage-2, var(--surface));
+  }
+
+  .stretch__canvas {
+    width: 100%;
+    height: 168px;
+    display: block;
+  }
+
+  @media (max-width: 560px) {
+    .stretch__canvas {
+      height: 152px;
+    }
+  }
+</style>
+
 <script>
   import { createTool } from '../lib/tool';
   import { changeTempo } from '../lib/audio/stretch';
@@ -201,6 +235,141 @@ const faq = [
 
   let source: AudioBuffer | null = null;
   let wired = false;
+
+  /**
+   * Where overlap-add stretching stays transparent.
+   *
+   * Not a property of the implementation so much as of the material: speech is
+   * mostly one voice with forgiving transients, a dense mix is many sources with
+   * sharp ones, and the same window-repeating artefact is inaudible in the first
+   * and obvious in the second. These are the ranges the page's own guidance
+   * gives, drawn rather than described.
+   */
+  const BANDS = [
+    { from: 60, to: 180, label: 'speech holds up', weight: 0.14 },
+    { from: 75, to: 140, label: 'safe for dense music', weight: 0.3 },
+  ];
+
+  function drawStretch(
+    panel: HTMLElement,
+    canvas: HTMLCanvasElement,
+    percent: number,
+    seconds: number
+  ): void {
+    const cssWidth = canvas.clientWidth;
+    const cssHeight = canvas.clientHeight;
+    if (cssWidth < 1 || cssHeight < 1) return;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.round(cssWidth * dpr);
+    const height = Math.round(cssHeight * dpr);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, width, height);
+
+    const styles = getComputedStyle(panel);
+    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
+    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+
+    const padL = 56 * dpr;
+    const padR = 14 * dpr;
+    const plotW = width - padL - padR;
+
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+    context.textBaseline = 'middle';
+
+    // ---- Length, both on one axis. ----
+    const after = seconds / (percent / 100);
+    const longest = Math.max(seconds, after) || 1;
+    const barH = 20 * dpr;
+    const barGap = 8 * dpr;
+    const barsTop = 12 * dpr;
+
+    const bar = (index: number, title: string, value: number, accent: string): void => {
+      const y = barsTop + index * (barH + barGap);
+      context.textAlign = 'right';
+      context.fillStyle = `color-mix(in oklch, ${ink} 55%, transparent)`;
+      context.fillText(title, padL - 10 * dpr, y + barH / 2);
+
+      context.fillStyle = `color-mix(in oklch, ${ink} 6%, transparent)`;
+      context.fillRect(padL, y, plotW, barH);
+
+      const w = Math.max(2 * dpr, (value / longest) * plotW);
+      context.fillStyle = accent;
+      context.beginPath();
+      context.roundRect(padL, y, w, barH, 3 * dpr);
+      context.fill();
+
+      const inside = w > 66 * dpr;
+      context.textAlign = inside ? 'right' : 'left';
+      context.fillStyle = inside
+        ? `color-mix(in oklch, ${ink} 92%, transparent)`
+        : `color-mix(in oklch, ${ink} 70%, transparent)`;
+      context.fillText(duration(value), padL + w + (inside ? -8 : 8) * dpr, y + barH / 2);
+    };
+
+    bar(0, 'Now', seconds, `color-mix(in oklch, ${ink} 26%, transparent)`);
+    bar(1, 'After', after, `color-mix(in oklch, ${hue} 70%, transparent)`);
+
+    // ---- How far the stretch is being pushed. ----
+    const rulerY = barsTop + barH * 2 + barGap + 44 * dpr;
+    if (rulerY + 26 * dpr > height) return;
+
+    const x = (value: number) => padL + ((clamp(value, 50, 200) - 50) / 150) * plotW;
+
+    context.textAlign = 'right';
+    context.fillStyle = `color-mix(in oklch, ${ink} 55%, transparent)`;
+    context.fillText('Stretch', padL - 10 * dpr, rulerY - 4 * dpr);
+    context.fillStyle = `color-mix(in oklch, ${ink} 40%, transparent)`;
+    context.fillText('quality', padL - 10 * dpr, rulerY + 10 * dpr);
+
+    context.fillStyle = `color-mix(in oklch, ${ink} 7%, transparent)`;
+    context.fillRect(padL, rulerY - 9 * dpr, plotW, 18 * dpr);
+
+    for (const band of BANDS) {
+      context.fillStyle = `color-mix(in oklch, ${hue} ${Math.round(band.weight * 100)}%, transparent)`;
+      context.fillRect(x(band.from), rulerY - 9 * dpr, x(band.to) - x(band.from), 18 * dpr);
+    }
+
+    context.textAlign = 'center';
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+    context.fillStyle = `color-mix(in oklch, ${ink} 46%, transparent)`;
+    context.fillText(BANDS[1]!.label, (x(75) + x(140)) / 2, rulerY - 20 * dpr);
+    context.fillStyle = `color-mix(in oklch, ${ink} 34%, transparent)`;
+    context.fillText(BANDS[0]!.label, (x(140) + x(180)) / 2, rulerY + 21 * dpr);
+
+    for (const tick of [50, 75, 100, 125, 150, 175, 200]) {
+      context.strokeStyle = `color-mix(in oklch, ${ink} ${tick === 100 ? 34 : 14}%, transparent)`;
+      context.lineWidth = dpr;
+      context.beginPath();
+      context.moveTo(x(tick), rulerY - 9 * dpr);
+      context.lineTo(x(tick), rulerY + 9 * dpr);
+      context.stroke();
+      context.fillStyle = `color-mix(in oklch, ${ink} 38%, transparent)`;
+      context.fillText(`${tick}%`, x(tick), rulerY + 34 * dpr);
+    }
+
+    context.fillStyle = hue;
+    context.beginPath();
+    context.arc(x(percent), rulerY, 6 * dpr, 0, Math.PI * 2);
+    context.fill();
+
+    const pushed = percent < 75 || percent > 140;
+    context.font = `600 ${11 * dpr}px system-ui, sans-serif`;
+    context.fillStyle = ink;
+    const right = x(percent) > padL + plotW * 0.6;
+    context.textAlign = right ? 'right' : 'left';
+    context.fillText(
+      percent === 100 ? 'unchanged' : pushed ? 'listen for flutter here' : 'clean stretch',
+      x(percent) + (right ? -12 : 12) * dpr,
+      rulerY - 22 * dpr
+    );
+  }
 
   function percentOf(): number {
     return clamp(tool?.value('tempo', 100) ?? 100, 50, 200);
@@ -223,11 +392,16 @@ const faq = [
       const length = root.querySelector<HTMLElement>('[data-out="length"]');
       const lengthHint = root.querySelector<HTMLElement>('[data-out="length-hint"]');
       const presets = root.querySelectorAll<HTMLButtonElement>('[data-preset]');
+      const stretchPanel = root.querySelector<HTMLElement>('[data-stretch-panel]');
+      const stretchCanvas = root.querySelector<HTMLCanvasElement>('[data-stretch]');
       if (!range) return;
 
       const paint = (): void => {
         const percent = percentOf();
         const multiplier = percent / 100;
+        if (stretchPanel && stretchCanvas) {
+          drawStretch(stretchPanel, stretchCanvas, percent, source?.duration ?? 0);
+        }
         range.style.setProperty('--pct', `${pct(percent, 50, 200)}%`);
         if (tempoOut) tempoOut.textContent = `${percent}%`;
         if (length) length.textContent = duration((source?.duration ?? 0) / multiplier);
@@ -254,11 +428,17 @@ const faq = [
       // instead of a second copy of the render here.
       const invalidate = (): void => paint();
 
+      // The canvas has no width until the workspace is on screen. Runs on every
+      // ready, since a second file changes the lengths the bars are drawn from.
+      requestAnimationFrame(paint);
+
       if (wired) {
         paint();
         return;
       }
       wired = true;
+
+      if (stretchPanel) new ResizeObserver(paint).observe(stretchPanel);
 
       range.addEventListener('input', () => {
         if (num) num.value = range.value;

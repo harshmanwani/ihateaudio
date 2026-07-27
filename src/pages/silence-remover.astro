@@ -52,6 +52,23 @@ const faq = [
         <span class="hint">A stretch is cut only if it is quiet enough and long enough.</span>
       </div>
 
+      {/*
+        The level the threshold is actually compared against.
+
+        "−45 dB" is a number with nothing to read it against, which is why
+        picking it has always been guesswork — a phone recording in a quiet room
+        floors at −60, the same room with a fan floors at −38, and the right
+        setting is a property of the file rather than of the tool. This plots the
+        exact quantity the detector measures, in the same 20 ms RMS windows, with
+        the threshold drawn across it. All three sliders become visible at once:
+        the line is the threshold, the dips it clears but that stay unshaded are
+        the ones too short to qualify, and the gap between a shaded band and the
+        dip around it is the padding being kept.
+      */}
+      <div class="floor controls__full" data-floor-panel>
+        <canvas class="floor__canvas" data-floor aria-hidden="true"></canvas>
+      </div>
+
       <div class="field">
         <label class="label" for="sr-threshold">
           Counts as silence below
@@ -203,10 +220,190 @@ const faq = [
   </Fragment>
 </ToolPage>
 
+<style>
+  .floor {
+    padding: var(--s4);
+    border-radius: var(--r-md);
+    background: var(--stage-2, var(--surface));
+  }
+
+  .floor__canvas {
+    width: 100%;
+    height: 176px;
+    display: block;
+  }
+
+  @media (max-width: 560px) {
+    .floor__canvas {
+      height: 152px;
+    }
+  }
+</style>
+
 <script>
   import { createTool } from '../lib/tool';
   import { findSilence, removeSilence } from '../lib/audio/dsp';
   import { duration as fmtDuration } from '../lib/format';
+
+  /**
+   * The file's level over time, in the same windows the detector uses.
+   *
+   * findSilence walks 20 ms RMS windows and compares each against the threshold,
+   * so plotting anything else — a peak envelope, the drawn waveform — would show
+   * a quantity the slider is not being compared to, and the line would sit in the
+   * wrong place relative to the dips. This is the detector's own measurement.
+   */
+  const WINDOW_SECONDS = 0.02;
+  const FLOOR_DB = -80;
+
+  let envelope: Float32Array | null = null;
+
+  function measureEnvelope(buffer: AudioBuffer): Float32Array {
+    const rate = buffer.sampleRate;
+    const window = Math.max(1, Math.floor(rate * WINDOW_SECONDS));
+    const windows = Math.ceil(buffer.length / window);
+    const out = new Float32Array(windows);
+    const channels = buffer.numberOfChannels;
+    const data: Float32Array[] = [];
+    for (let c = 0; c < channels; c += 1) data.push(buffer.getChannelData(c));
+
+    for (let w = 0; w < windows; w += 1) {
+      const from = w * window;
+      const to = Math.min(from + window, buffer.length);
+      let sum = 0;
+      let count = 0;
+      for (let c = 0; c < channels; c += 1) {
+        const channel = data[c]!;
+        for (let i = from; i < to; i += 1) sum += channel[i]! * channel[i]!;
+        count += to - from;
+      }
+      const rms = count === 0 ? 0 : Math.sqrt(sum / count);
+      out[w] = rms > 0 ? Math.max(FLOOR_DB, 20 * Math.log10(rms)) : FLOOR_DB;
+    }
+    return out;
+  }
+
+  function drawFloor(
+    panel: HTMLElement,
+    canvas: HTMLCanvasElement,
+    levels: Float32Array,
+    seconds: number,
+    threshold: number,
+    cuts: { start: number; end: number }[]
+  ): void {
+    const cssWidth = canvas.clientWidth;
+    const cssHeight = canvas.clientHeight;
+    if (cssWidth < 1 || cssHeight < 1) return;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.round(cssWidth * dpr);
+    const height = Math.round(cssHeight * dpr);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, width, height);
+
+    const styles = getComputedStyle(panel);
+    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
+    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+
+    const padL = 34 * dpr;
+    const padR = 12 * dpr;
+    const padT = 12 * dpr;
+    const padB = 22 * dpr;
+    const plotW = width - padL - padR;
+    const plotH = height - padT - padB;
+
+    const x = (time: number) => padL + (time / Math.max(0.001, seconds)) * plotW;
+    const y = (dB: number) =>
+      padT + plotH - ((Math.max(FLOOR_DB, Math.min(0, dB)) - FLOOR_DB) / -FLOOR_DB) * plotH;
+
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+    context.textBaseline = 'middle';
+
+    for (const dB of [-20, -40, -60]) {
+      context.strokeStyle = `color-mix(in oklch, ${ink} 8%, transparent)`;
+      context.lineWidth = dpr;
+      context.beginPath();
+      context.moveTo(padL, y(dB));
+      context.lineTo(padL + plotW, y(dB));
+      context.stroke();
+      context.fillStyle = `color-mix(in oklch, ${ink} 38%, transparent)`;
+      context.textAlign = 'right';
+      context.fillText(String(dB), padL - 5 * dpr, y(dB));
+    }
+
+    // What actually gets removed, drawn behind the level so the level stays
+    // readable across it.
+    for (const cut of cuts) {
+      const from = x(cut.start);
+      const to = x(cut.end);
+      context.fillStyle = `color-mix(in oklch, ${hue} 26%, transparent)`;
+      context.fillRect(from, padT, Math.max(dpr, to - from), plotH);
+    }
+
+    /*
+      One column per pixel, drawn as the band between the quietest and loudest
+      window in it.
+
+      The minimum is the part that matters — a column is only a candidate for
+      cutting if some window inside it fell under the line — so collapsing to an
+      average would hide exactly the thing being decided.
+    */
+    const columns = Math.max(1, Math.round(plotW));
+    const perColumn = levels.length / columns;
+    const body = `color-mix(in oklch, ${ink} 16%, transparent)`;
+    const band = `color-mix(in oklch, ${ink} 55%, transparent)`;
+    for (let column = 0; column < columns; column += 1) {
+      const from = Math.floor(column * perColumn);
+      const to = Math.max(from + 1, Math.floor((column + 1) * perColumn));
+      let low = 0;
+      let high = FLOOR_DB;
+      for (let i = from; i < to && i < levels.length; i += 1) {
+        const value = levels[i]!;
+        if (value < low) low = value;
+        if (value > high) high = value;
+      }
+      const px = padL + column;
+
+      // Filled to the floor so the plot has a body to read against the line,
+      // then the min-to-max band on top. Rectangles rather than line segments:
+      // a column of steady material has min equal to max, and a zero-length
+      // stroke draws nothing at all.
+      context.fillStyle = body;
+      context.fillRect(px, y(high), 1, padT + plotH - y(high));
+      context.fillStyle = band;
+      context.fillRect(px, y(high), 1, Math.max(dpr, y(low) - y(high)));
+    }
+
+    // The threshold, which is the whole point of the picture.
+    context.strokeStyle = hue;
+    context.lineWidth = 2 * dpr;
+    context.beginPath();
+    context.moveTo(padL, y(threshold));
+    context.lineTo(padL + plotW, y(threshold));
+    context.stroke();
+
+    context.font = `600 ${10 * dpr}px system-ui, sans-serif`;
+    context.fillStyle = hue;
+    context.textAlign = 'left';
+    context.fillText(
+      `${threshold} dB — anything under this line is a candidate`,
+      padL + 6 * dpr,
+      y(threshold) - 9 * dpr
+    );
+
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+    context.fillStyle = `color-mix(in oklch, ${ink} 40%, transparent)`;
+    context.textAlign = 'right';
+    context.fillText(fmtDuration(seconds), padL + plotW, height - 8 * dpr);
+    context.textAlign = 'left';
+    context.fillText('0:00', padL, height - 8 * dpr);
+  }
 
   const tool = createTool({
     suffix: 'tightened',
@@ -216,6 +413,24 @@ const faq = [
       const root = runtime.root;
       const report = root.querySelector<HTMLElement>('[data-report]');
       const reportText = root.querySelector<HTMLElement>('[data-report-text]');
+      const floorPanel = root.querySelector<HTMLElement>('[data-floor-panel]');
+      const floorCanvas = root.querySelector<HTMLCanvasElement>('[data-floor]');
+
+      // One pass over the file, kept for the life of the page — the sliders move
+      // the line, not the level underneath it.
+      envelope = measureEnvelope(ctx.buffer);
+
+      const paintFloor = (cuts: { start: number; end: number }[]): void => {
+        if (!floorPanel || !floorCanvas || !envelope) return;
+        drawFloor(
+          floorPanel,
+          floorCanvas,
+          envelope,
+          ctx.buffer.duration,
+          runtime.value('threshold', -45),
+          cuts
+        );
+      };
 
       /**
        * Mirrors the arithmetic removeSilence performs, so the estimate can be
@@ -232,6 +447,7 @@ const faq = [
 
         if (regions.length === 0) {
           runtime.setHighlights([]);
+          paintFloor([]);
           reportText.textContent =
             `No stretch is both quieter than ${threshold} dB and longer than ${minSec.toFixed(2)} s. ` +
             'Move the threshold up toward -20 dB, or shorten the minimum gap.';
@@ -251,16 +467,18 @@ const faq = [
         );
 
         let removed = 0;
-        let cut = 0;
         let cursor = 0;
+        const cuts: { start: number; end: number }[] = [];
         for (const region of regions) {
           const start = Math.max(cursor, region.start + padSec);
           const end = Math.min(total, region.end - padSec);
           if (end <= start) continue;
           removed += end - start;
           cursor = end;
-          cut += 1;
+          cuts.push({ start, end });
         }
+        const cut = cuts.length;
+        paintFloor(cuts);
 
         if (cut === 0) {
           reportText.textContent =
@@ -321,6 +539,10 @@ const faq = [
       bindSlider('threshold', (value) => `${value} dB`);
       bindSlider('min', (value) => `${value.toFixed(2)} s`);
       bindSlider('pad', (value) => `${value.toFixed(2)} s`);
+
+      // The canvas has no width until the workspace is on screen.
+      requestAnimationFrame(measure);
+      if (floorPanel) new ResizeObserver(measure).observe(floorPanel);
 
       measure();
     },

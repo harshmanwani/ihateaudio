@@ -54,6 +54,22 @@ const faq = [
         <span class="hint">The preset runs first, then any manual pitch shift.</span>
       </div>
 
+      {/*
+        The two halves of a voice, on the axis they both live on.
+
+        The prose below already says it: speech is a buzz at some pitch, shaped
+        by resonances that carry the words. Every preset here moves one or the
+        other, and which one is the whole difference between them — deeper and
+        higher slide the buzz, telephone and radio leave it alone and throw away
+        the outside of the band instead. Drawn on one frequency axis, "band
+        limited to 300 Hz–3.4 kHz" stops being a specification and becomes a
+        visible amount of missing voice.
+      */}
+      <div class="vox controls__full" data-vox-panel>
+        <canvas class="vox__canvas" data-vox aria-hidden="true"></canvas>
+        <p class="vox__caption" data-vox-caption></p>
+      </div>
+
       <div class="field">
         <label class="label" for="preset">Preset</label>
         <select class="select" id="preset" data-control="preset">
@@ -172,6 +188,36 @@ const faq = [
   </Fragment>
 </ToolPage>
 
+<style>
+  .vox {
+    padding: var(--s4);
+    border-radius: var(--r-md);
+    background: var(--stage-2, var(--surface));
+    display: flex;
+    flex-direction: column;
+    gap: var(--s3);
+  }
+
+  .vox__canvas {
+    width: 100%;
+    height: 168px;
+    display: block;
+  }
+
+  .vox__caption {
+    margin: 0;
+    font-size: var(--t-small);
+    color: var(--stage-ink-2);
+    max-width: var(--prose);
+  }
+
+  @media (max-width: 560px) {
+    .vox__canvas {
+      height: 150px;
+    }
+  }
+</style>
+
 <script>
   import { createTool } from '../lib/tool';
   import { changeSpeed } from '../lib/audio/dsp';
@@ -184,6 +230,41 @@ const faq = [
     telephone,
   } from '../lib/audio/effects';
   import { clamp, pct } from '../lib/format';
+
+  /**
+   * What each preset does, in the same numbers render() uses below.
+   *
+   * `semitones` is how far the buzz moves; `low`/`high` are the edges of what
+   * survives. Both are read straight off the effect chain — the telephone band
+   * really is 300 to 3400 because that is what telephone() builds, and chipmunk
+   * is +7.02 because 1.5x speed is 12·log2(1.5) whether or not that is a round
+   * number. Keeping one table means the picture cannot drift from the render.
+   */
+  const SHAPES: Record<
+    string,
+    { semitones: number; low: number; high: number; lift?: number; stretches: boolean }
+  > = {
+    deeper: { semitones: -4, low: 50, high: 12000, stretches: false },
+    higher: { semitones: 4, low: 50, high: 12000, stretches: false },
+    chipmunk: { semitones: 12 * Math.log2(1.5), low: 50, high: 12000, stretches: true },
+    giant: { semitones: 12 * Math.log2(0.7), low: 50, high: 12000, stretches: true },
+    robot: { semitones: 0, low: 50, high: 3200, stretches: false },
+    telephone: { semitones: 0, low: 300, high: 3400, stretches: false },
+    radio: { semitones: 0, low: 200, high: 5200, lift: 2200, stretches: false },
+    none: { semitones: 0, low: 50, high: 12000, stretches: false },
+  };
+
+  /**
+   * The ranges the about text names, so the picture and the prose agree.
+   *
+   * The fundamental band covers both the male and female speaking ranges; the
+   * formant band is where the resonances that carry vowels and consonants sit,
+   * which is why cutting into it costs intelligibility rather than just tone.
+   */
+  const VOICE_BANDS = [
+    { from: 85, to: 255, label: 'the buzz — pitch lives here' },
+    { from: 300, to: 3500, label: 'the resonances — the words live here' },
+  ];
 
   const NOTES: Record<string, string> = {
     deeper: 'Four semitones down, length unchanged.',
@@ -200,6 +281,148 @@ const faq = [
   const HEAVY = new Set(['deeper', 'higher']);
 
   let wired = false;
+
+  const F_MIN = 50;
+  const F_MAX = 12000;
+  /** A typical adult speaking fundamental, used as the thing being moved. */
+  const REFERENCE_HZ = 120;
+
+  function drawVox(
+    panel: HTMLElement,
+    canvas: HTMLCanvasElement,
+    preset: string,
+    manual: number
+  ): void {
+    const cssWidth = canvas.clientWidth;
+    const cssHeight = canvas.clientHeight;
+    if (cssWidth < 1 || cssHeight < 1) return;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.round(cssWidth * dpr);
+    const height = Math.round(cssHeight * dpr);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, width, height);
+
+    const styles = getComputedStyle(panel);
+    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
+    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+
+    const shape = SHAPES[preset] ?? SHAPES.none!;
+    const padL = 12 * dpr;
+    const padR = 12 * dpr;
+    const plotW = width - padL - padR;
+
+    const x = (hz: number) =>
+      padL +
+      (Math.log(Math.max(F_MIN, Math.min(F_MAX, hz)) / F_MIN) / Math.log(F_MAX / F_MIN)) * plotW;
+
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+    context.textBaseline = 'middle';
+
+    const bandTop = 44 * dpr;
+    const bandH = height - bandTop - 30 * dpr;
+    if (bandH < 24 * dpr) return;
+
+    // What the voice is made of, before anything is done to it.
+    for (const band of VOICE_BANDS) {
+      context.fillStyle = `color-mix(in oklch, ${ink} 8%, transparent)`;
+      context.fillRect(x(band.from), bandTop, x(band.to) - x(band.from), bandH);
+      context.strokeStyle = `color-mix(in oklch, ${ink} 16%, transparent)`;
+      context.lineWidth = dpr;
+      context.strokeRect(x(band.from), bandTop, x(band.to) - x(band.from), bandH);
+
+      context.fillStyle = `color-mix(in oklch, ${ink} 42%, transparent)`;
+      context.textAlign = 'center';
+      const centre = (x(band.from) + x(band.to)) / 2;
+      if (x(band.to) - x(band.from) > 90 * dpr) {
+        context.fillText(band.label, centre, bandTop - 10 * dpr);
+      }
+    }
+
+    // What survives the preset. Anything outside is gone, not merely quieter,
+    // which is the part a specification in hertz never conveys.
+    const keptFrom = x(shape.low);
+    const keptTo = x(shape.high);
+    context.fillStyle = `color-mix(in oklch, ${hue} 22%, transparent)`;
+    context.fillRect(keptFrom, bandTop, keptTo - keptFrom, bandH);
+    context.strokeStyle = hue;
+    context.lineWidth = 2 * dpr;
+    context.strokeRect(keptFrom, bandTop, keptTo - keptFrom, bandH);
+
+    if (shape.lift) {
+      // The radio preset's presence bump, marked where it actually sits.
+      context.strokeStyle = `color-mix(in oklch, ${hue} 70%, transparent)`;
+      context.lineWidth = 1.5 * dpr;
+      context.setLineDash([3 * dpr, 3 * dpr]);
+      context.beginPath();
+      context.moveTo(x(shape.lift), bandTop);
+      context.lineTo(x(shape.lift), bandTop + bandH);
+      context.stroke();
+      context.setLineDash([]);
+    }
+
+    // Where the buzz ends up. One arrow, because the pitch move is one number.
+    const total = shape.semitones + manual;
+    const landed = REFERENCE_HZ * 2 ** (total / 12);
+    const arrowY = bandTop + bandH * 0.5;
+
+    context.strokeStyle = `color-mix(in oklch, ${ink} 45%, transparent)`;
+    context.lineWidth = 1.5 * dpr;
+    context.beginPath();
+    context.arc(x(REFERENCE_HZ), arrowY, 4 * dpr, 0, Math.PI * 2);
+    context.stroke();
+
+    if (Math.abs(total) > 0.02) {
+      context.strokeStyle = hue;
+      context.lineWidth = 2.5 * dpr;
+      context.beginPath();
+      context.moveTo(x(REFERENCE_HZ), arrowY);
+      context.lineTo(x(landed), arrowY);
+      context.stroke();
+
+      const direction = landed > REFERENCE_HZ ? 1 : -1;
+      context.fillStyle = hue;
+      context.beginPath();
+      context.moveTo(x(landed), arrowY);
+      context.lineTo(x(landed) - direction * 7 * dpr, arrowY - 4.5 * dpr);
+      context.lineTo(x(landed) - direction * 7 * dpr, arrowY + 4.5 * dpr);
+      context.closePath();
+      context.fill();
+    }
+
+    context.fillStyle = hue;
+    context.beginPath();
+    context.arc(x(landed), arrowY, 4.5 * dpr, 0, Math.PI * 2);
+    context.fill();
+
+    context.font = `600 ${10 * dpr}px system-ui, sans-serif`;
+    context.fillStyle = ink;
+    context.textAlign = 'left';
+    context.fillText(
+      total === 0
+        ? `a ${REFERENCE_HZ} Hz voice stays put`
+        : `a ${REFERENCE_HZ} Hz voice becomes ${Math.round(landed)} Hz`,
+      padL,
+      14 * dpr
+    );
+
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+    context.fillStyle = `color-mix(in oklch, ${ink} 45%, transparent)`;
+    context.textAlign = 'center';
+    for (const hz of [100, 300, 1000, 3000, 10000]) {
+      context.fillText(
+        hz >= 1000 ? `${hz / 1000}k` : String(hz),
+        x(hz),
+        height - 12 * dpr
+      );
+    }
+  }
 
   function presetOf(): string {
     return tool?.text('preset', 'deeper') ?? 'deeper';
@@ -270,6 +493,9 @@ const faq = [
       const num = root.querySelector<HTMLInputElement>('[data-control="pitch-num"]');
       const note = root.querySelector<HTMLElement>('[data-out="preset-note"]');
       const pitchOut = root.querySelector<HTMLElement>('[data-out="pitch"]');
+      const voxPanel = root.querySelector<HTMLElement>('[data-vox-panel]');
+      const voxCanvas = root.querySelector<HTMLCanvasElement>('[data-vox]');
+      const voxCaption = root.querySelector<HTMLElement>('[data-vox-caption]');
       if (!range) return;
 
       const paint = (): void => {
@@ -280,6 +506,41 @@ const faq = [
           pitchOut.textContent = `${sign}${semitones} semitone${Math.abs(semitones) === 1 ? '' : 's'}`;
         }
         if (note) note.textContent = NOTES[presetOf()] ?? '';
+
+        const chosen = presetOf();
+        if (voxPanel && voxCanvas) drawVox(voxPanel, voxCanvas, chosen, semitones);
+
+        if (voxCaption) {
+          const shape = SHAPES[chosen] ?? SHAPES.none!;
+          const cuts = shape.low > 100 || shape.high < 8000;
+          const moved = Math.abs(shape.semitones + semitones) > 0.02;
+          const parts: string[] = [];
+          if (moved) {
+            parts.push(
+              `the buzz moves ${Math.abs(shape.semitones + semitones).toFixed(1)} semitones ${shape.semitones + semitones > 0 ? 'up' : 'down'}`
+            );
+          }
+          if (cuts) {
+            parts.push(
+              `everything outside ${shape.low} Hz to ${shape.high >= 1000 ? `${shape.high / 1000} kHz` : `${shape.high} Hz`} is discarded`
+            );
+          }
+          if (shape.stretches) parts.push('and the file changes length with it');
+
+          // The striking case, and the one that explains why a phone call is
+          // still intelligible: the band can exclude the fundamental entirely.
+          const landed = REFERENCE_HZ * 2 ** ((shape.semitones + semitones) / 12);
+          const buzzGone = landed < shape.low || landed > shape.high;
+
+          voxCaption.textContent =
+            parts.length === 0
+              ? 'Nothing is being changed yet. Pick a preset, or move the pitch.'
+              : `${parts.join(', ').replace(/^./, (c) => c.toUpperCase())}.${
+                  buzzGone
+                    ? ' That band starts above the fundamental of most adult voices, so the buzz itself is gone — the words still come through because the resonances that carry them survive.'
+                    : ''
+                }`;
+        }
       };
 
       // Rendering, its progress, its failures and the stale state all belong to
@@ -287,11 +548,16 @@ const faq = [
       // instead of a second copy of the render here.
       const invalidate = (): void => paint();
 
+      // The canvas has no width until the workspace is on screen.
+      requestAnimationFrame(paint);
+
       if (wired) {
         paint();
         return;
       }
       wired = true;
+
+      if (voxPanel) new ResizeObserver(paint).observe(voxPanel);
 
       preset?.addEventListener('change', invalidate);
 
