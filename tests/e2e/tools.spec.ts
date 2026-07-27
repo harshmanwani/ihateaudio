@@ -418,6 +418,40 @@ test.describe('responsive', () => {
     }
   });
 
+  /*
+    The test above only visits the trimmer, whose controls are two timecode
+    fields — it cannot fail on a control that is too wide, because it never
+    loads one.
+
+    Segmented controls are where that bites: their labels are `white-space:
+    nowrap`, so each segment's minimum width is its whole label, and three long
+    labels at 320px need more room than the column has. These are the pages with
+    the longest ones, checked at the two widths where the difference shows.
+  */
+  test('tool pages with segmented controls fit a phone', async ({ page }) => {
+    const pages = [
+      'stereo-to-mono',
+      'speed-changer',
+      'tempo-changer',
+      'audio-splitter',
+      'volume-booster',
+    ];
+
+    for (const width of [320, 375]) {
+      await page.setViewportSize({ width, height: 900 });
+      for (const slug of pages) {
+        await page.goto(`/${slug}`);
+        await dropGeneratedAudio(page, { seconds: 5 });
+        await waitForWorkspace(page);
+
+        const overflow = await page.evaluate(
+          () => document.documentElement.scrollWidth - document.documentElement.clientWidth
+        );
+        expect(overflow, `${slug} overflows at ${width}px`).toBeLessThanOrEqual(1);
+      }
+    }
+  });
+
   // Touch sizing keys off `pointer: coarse`, not viewport width — a narrow
   // desktop window driven by a mouse genuinely does not need 44px targets.
   // So this has to run on a project with real touch emulation.
