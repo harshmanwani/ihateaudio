@@ -74,6 +74,34 @@ const schema = [
   schema={schema}
 >
   <div class="wrap">
+    {/*
+      The sister-site pointer.
+
+      Above the hero rather than below the fold, because the people it is for
+      identify themselves in the first two seconds — they came looking for video
+      and are about to work out this is the wrong site. It is deliberately not in
+      the site's green: a different product should not look like another tool in
+      this set, and the blue is the fastest way to say so without a label.
+    */}
+    <a
+      class="crosspromo"
+      href="https://supercut.cc"
+      target="_blank"
+      rel="noopener"
+      data-crosspromo
+    >
+      <span class="crosspromo__mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none">
+          <rect x="2.5" y="4.5" width="19" height="15" rx="3.5" stroke="currentColor" stroke-width="1.8"></rect>
+          <path d="M10 9.4v5.2l4.4-2.6z" fill="currentColor"></path>
+        </svg>
+      </span>
+      <span class="crosspromo__text">
+        Need to edit video? Try <strong>supercut.cc</strong>
+      </span>
+      <Icon name="arrow-up-right" size={13} class="crosspromo__go" />
+    </a>
+
     <section class="hero">
       <div>
         <h1>Audio editing is miserable. We make it less so.</h1>
@@ -278,6 +306,122 @@ const schema = [
     </div>
   </div>
 </Base>
+
+<style>
+  /* ---------- supercut cross-promo ----------
+     Carries its own accent rather than the site's, because it points somewhere
+     else. Everything green on this page is a tool you can use here; this is not
+     one, and the colour is doing that work before the words are read. */
+  .crosspromo {
+    --sc: oklch(0.6 0.18 253);
+    --sc-ink: oklch(0.45 0.14 253);
+
+    display: flex;
+    width: fit-content;
+    max-width: 100%;
+    align-items: center;
+    gap: var(--s2);
+    margin: 0 auto var(--s6);
+    padding: 6px 12px 6px 8px;
+    border-radius: 999px;
+    background: color-mix(in oklch, var(--sc) 7%, var(--surface));
+    color: var(--ink-2);
+    font-size: var(--t-small);
+    line-height: 1.3;
+    text-decoration: none;
+    position: relative;
+    isolation: isolate;
+    transition:
+      background-color var(--dur) var(--ease),
+      transform var(--dur) var(--ease);
+  }
+
+  /* Same ring as the AI pill: one conic gradient rotating behind a masked
+     border, which is a single animated property on a single element rather than
+     a keyframed border. The angle property and the keyframes are already
+     registered globally, so this only restates the colour. */
+  .crosspromo::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: conic-gradient(
+      from var(--shimmer-angle, 0deg),
+      transparent 0deg,
+      transparent 250deg,
+      var(--sc) 310deg,
+      color-mix(in oklch, var(--sc) 50%, white) 340deg,
+      var(--sc) 350deg,
+      transparent 360deg
+    );
+    -webkit-mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    animation: pill-shimmer 4s linear infinite;
+    pointer-events: none;
+    z-index: -1;
+  }
+
+  .crosspromo:hover {
+    background: color-mix(in oklch, var(--sc) 13%, var(--surface));
+    transform: translateY(-1px);
+  }
+
+  .crosspromo:focus-visible {
+    outline: 2px solid var(--sc);
+    outline-offset: 2px;
+  }
+
+  .crosspromo__mark {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    flex: none;
+    border-radius: 7px;
+    background: color-mix(in oklch, var(--sc) 16%, transparent);
+    color: var(--sc);
+  }
+
+  .crosspromo__text {
+    min-width: 0;
+  }
+
+  .crosspromo__text strong {
+    color: var(--sc-ink);
+    font-weight: 600;
+  }
+
+  .crosspromo__go {
+    flex: none;
+    color: var(--sc);
+    opacity: 0.75;
+  }
+
+  @media (max-width: 480px) {
+    .crosspromo {
+      font-size: 0.8125rem;
+      padding: 5px 10px 5px 6px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .crosspromo::before {
+      animation: none;
+      background: color-mix(in oklch, var(--sc) 45%, transparent);
+    }
+
+    .crosspromo:hover {
+      transform: none;
+    }
+  }
+</style>
 
 <script>
   const search = document.querySelector<HTMLInputElement>('#tool-search');
