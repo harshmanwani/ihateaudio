@@ -148,6 +148,8 @@ export class ToolRuntime {
     size: HTMLElement | null;
     download: HTMLButtonElement | null;
     reset: HTMLButtonElement | null;
+    addFiles: HTMLButtonElement | null;
+    addInput: HTMLInputElement | null;
     chain: HTMLElement | null;
     results: HTMLElement | null;
     resultPanel: HTMLElement | null;
@@ -208,6 +210,8 @@ export class ToolRuntime {
       size: $(root, '[data-size]'),
       download: $<HTMLButtonElement>(root, '[data-download]'),
       reset: $<HTMLButtonElement>(root, '[data-reset]'),
+      addFiles: $<HTMLButtonElement>(root, '[data-add-files]'),
+      addInput: $<HTMLInputElement>(root, '[data-add-input]'),
       chain: $(root, '[data-chain]'),
       results: $(root, '[data-results]'),
       resultPanel: $(root, '[data-stem-panel="result"]'),
@@ -237,6 +241,22 @@ export class ToolRuntime {
 
     this.el.download?.addEventListener('click', () => void this.run());
     this.el.reset?.addEventListener('click', () => this.reset());
+
+    // Add-files lives in the workspace header on multi-file tools, because the
+    // drop zone it would otherwise use is hidden by then.
+    if (this.el.addFiles && this.el.addInput) {
+      const input = this.el.addInput;
+      input.accept = this.config.video ? MEDIA_ACCEPT : AUDIO_ACCEPT;
+      input.multiple = true;
+      this.el.addFiles.addEventListener('click', () => input.click());
+      input.addEventListener('change', () => {
+        const chosen = Array.from(input.files ?? []);
+        // Cleared so picking the same file twice in a row still fires a change.
+        input.value = '';
+        if (chosen.length > 0) void this.load(chosen, { append: true });
+      });
+    }
+
     this.el.alertClose?.addEventListener('click', () => this.hideAlert());
     this.el.format?.addEventListener('change', () => this.onFormatChange());
     this.el.quality?.addEventListener('change', () => this.updateSize());
@@ -354,7 +374,15 @@ export class ToolRuntime {
 
   // ---------- intake ----------
 
-  async load(files: File[]): Promise<void> {
+  /**
+   * Decodes files and opens the workspace on them.
+   *
+   * `append` keeps what is already loaded and adds to it, which is what the
+   * multi-file tools need: the drop zone is gone once the workspace is open, so
+   * without it the only way to add a fourth track to a join was to clear the
+   * three already there and pick all four again.
+   */
+  async load(files: File[], { append = false }: { append?: boolean } = {}): Promise<void> {
     if (files.length === 0) return;
 
     this.controller?.abort();
@@ -379,16 +407,21 @@ export class ToolRuntime {
 
       if (signal.aborted) return;
 
-      this.files = files;
-      this.buffers = decoded;
-      this.selection = { start: 0, end: decoded[0].duration };
-      this.markers = [];
+      this.files = append ? [...this.files, ...files] : files;
+      this.buffers = append ? [...this.buffers, ...decoded] : decoded;
+      // Appending must not move a selection the user has already made, and the
+      // first buffer is still the one the stage is showing.
+      if (!append) this.selection = { start: 0, end: decoded[0].duration };
+      this.markers = append ? this.markers : [];
       this.lastOutput = null;
 
       this.setBusy(false);
       this.clearStatus();
       this.showWorkspace();
-      this.mountStage();
+      // The stage shows the first buffer, which appending does not change —
+      // remounting it would tear down the waveform and stop playback for a file
+      // that is still the same file.
+      if (!append) this.mountStage();
       this.updateFileMeta();
       this.updateSize();
       this.el.chain?.setAttribute('hidden', '');

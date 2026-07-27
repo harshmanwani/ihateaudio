@@ -6,7 +6,7 @@ import { getTool } from '../data/tools';
 const tool = getTool('crossfade-joiner');
 
 const steps = [
-  'Drop every file you want blended together in one go. They are decoded on your machine, so a set of full-length tracks opens as fast as a set of clips.',
+  'Drop the files you want blended together. They are decoded on your machine, so a set of full-length tracks opens as fast as a set of clips, and Add files brings in more without disturbing the order you have set.',
   'Arrange them in playing order. Drag a row by its handle, or move it with the up and down buttons, which work from the keyboard.',
   'Set the crossfade length. Each join overlaps by that amount, so the finished file is shorter than the parts added together. The running total shows by how much.',
   'Choose a format and download. Every join is rendered with an equal-power blend, so the level stays steady straight through the transition.',
@@ -202,6 +202,8 @@ const faq = [
   let order: number[] = [];
   let names: string[] = [];
   let lengths: number[] = [];
+  /** Set once the controls are bound, so adding files does not bind them twice. */
+  let wired = false;
 
   /**
    * The join diagram.
@@ -397,7 +399,19 @@ const faq = [
       const totalOut = root.querySelector<HTMLElement>('[data-total]');
       if (!list) return;
 
-      order = ctx.buffers.map((_, index) => index);
+      /*
+        Adding files re-runs onReady, so the arrangement has to survive it.
+
+        Rebuilding order from scratch would silently undo any reordering the
+        moment a fourth track was added, which is the worst possible time to
+        lose it. Existing positions are kept and the newcomers go on the end,
+        where they were asked for.
+      */
+      const known = order.filter((index) => index < ctx.buffers.length);
+      order = [
+        ...known,
+        ...ctx.buffers.map((_, index) => index).filter((index) => !known.includes(index)),
+      ];
       names = ctx.files.map((file, index) => file?.name ?? `Track ${index + 1}`);
       lengths = ctx.buffers.map((buffer) => buffer.duration);
 
@@ -553,23 +567,36 @@ const faq = [
         fadeNum.value = fade.value;
       }
 
-      fade?.addEventListener('input', () => {
-        if (fadeNum) fadeNum.value = fade.value;
-        paintFade();
-      });
-
-      fadeNum?.addEventListener('input', () => {
-        if (fade) fade.value = fadeNum.value;
-        paintFade();
-      });
-
-      fadeNum?.addEventListener('change', () => {
-        if (fade && fadeNum) fadeNum.value = fade.value;
-      });
-
-      // The canvas has no width until the workspace is on screen.
+      // The canvas has no width until the workspace is on screen. Runs on every
+      // ready, because adding a file changes what there is to draw.
       requestAnimationFrame(showTotal);
-      if (joinPanel) new ResizeObserver(showTotal).observe(joinPanel);
+
+      /*
+        onReady runs again whenever files are added, but the slider is the same
+        element each time. Binding again would stack a second handler on it, and
+        the observer would fire the redraw twice. The handlers below close over
+        the first pass, which is fine — order and lengths are module state, and
+        the elements never change.
+      */
+      if (!wired) {
+        wired = true;
+
+        fade?.addEventListener('input', () => {
+          if (fadeNum) fadeNum.value = fade.value;
+          paintFade();
+        });
+
+        fadeNum?.addEventListener('input', () => {
+          if (fade) fade.value = fadeNum.value;
+          paintFade();
+        });
+
+        fadeNum?.addEventListener('change', () => {
+          if (fade && fadeNum) fadeNum.value = fade.value;
+        });
+
+        if (joinPanel) new ResizeObserver(showTotal).observe(joinPanel);
+      }
 
       paintFade();
     },

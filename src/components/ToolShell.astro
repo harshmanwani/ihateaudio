@@ -131,11 +131,37 @@ const formats = video
         <div class="filebar__name" data-filename></div>
         <div class="filebar__meta" data-filemeta></div>
       </div>
+      {
+        /*
+          Multi-file tools need a way back to the file picker.
+
+          The drop zone is hidden once the workspace opens, so on a joiner the
+          only route to a fourth track was to clear everything and re-pick all
+          four. This adds to what is loaded rather than replacing it, which is
+          why it is a separate control from Clear rather than a second use of
+          the same one.
+        */
+        multiple && (
+          <button type="button" class="btn btn--ghost btn--sm" data-add-files>
+            <Icon name="plus" size={16} />
+            <span aria-hidden="true">Add files</span>
+            <span class="visually-hidden">Add more files to the ones already loaded</span>
+          </button>
+        )
+      }
       <button type="button" class="btn btn--ghost btn--sm" data-reset>
         <Icon name="x" size={16} />
         <span class="visually-hidden">Remove file and start over</span>
         <span aria-hidden="true">Clear</span>
       </button>
+      <input
+        type="file"
+        data-add-input
+        tabindex="-1"
+        aria-hidden="true"
+        hidden
+        multiple={multiple}
+      />
     </div>
 
     {
