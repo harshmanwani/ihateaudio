@@ -1,6 +1,7 @@
 ---
 import ToolPage from '../layouts/ToolPage.astro';
 import ToolShell from '../components/ToolShell.astro';
+import RunAction from '../components/RunAction.astro';
 import AiSetup from '../components/AiSetup.astro';
 import Icon from '../components/Icon.astro';
 import { getTool } from '../data/tools';
@@ -56,12 +57,17 @@ const faq = [
         </span>
       </div>
 
-      <div class="controls__full">
-        <button type="button" class="btn btn--solid btn--lg" data-generate>
-          <Icon name="closed-captioning" size={18} />
-          Generate subtitles
-        </button>
-      </div>
+      {/* preview mode, because the output of this tool is not a file the export
+          bar can save — it is a list of cues plus the .srt and .vtt buttons
+          below. Running it must therefore not deliver anything. */}
+      <RunAction
+        icon="closed-captioning"
+        mode="preview"
+        label="Generate subtitles"
+        busy="Listening for the timings"
+        hint="Runs on your device. Nothing is downloaded until you pick .srt or .vtt."
+        done="Done. The cues are below — check the timings, then download .srt or .vtt."
+      />
 
       <AiSetup
         bytes={tool.modelBytes ?? 0}
@@ -182,34 +188,48 @@ const faq = [
     background: var(--surface);
   }
 
-  .cue {
+  /*
+   * :global on every cue selector, because the rows are built in JavaScript.
+   *
+   * Astro scopes a <style> block by stamping a hash attribute onto the elements
+   * in its template, and elements created later with createElement never get it
+   * — so none of this reached the cue list at all. The visible symptom was a
+   * timecode running straight into its subtitle with no gap, but nothing here
+   * was applying: no grid, no padding, no dividers. Same reason StemPanel marks
+   * its .stem rules global.
+   */
+  :global(.cue) {
     display: grid;
-    grid-template-columns: 8.5rem 1fr;
+    /* minmax rather than a fixed track, which would not grow for a long
+       timecode and would let it eat the gap. */
+    grid-template-columns: minmax(8.5rem, max-content) 1fr;
     gap: var(--s3);
     padding: var(--s3) var(--s4);
     font-size: var(--t-ui);
     line-height: 1.55;
   }
 
-  .cue + .cue {
+  :global(.cue + .cue) {
     border-top: 1px solid var(--line);
   }
 
-  .cue__time {
+  :global(.cue__time) {
     font-variant-numeric: tabular-nums;
     font-size: var(--t-small);
     color: var(--ink-2);
+    /* The arrow must never be a wrap point. */
+    white-space: nowrap;
   }
 
   /* A cue too short to read is the most common defect in automatic subtitles, so
      it is flagged rather than left for someone to discover on screen. */
-  .cue[data-tight='true'] .cue__time {
+  :global(.cue[data-tight='true'] .cue__time) {
     color: var(--cat-vivid, var(--brand));
     font-weight: 600;
   }
 
   @media (max-width: 560px) {
-    .cue {
+    :global(.cue) {
       grid-template-columns: 1fr;
       gap: 2px;
     }
@@ -256,13 +276,6 @@ const faq = [
         })
       );
 
-      const button = runtime.root.querySelector<HTMLButtonElement>('[data-generate]');
-      button?.addEventListener('click', () => {
-        button.disabled = true;
-        void runtime.run().finally(() => {
-          button.disabled = false;
-        });
-      });
     },
 
     async process(ctx) {

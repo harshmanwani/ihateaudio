@@ -127,9 +127,53 @@ export async function separate(
       primary?: [Float32Array, Float32Array];
       complement?: [Float32Array, Float32Array];
     }>((resolve, reject) => {
+      /**
+       * Watchdog, because a worker can die without telling anyone.
+       *
+       * The `error` event covers a worker that throws. It does not cover a worker
+       * the browser kills, which is what happens when a long track exhausts
+       * memory: the thread simply stops, no event fires on this side, and the
+       * promise below is left pending for ever. That is the separation that
+       * "keeps going and never finishes" — nothing is running, but nothing said
+       * so either.
+       *
+       * The worker reports progress per chunk, so silence is the signal. Startup
+       * gets a long allowance because building the ONNX session out of a 64 MB
+       * model is genuinely slow on a modest machine; once chunks are arriving,
+       * a whole minute without one means it is gone.
+       */
+      const STARTUP_MS = 120_000;
+      const STALL_MS = 60_000;
+      let timer = 0;
+      let started = false;
+
+      const finish = (): void => {
+        clearTimeout(timer);
+        signal?.removeEventListener('abort', abort);
+      };
+
+      const watch = (ms: number): void => {
+        clearTimeout(timer);
+        timer = self.setTimeout(() => {
+          finish();
+          worker.terminate();
+          reject(
+            new Error(
+              started
+                ? 'Separation stopped responding partway through. On a long track this is ' +
+                  'almost always the browser running out of memory. Try a shorter section, ' +
+                  'or close other tabs and start again.'
+                : 'The AI engine did not start. This is usually memory pressure or an ' +
+                  'extension blocking WebAssembly. Close other tabs and try again.'
+            )
+          );
+        }, ms);
+      };
+
       const abort = (): void => {
         // Terminating is the point of doing this in a worker: it stops the
         // arithmetic immediately rather than waiting for the current chunk.
+        finish();
         worker.terminate();
         reject(new DOMException('Aborted', 'AbortError'));
       };
@@ -138,24 +182,36 @@ export async function separate(
       worker.addEventListener('message', (event: MessageEvent<SeparateResponse>) => {
         const message = event.data;
         if (message.type === 'progress') {
+          started = true;
+          watch(STALL_MS);
           onStage?.({
             phase: 'separating',
             ratio: message.total ? message.done / message.total : null,
           });
         } else if (message.type === 'loaded') {
+          started = true;
+          watch(STALL_MS);
           onStage?.({ phase: 'separating', ratio: 0 });
         } else if (message.type === 'error') {
-          signal?.removeEventListener('abort', abort);
+          finish();
           reject(new Error(message.message));
         } else if (message.type === 'done') {
-          signal?.removeEventListener('abort', abort);
+          finish();
           resolve({ primary: message.primary, complement: message.complement });
         }
       });
 
       worker.addEventListener('error', (event) => {
-        signal?.removeEventListener('abort', abort);
+        finish();
         reject(new Error(event.message || 'The AI engine failed to start.'));
+      });
+
+      // A structured-clone failure on the way back would otherwise be silent, and
+      // silence here is indistinguishable from the hang above.
+      worker.addEventListener('messageerror', () => {
+        finish();
+        worker.terminate();
+        reject(new Error('The separated audio could not be handed back from the worker.'));
       });
 
       const request: SeparateRequest = { model, weights, channels, want };
@@ -164,6 +220,7 @@ export async function separate(
       // copy so the next tool on the page would find 0 bytes. The channels are
       // ours and are transferred.
       worker.postMessage(request, [channels[0].buffer, channels[1].buffer]);
+      watch(STARTUP_MS);
     });
 
     onStage?.({ phase: 'finishing', ratio: null });

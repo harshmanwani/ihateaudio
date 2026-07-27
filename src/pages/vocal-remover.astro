@@ -2,6 +2,7 @@
 import ToolPage from '../layouts/ToolPage.astro';
 import ToolShell from '../components/ToolShell.astro';
 import AiSetup from '../components/AiSetup.astro';
+import RunAction from '../components/RunAction.astro';
 import StemPanel from '../components/StemPanel.astro';
 import { getTool } from '../data/tools';
 
@@ -51,7 +52,9 @@ const faq = [
 ---
 
 <ToolPage slug={tool.slug} steps={steps} faq={faq}>
-  <ToolShell tool={tool} results action="Download instrumental">
+  {/* No export bar: the mixer's per-stem arrows and mix button are the download
+      surface, with the format picker beside them. */}
+  <ToolShell tool={tool} exportBar={false}>
     <div class="controls">
       <div class="controls__head">
         <span class="controls__title">Separation</span>
@@ -65,6 +68,14 @@ const faq = [
         bytes={tool.modelBytes ?? 0}
         what="It is an AI model that has learned to tell a singing voice apart from the instruments behind it, and it runs on your device rather than on a server. It is the same one the acapella extractor uses."
         speed="Separating takes about as long as the song itself, so a four minute track takes roughly four minutes."
+      />
+
+      <RunAction
+        icon="microphone-slash"
+        label="Separate the vocals"
+        busy="Separating"
+        hint="Nothing is downloaded until you have heard the result."
+        done="Separated. Hear both halves below, then download."
       />
 
       {/* Both halves come out of the one pass, so the panel below always shows
@@ -211,11 +222,15 @@ const faq = [
           onStage: (stage) => {
             if (stage.phase === 'separating') {
               panel?.setPhase('Separating', stage.ratio);
-              if (stage.ratio !== null) ctx.progress(stage.ratio);
+              ctx.progress(stage.ratio ?? 0, 'Separating');
+            } else if (stage.phase === 'downloading') {
+              ctx.progress(stage.ratio ?? 0, 'Downloading the AI model (one time)');
             } else if (stage.phase === 'starting') {
               panel?.setPhase('Starting the engine', null);
+              ctx.progress(0, 'Starting the engine');
             } else if (stage.phase === 'finishing') {
               panel?.setPhase('Writing the audio', null);
+              ctx.progress(1, 'Writing the audio');
             }
           },
         }
@@ -230,22 +245,22 @@ const faq = [
       // The panel is the real result. It lets both halves be heard against each
       // other, soloed, balanced and downloaded — which is the only way to judge
       // whether the separation worked, and is far more use than two files landing
-      // in the downloads folder.
+      // in the downloads folder. The instrumental row's arrow is the download
+      // most people came for.
       mountStemPanel(
-        runtime.root.querySelector<HTMLElement>('[data-stem-panel]'),
+        // "mixer" explicitly: ToolShell renders a second, listen-only panel (the
+        // result strip) on every tool, and a bare [data-stem-panel] could match it.
+        runtime.root.querySelector<HTMLElement>('[data-stem-panel="mixer"]'),
         [
           { id: 'instrumental', name: 'Music', buffer: result.primary },
           { id: 'vocals', name: 'Vocal', buffer: result.complement },
         ],
         {
           baseName: baseName(ctx.files[0]?.name ?? 'track'),
-          format: () => runtime.getFormat(),
           onError: (message) => runtime.showNote(message, 'warn'),
         }
       );
 
-      // The export bar still delivers the instrumental, since that is what the
-      // button says and what most people came for.
       return result.primary;
     },
   });

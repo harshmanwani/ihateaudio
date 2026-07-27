@@ -1,6 +1,7 @@
 ---
 import ToolPage from '../layouts/ToolPage.astro';
 import ToolShell from '../components/ToolShell.astro';
+import RunAction from '../components/RunAction.astro';
 import AiSetup from '../components/AiSetup.astro';
 import Icon from '../components/Icon.astro';
 import { getTool } from '../data/tools';
@@ -78,12 +79,14 @@ const faq = [
           the output is text. So the action lives here, and it calls the same
           runtime.run() the bar would have — keeping the progress reporting, the
           cancel behaviour and the error surface that come with it. */}
-      <div class="controls__full">
-        <button type="button" class="btn btn--solid btn--lg" data-transcribe>
-          <Icon name="text-t" size={18} />
-          Transcribe
-        </button>
-      </div>
+      <RunAction
+        icon="text-t"
+        mode="preview"
+        label="Transcribe"
+        busy="Listening"
+        hint="Runs on your device. Nothing is downloaded until you copy or save the text."
+        done="Done. The transcript is below — read it, then copy or save it."
+      />
 
       <div class="controls__full transcript" data-transcript hidden>
         <div class="transcript__bar">
@@ -242,13 +245,6 @@ const faq = [
         })
       );
 
-      const button = runtime.root.querySelector<HTMLButtonElement>('[data-transcribe]');
-      button?.addEventListener('click', () => {
-        button.disabled = true;
-        void runtime.run().finally(() => {
-          button.disabled = false;
-        });
-      });
     },
 
     async process(ctx) {

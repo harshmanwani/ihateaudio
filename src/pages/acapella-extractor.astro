@@ -2,6 +2,7 @@
 import ToolPage from '../layouts/ToolPage.astro';
 import ToolShell from '../components/ToolShell.astro';
 import AiSetup from '../components/AiSetup.astro';
+import RunAction from '../components/RunAction.astro';
 import { getTool } from '../data/tools';
 
 const tool = getTool('acapella-extractor');
@@ -42,7 +43,10 @@ const faq = [
 ---
 
 <ToolPage slug={tool.slug} steps={steps} faq={faq}>
-  <ToolShell tool={tool} results action="Download vocals">
+  {/* Unlike the other separation pages this one keeps the export bar, because it
+      has no mixer (mounting one hangs the tab — see drafts/README.md) and the bar
+      is therefore the only download. */}
+  <ToolShell tool={tool} action="Download vocals">
     <div class="controls">
       <div class="controls__head">
         <span class="controls__title">Extraction</span>
@@ -56,6 +60,14 @@ const faq = [
         bytes={tool.modelBytes ?? 0}
         what="It is an AI model that has learned to tell a singing voice apart from the instruments behind it, and it runs on your device rather than on a server. It is the same one the vocal remover uses."
         speed="Extracting takes about as long as the song itself, so a four minute track takes roughly four minutes."
+      />
+
+      <RunAction
+        icon="microphone-stage"
+        label="Extract the vocals"
+        busy="Extracting"
+        hint="Nothing is downloaded until you have heard the result."
+        done="Extracted. The vocal has its own player below — listen, then download."
       />
     </div>
   </ToolShell>
@@ -155,11 +167,15 @@ const faq = [
           onStage: (stage) => {
             if (stage.phase === 'separating') {
               panel?.setPhase('Extracting the vocal', stage.ratio);
-              if (stage.ratio !== null) ctx.progress(stage.ratio);
+              ctx.progress(stage.ratio ?? 0, 'Extracting the vocal');
+            } else if (stage.phase === 'downloading') {
+              ctx.progress(stage.ratio ?? 0, 'Downloading the AI model (one time)');
             } else if (stage.phase === 'starting') {
               panel?.setPhase('Starting the engine', null);
+              ctx.progress(0, 'Starting the engine');
             } else if (stage.phase === 'finishing') {
               panel?.setPhase('Writing the audio', null);
+              ctx.progress(1, 'Writing the audio');
             }
           },
         }
@@ -170,12 +186,13 @@ const faq = [
         throw new Error('extraction produced nothing');
       }
 
-      // The mixer is deliberately absent here for now. Mounting it on this page
-      // hangs the tab — reproducibly, locally and in production, while the
+      // The full mixer is deliberately absent here for now. Mounting it on this
+      // page hangs the tab — reproducibly, locally and in production, while the
       // structurally identical vocal remover is fine — and a frozen page is far
-      // worse than a missing convenience. The extractor works; it just hands you
-      // the vocal rather than letting you audition it against the backing. See
-      // drafts/README.md for what has been eliminated so far.
+      // worse than a missing convenience. See drafts/README.md for what has been
+      // eliminated so far. The result strip is the audition instead: the vocal
+      // gets its own player under the controls, alongside the original above.
+      runtime.showResult(result.complement, 'Vocal');
       return result.complement;
     },
   });

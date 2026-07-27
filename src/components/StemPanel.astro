@@ -10,14 +10,26 @@
  *
  * The markup is empty on purpose — rows are built by src/lib/ai/stem-panel.ts once
  * the stems exist, because how many there are is not known until then.
+ *
+ * Two purposes share this component. 'mixer' is the full thing above. 'result' is
+ * the same player rendered by ToolShell on every tool as the landing place for a
+ * processed result — original stays in the main transport, result plays here,
+ * side by side like the splitter's stems. A result strip is listen-only, so it
+ * has no foot: downloading stays with the export bar it sits above.
  */
 import Icon from './Icon.astro';
+
+interface Props {
+  purpose?: 'mixer' | 'result';
+}
+
+const { purpose = 'mixer' } = Astro.props;
 ---
 
 {/* controls__full because this always sits inside the .controls grid, whose
     columns are 236px minimums — without it the mixer is squeezed into one column
     and the waveforms have no width to paint into. */}
-<div class="stems controls__full" data-stem-panel hidden>
+<div class="stems controls__full" data-stem-panel={purpose} hidden>
   <div class="stems__transport">
     {/* Both glyphs ship and CSS picks one, so the button never re-renders and
         therefore never loses focus in the middle of playback. */}
@@ -45,17 +57,65 @@ import Icon from './Icon.astro';
     <span class="stems__time tnum" data-stem-time>0:00 / 0:00</span>
   </div>
 
-  <div class="stems__list" data-stem-list></div>
+  {/* The stage holds the tracks plus everything that has to float over them at a
+      time position. The playhead lives here rather than inside .stems__list
+      because the list clips its own overflow to keep its rounded corners, which
+      would cut the head and its time bubble off at the top. */}
+  {/* Focusable so the playhead can be driven from the keyboard. The pointer
+      surfaces are canvases, which are not reachable by tab, so without this the
+      only keyboard control over position would be none. */}
+  <div
+    class="stems__stage"
+    data-stem-stage
+    tabindex="0"
+    role="group"
+    aria-label="Track timeline. Arrow keys move through the audio, Home and End jump to the start and finish."
+  >
+    {/* Empty strip above the tracks: the room the bubble and the grip ride in. */}
+    <div class="stems__ruler" aria-hidden="true"></div>
 
-  <div class="stems__foot">
-    <p class="stems__hint" data-stem-hint>
-      Solo a track to hear it alone. What you can hear is what gets mixed down.
-    </p>
-    <button type="button" class="btn btn--solid" data-stem-mix>
-      <Icon name="download-simple" size={17} />
-      Download the mix
-    </button>
+    <div class="stems__list" data-stem-list></div>
+
+    {/* Everything below is decoration over a canvas that is already painted, so
+        none of it takes pointer events — seeking is bound to the canvases
+        themselves, which is the only way to avoid swallowing clicks meant for the
+        mute, solo and level controls sitting in the same rows. */}
+    <div class="stems__wash" aria-hidden="true"></div>
+
+    <div class="stems__ghost" data-stem-ghost hidden aria-hidden="true">
+      <span class="stems__ghost-time tnum" data-stem-ghost-time></span>
+    </div>
+
+    <div class="stems__head" data-stem-head hidden aria-hidden="true">
+      <span class="stems__head-bubble tnum" data-stem-head-time>0:00.0</span>
+      <span class="stems__head-grip"></span>
+    </div>
   </div>
+
+  {
+    purpose === 'mixer' && (
+      <div class="stems__foot">
+        <p class="stems__hint" data-stem-hint>
+          Solo a track to hear it alone. What you can hear is what gets mixed down.
+        </p>
+        {/* The mixer is the only download surface on these pages — the shared export
+            bar is switched off, because the per-stem arrows and the mix button
+            already cover everything it did, and four ways to save one result was
+            confusing people. The format picker therefore lives here, next to the
+            buttons that use it. */}
+        <div class="stems__save">
+          <select class="select" data-stem-format aria-label="Download format">
+            <option value="wav" selected>WAV</option>
+            <option value="mp3">MP3</option>
+          </select>
+          <button type="button" class="btn btn--solid" data-stem-mix>
+            <Icon name="download-simple" size={17} />
+            Download the mix
+          </button>
+        </div>
+      </div>
+    )
+  }
 </div>
 
 <style>
@@ -147,6 +207,157 @@ import Icon from './Icon.astro';
     font-variant-numeric: tabular-nums;
   }
 
+  /* ---------- stage: the tracks, and what floats over them ---------- */
+
+  .stems__stage {
+    position: relative;
+
+    /*
+     * Geometry of the waveform column, measured once per layout by
+     * stem-panel.ts and written here as custom properties.
+     *
+     * It has to be measured rather than hardcoded because the column is in a
+     * different place at each breakpoint: on a wide screen the waveform is the
+     * third grid column, after the name and the controls; under 720px it is a
+     * full-width row of its own. Handing CSS the two numbers means the
+     * per-frame update from the animation loop is a single custom property
+     * write, with no layout read and no arithmetic in JavaScript.
+     */
+    --wave-left: 0px;
+    --wave-width: 0px;
+    /* 0..1, playback position and pointer position. Unitless so they can
+       multiply a length in calc(). */
+    --play: 0;
+    --hover: 0;
+    /* Height of the strip above the tracks. Named because four rules depend on
+       it and a mismatch shows up as a playhead that starts in mid-air. */
+    --ruler: 34px;
+  }
+
+  .stems__stage:focus-visible {
+    outline: 2px solid var(--cat-vivid, var(--brand));
+    outline-offset: 4px;
+    border-radius: var(--r-md);
+  }
+
+  /* Empty strip above the first track: the room the bubble and grip ride in,
+     so neither has to overlap the top track to be visible. */
+  .stems__ruler {
+    height: var(--ruler);
+  }
+
+  /* The played region, lightened rather than the unplayed region dimmed — the
+     waveforms are already the brightest thing in a dark strip, and dimming them
+     would fight the mute/solo dimming that means something. */
+  .stems__wash {
+    position: absolute;
+    top: var(--ruler);
+    bottom: 0;
+    left: var(--wave-left);
+    width: calc(var(--wave-width) * var(--play));
+    background: color-mix(in oklch, var(--stage-ink, #fff) 7%, transparent);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .stems__head,
+  .stems__ghost {
+    position: absolute;
+    pointer-events: none;
+    z-index: 2;
+    /* Transform rather than `left`, so moving it is a composite step and never
+       relayouts four canvases sixty times a second. */
+    will-change: transform;
+  }
+
+  /*
+   * The line covers the tracks only, and everything that has to sit above them
+   * lives in the ruler in the opposite colour.
+   *
+   * That split is the whole trick here. The tracks are a dark strip and the
+   * ruler is the page, which is white, so a single colour cannot work on both:
+   * the first version drew a white line and a white grip straight up through the
+   * ruler and both simply vanished against the page. Light on the strip, dark on
+   * the page.
+   */
+  .stems__head {
+    top: var(--ruler);
+    bottom: 0;
+    width: 2px;
+    /* Centres the 2px line on the exact sample position rather than starting it
+       there, which would put playback half a pixel late at every zoom level. */
+    margin-left: -1px;
+    background: var(--stage-ink, #fff);
+    box-shadow: 0 0 12px color-mix(in oklch, var(--cat-vivid, var(--brand)) 65%, transparent);
+    transform: translateX(calc(var(--wave-left) + var(--wave-width) * var(--play)));
+  }
+
+  .stems__head-grip {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    margin-bottom: 2px;
+    width: 10px;
+    height: 10px;
+    transform: translateX(-50%) rotate(45deg);
+    border-radius: 2px;
+    background: var(--ink);
+  }
+
+  .stems__head-bubble {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 10px;
+    padding: 2px var(--s2);
+    border-radius: var(--r-full);
+    background: var(--ink);
+    color: var(--bg);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    line-height: 1.6;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Where a click would land, shown before it is made. Deliberately much fainter
+     than the head: it is a preview, and two lines of equal weight would be two
+     playheads. */
+  .stems__ghost {
+    top: var(--ruler);
+    bottom: 0;
+    width: 1px;
+    background: color-mix(in oklch, var(--stage-ink, #fff) 38%, transparent);
+    transform: translateX(calc(var(--wave-left) + var(--wave-width) * var(--hover)));
+  }
+
+  /* Also inverted, and for the same reason as the bubble: it sits in the ruler,
+     over the page rather than over the strip. Muted against the bubble so the
+     preview never competes with the position that is actually playing. */
+  .stems__ghost-time {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 4px;
+    padding: 1px 6px;
+    border-radius: var(--r-sm);
+    background: color-mix(in oklch, var(--ink) 62%, transparent);
+    color: var(--bg);
+    font-size: 10px;
+    font-weight: 600;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Seeking is bound to the canvases, so they get the cursor that says so. */
+  :global(.stem__wave) {
+    cursor: pointer;
+    touch-action: none;
+  }
+
   /* ---------- tracks ---------- */
 
   .stems__list {
@@ -172,6 +383,11 @@ import Icon from './Icon.astro';
 
   :global(.stem + .stem) {
     border-top: 1px solid color-mix(in oklch, var(--line) 60%, transparent);
+  }
+
+  /* A listen-only row has no controls column: just the name and the waveform. */
+  :global(.stem--listen) {
+    grid-template-columns: 7.5rem 1fr;
   }
 
   /* Muted, or not-soloed, reads as dimmed rather than hidden — you still need to
@@ -265,6 +481,13 @@ import Icon from './Icon.astro';
     margin: 0;
   }
 
+  .stems__save {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    flex-wrap: wrap;
+  }
+
   @media (max-width: 720px) {
     :global(.stem) {
       grid-template-columns: 1fr auto;
@@ -272,6 +495,13 @@ import Icon from './Icon.astro';
         'name controls'
         'wave wave';
       gap: var(--s2) var(--s3);
+    }
+
+    :global(.stem--listen) {
+      grid-template-columns: 1fr;
+      grid-template-areas:
+        'name'
+        'wave';
     }
 
     :global(.stem__name) {

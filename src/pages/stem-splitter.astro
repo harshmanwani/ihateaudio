@@ -2,6 +2,7 @@
 import ToolPage from '../layouts/ToolPage.astro';
 import ToolShell from '../components/ToolShell.astro';
 import AiSetup from '../components/AiSetup.astro';
+import RunAction from '../components/RunAction.astro';
 import StemPanel from '../components/StemPanel.astro';
 import { getTool } from '../data/tools';
 
@@ -43,7 +44,10 @@ const faq = [
 ---
 
 <ToolPage slug={tool.slug} steps={steps} faq={faq}>
-  <ToolShell tool={tool} results action="Split into stems">
+  {/* No export bar: the mixer is the one download surface. It has a per-stem
+      arrow, a mix button and its own format picker, and a second big Download
+      underneath all of that was producing four ways to save one result. */}
+  <ToolShell tool={tool} exportBar={false}>
     <div class="controls">
       <div class="controls__head">
         <span class="controls__title">Stems</span>
@@ -79,6 +83,14 @@ const faq = [
         bytes={0}
         what="Each part you tick is a separate 28 MB download, saved afterwards so it only happens once. They are AI models that have learned what a voice, drums or a bass sound like on their own, and they run on your device rather than on a server."
         speed="Expect about the length of the song for each part you picked."
+      />
+
+      <RunAction
+        icon="cards-three"
+        label="Split into stems"
+        busy="Splitting"
+        hint="Nothing is downloaded until you have heard the result."
+        done="Split. Listen to the parts below, then download the ones you want."
       />
 
       <StemPanel />
@@ -235,47 +247,92 @@ const faq = [
       await panel?.ensure(ctx.signal);
 
       const outputs: { id: string; name: string; buffer: AudioBuffer }[] = [];
+      const failed: string[] = [];
 
       for (let i = 0; i < chosen.length; i += 1) {
         const stem = chosen[i]!;
         const model: MdxModel = KUIELAB[stem.key];
+        const label = `${stem.name} — ${i + 1} of ${chosen.length}`;
 
-        const result = await separate(
-          ctx.buffer,
-          model,
-          { primary: true, complement: false },
-          {
-            signal: ctx.signal,
-            onStage: (stage) => {
-              const label = `${stem.name} (${i + 1} of ${chosen.length})`;
-              if (stage.phase === 'separating') {
-                panel?.setPhase(label, stage.ratio);
-                // Overall progress spans every stem, not just the current one, so
-                // the bar does not restart four times.
-                if (stage.ratio !== null) {
-                  ctx.progress((i + stage.ratio) / chosen.length);
+        /**
+         * One stem failing does not lose the others.
+         *
+         * Each stem is an independent model and an independent pass, and the one
+         * most likely to fail is the one most likely to exhaust memory (bass, whose
+         * transform is the largest). Throwing the whole run away because the fourth
+         * pass died means throwing away three that took minutes and worked. A
+         * cancel still stops everything, because that is what was asked for.
+         */
+        try {
+          const result = await separate(
+            ctx.buffer,
+            model,
+            { primary: true, complement: false },
+            {
+              signal: ctx.signal,
+              onStage: (stage) => {
+                if (stage.phase === 'separating') {
+                  panel?.setPhase(label, stage.ratio);
+                  // Overall progress spans every stem, not just the current one,
+                  // so the bar does not restart four times.
+                  ctx.progress(
+                    (i + (stage.ratio ?? 0)) / chosen.length,
+                    `Separating ${label}`
+                  );
+                } else if (stage.phase === 'downloading') {
+                  ctx.progress(i / chosen.length, `Downloading the ${stem.name.toLowerCase()} model`);
+                } else if (stage.phase === 'starting') {
+                  panel?.setPhase(`Loading the ${stem.name.toLowerCase()} model`, null);
+                  ctx.progress(i / chosen.length, `Loading the ${stem.name.toLowerCase()} model`);
+                } else if (stage.phase === 'finishing') {
+                  ctx.progress((i + 1) / chosen.length, `Writing ${stem.name.toLowerCase()}`);
                 }
-              } else if (stage.phase === 'starting') {
-                panel?.setPhase(`Loading the ${stem.name.toLowerCase()} model`, null);
-              }
-            },
-          }
-        );
+              },
+            }
+          );
 
-        if (result.primary) {
-          outputs.push({ id: stem.key, name: stem.name, buffer: result.primary });
+          if (result.primary) {
+            outputs.push({ id: stem.key, name: stem.name, buffer: result.primary });
+          } else {
+            failed.push(stem.name);
+          }
+        } catch (error) {
+          if (error instanceof DOMException && error.name === 'AbortError') throw error;
+          failed.push(stem.name);
+          // Keep the reason in the console for anyone who goes looking; the page
+          // gets the short version below.
+          console.error(`${stem.name} stem failed`, error);
         }
       }
 
       panel?.finish();
-      if (outputs.length === 0) throw new Error('separation produced nothing');
+
+      if (outputs.length === 0) {
+        throw new Error(
+          failed.length === 1
+            ? `The ${failed[0]!.toLowerCase()} stem could not be separated. This is usually the ` +
+              'browser running out of memory — try a shorter section, or close other tabs.'
+            : 'None of the stems could be separated. This is usually the browser running out ' +
+              'of memory on a long track — try trimming it first, or asking for fewer stems.'
+        );
+      }
+
+      if (failed.length > 0) {
+        runtime.showNote(
+          `${failed.join(' and ')} could not be separated, so ${failed.length === 1 ? 'it is' : 'they are'} ` +
+            `missing below. The rest came through. Running just ${failed.length === 1 ? 'that stem' : 'those stems'} ` +
+            'on its own, or on a shorter section, usually works.',
+          'warn'
+        );
+      }
 
       // The panel is the point of this tool. Four separate downloads tell you
       // nothing about whether the split worked; soloing the bass and hearing
       // whether the kick came with it tells you immediately.
-      mountStemPanel(runtime.root.querySelector<HTMLElement>('[data-stem-panel]'), outputs, {
+      // "mixer" explicitly: ToolShell renders a second, listen-only panel (the
+      // result strip) on every tool, and a bare [data-stem-panel] could match it.
+      mountStemPanel(runtime.root.querySelector<HTMLElement>('[data-stem-panel="mixer"]'), outputs, {
         baseName: baseName(ctx.files[0]?.name ?? 'track'),
-        format: () => runtime.getFormat(),
         onError: (message) => runtime.showNote(message, 'warn'),
       });
 
