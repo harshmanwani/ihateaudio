@@ -85,15 +85,28 @@ const schema = [
     */}
     <a
       class="crosspromo"
-      href="https://supercut.cc"
+      href="https://www.supercut.cc"
       target="_blank"
       rel="noopener"
       data-crosspromo
     >
+      {/*
+        Supercut's own mark, the "Stack": three tonal-blue layers and a play
+        glyph, copied from its BrandMark component. Static here — the original
+        animates on mount and on hover through classes defined in that app's
+        stylesheet, and a mark that reaches for animations which do not exist is
+        worse than one that never moves.
+      */}
       <span class="crosspromo__mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none">
-          <rect x="2.5" y="4.5" width="19" height="15" rx="3.5" stroke="currentColor" stroke-width="1.8"></rect>
-          <path d="M10 9.4v5.2l4.4-2.6z" fill="currentColor"></path>
+        <svg viewBox="0 0 128 128" width="24" height="24" focusable="false">
+          <rect x="14" y="14" width="68" height="68" rx="17" fill="#0a4099"></rect>
+          <rect x="30" y="30" width="68" height="68" rx="17" fill="#1162e0"></rect>
+          <rect x="46" y="46" width="68" height="68" rx="17" fill="#1f7afe"></rect>
+          <path
+            d="M46 62 a16 16 0 0 1 16-16 h36 a16 16 0 0 1 16 16 v3 H46 Z"
+            fill="#fff"
+            opacity="0.14"></path>
+          <path d="M73 67 q-2 -1 -2 2 v22 q0 3 2 2 l20 -11 q3 -2 0 -4 Z" fill="#fff"></path>
         </svg>
       </span>
       <span class="crosspromo__text">
@@ -313,18 +326,28 @@ const schema = [
      else. Everything green on this page is a tool you can use here; this is not
      one, and the colour is doing that work before the words are read. */
   .crosspromo {
-    --sc: oklch(0.6 0.18 253);
-    --sc-ink: oklch(0.45 0.14 253);
+    /* Supercut's own blues, taken from its brand mark rather than approximated:
+       the front layer of the stack, and the back layer for text that has to
+       carry contrast on a near-white pill. */
+    --sc: #1f7afe;
+    --sc-ink: #0a4099;
 
     display: flex;
     width: fit-content;
     max-width: 100%;
     align-items: center;
     gap: var(--s2);
-    margin: 0 auto var(--s6);
+    /* Measured: with no top margin the pill sat flush against the header, and
+       the hero's own 40px of top padding put it 64px clear of the headline. A
+       matched 20px either side reads as one small piece of furniture rather
+       than a band with its own section. */
+    margin: var(--s5) auto 0;
     padding: 6px 12px 6px 8px;
     border-radius: 999px;
-    background: color-mix(in oklch, var(--sc) 7%, var(--surface));
+    /* Mixed into white rather than --surface: the site's surface carries a green
+       hue, so a small share of blue over it still reads mint, which is exactly
+       the impression this pill exists to avoid. */
+    background: color-mix(in oklch, var(--sc) 11%, white);
     color: var(--ink-2);
     font-size: var(--t-small);
     line-height: 1.3;
@@ -340,6 +363,10 @@ const schema = [
      border, which is a single animated property on a single element rather than
      a keyframed border. The angle property and the keyframes are already
      registered globally, so this only restates the colour. */
+  .crosspromo + .hero {
+    padding-block-start: var(--s5);
+  }
+
   .crosspromo::before {
     content: '';
     position: absolute;
@@ -369,7 +396,7 @@ const schema = [
   }
 
   .crosspromo:hover {
-    background: color-mix(in oklch, var(--sc) 13%, var(--surface));
+    background: color-mix(in oklch, var(--sc) 16%, white);
     transform: translateY(-1px);
   }
 
@@ -378,15 +405,12 @@ const schema = [
     outline-offset: 2px;
   }
 
+  /* No tint or plate behind the mark: it is already a stack of rounded squares,
+     and putting it inside a fourth one reads as a mistake. */
   .crosspromo__mark {
     display: grid;
     place-items: center;
-    width: 24px;
-    height: 24px;
     flex: none;
-    border-radius: 7px;
-    background: color-mix(in oklch, var(--sc) 16%, transparent);
-    color: var(--sc);
   }
 
   .crosspromo__text {
