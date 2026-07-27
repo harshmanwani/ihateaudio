@@ -10,7 +10,7 @@ const steps = [
   'Drop a stereo file onto the page. The tool needs two channels that differ from each other. A mono file has nothing to widen, and it will tell you so.',
   'Move the width control. One is the original, above one pushes the sides outward, and zero collapses the whole mix to the centre.',
   'Watch the line under the slider: it reports how much of the sound disappears when the result is folded down to mono, which is what happens on most phone and smart speakers.',
-  'Press play to hear the change, then back off until the image is wide but the centre still feels solid, and download.',
+  'Play the result below the controls to hear the change, then back off until the image is wide but the centre still feels solid, and download.',
 ];
 
 const faq = [
@@ -51,6 +51,33 @@ const faq = [
       <div class="controls__head">
         <span class="controls__title">Width</span>
         <span class="hint">1 is the original. Below 1 narrows toward the centre.</span>
+      </div>
+
+      {/*
+        Goniometer and correlation.
+        Width is the one control on this site whose damage is inaudible on the
+        speakers you are using and obvious on someone else's: push the side
+        signal far enough and the mix partially cancels the moment anything
+        folds it to mono. A number cannot convey that. A vectorscope shows the
+        image opening out toward the horizontal, and the correlation bar goes
+        red exactly when mono is at risk.
+      */}
+      <div class="scope controls__full" data-scope-panel>
+        <canvas class="scope__canvas" data-scope aria-hidden="true"></canvas>
+        <div class="scope__side">
+          <div class="scope__fact">
+            <span class="scope__label">Correlation</span>
+            <span class="scope__value tnum" data-corr>—</span>
+          </div>
+          <div class="scope__bar" aria-hidden="true">
+            <span class="scope__bar-scale"><i>−1</i><i>0</i><i>+1</i></span>
+            <span class="scope__bar-track">
+              <span class="scope__bar-zero"></span>
+              <span class="scope__bar-dot" data-corr-dot></span>
+            </span>
+          </div>
+          <p class="scope__note" data-corr-note></p>
+        </div>
       </div>
 
       <div class="note note--warn controls__full" data-mono-note hidden>
@@ -187,6 +214,130 @@ const faq = [
   </Fragment>
 </ToolPage>
 
+<style>
+  .scope {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s4);
+    padding: var(--s4);
+    border-radius: var(--r-md);
+    background: var(--stage-2, var(--surface));
+  }
+
+  /* Square, because the mid/side axes share a scale — a stretched scope would
+     make a centred mono signal look like a diagonal. */
+  .scope__canvas {
+    width: 240px;
+    height: 240px;
+    max-width: 100%;
+    flex: none;
+    display: block;
+  }
+
+  .scope__side {
+    flex: 1 1 12rem;
+    display: grid;
+    align-content: start;
+    gap: var(--s3);
+  }
+
+  .scope__fact {
+    display: grid;
+    gap: 2px;
+  }
+
+  .scope__label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--stage-ink-2, var(--ink-2));
+  }
+
+  .scope__value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--stage-ink, var(--ink));
+    font-variant-numeric: tabular-nums;
+  }
+
+  .scope__bar {
+    display: grid;
+    gap: 4px;
+  }
+
+  .scope__bar-scale {
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--stage-ink-2, var(--ink-2));
+    font-style: normal;
+  }
+
+  .scope__bar-scale i {
+    font-style: normal;
+  }
+
+  .scope__bar-track {
+    position: relative;
+    display: block;
+    height: 8px;
+    border-radius: var(--r-full);
+    /* Red at -1, amber through 0, green at +1: the axis is a verdict, so it
+       carries the verdict's colours rather than a neutral fill. */
+    background: linear-gradient(
+      to right,
+      var(--danger) 0%,
+      var(--accent) 45%,
+      var(--brand) 75%
+    );
+  }
+
+  .scope__bar-zero {
+    position: absolute;
+    top: -2px;
+    bottom: -2px;
+    left: 50%;
+    width: 1px;
+    background: color-mix(in oklch, var(--stage-ink, #fff) 45%, transparent);
+  }
+
+  .scope__bar-dot {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 14px;
+    height: 14px;
+    border-radius: var(--r-full);
+    background: var(--stage-ink, #fff);
+    border: 2px solid var(--stage-2, #10201a);
+    transform: translate(-50%, -50%);
+    transition: left var(--dur-micro) var(--ease);
+  }
+
+  .scope__note {
+    margin: 0;
+    font-size: var(--t-small);
+    line-height: 1.5;
+    color: var(--stage-ink-2, var(--ink-2));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .scope__bar-dot {
+      transition: none;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .scope__canvas {
+      width: 100%;
+      height: auto;
+      aspect-ratio: 1;
+    }
+  }
+</style>
+
 <script>
   import { createTool } from '../lib/tool';
   import { setStereoWidth } from '../lib/audio/effects';
@@ -226,6 +377,121 @@ const faq = [
     return { mid: Math.sqrt(midSq / n), side: Math.sqrt(sideSq / n), peak };
   }
 
+  /**
+   * Sample pairs for the scope, thinned once on load.
+   *
+   * Plotting every sample of a four-minute track is ten million points for a
+   * 240px square — indistinguishable from plotting twelve thousand, and slow
+   * enough to stutter the slider. The stride is deliberately not a round number
+   * of samples so it does not lock onto a periodic waveform and draw a Lissajous
+   * figure that is an artefact of the sampling rather than the music.
+   */
+  const SCOPE_POINTS = 12000;
+  let scopePairs: Float32Array | null = null;
+
+  function collectPairs(buffer: AudioBuffer): Float32Array {
+    if (buffer.numberOfChannels < 2) return new Float32Array(0);
+    const left = buffer.getChannelData(0);
+    const right = buffer.getChannelData(1);
+    const count = Math.min(SCOPE_POINTS, left.length);
+    const stride = Math.max(1, Math.floor(left.length / count) + 1);
+    const out = new Float32Array(Math.floor(left.length / stride) * 2);
+    let n = 0;
+    for (let i = 0; i + 1 < left.length && n + 1 < out.length; i += stride) {
+      out[n] = left[i]!;
+      out[n + 1] = right[i]!;
+      n += 2;
+    }
+    return out.subarray(0, n);
+  }
+
+  /**
+   * Pearson correlation between the channels, at the current width.
+   *
+   * +1 is mono, 0 is fully decorrelated, and negative means the channels are
+   * partly out of phase — which is the state where folding to mono cancels
+   * audible material. This is the number a mastering engineer watches while
+   * widening, and it is the only honest way to say "this far and no further".
+   */
+  function correlationAt(pairs: Float32Array, width: number): number {
+    let sumLL = 0;
+    let sumRR = 0;
+    let sumLR = 0;
+    for (let i = 0; i + 1 < pairs.length; i += 2) {
+      const mid = (pairs[i]! + pairs[i + 1]!) / 2;
+      const side = ((pairs[i]! - pairs[i + 1]!) / 2) * width;
+      const l = mid + side;
+      const r = mid - side;
+      sumLL += l * l;
+      sumRR += r * r;
+      sumLR += l * r;
+    }
+    const denom = Math.sqrt(sumLL * sumRR);
+    return denom > 1e-12 ? sumLR / denom : 1;
+  }
+
+  function drawScope(panel: HTMLElement, canvas: HTMLCanvasElement, pairs: Float32Array, width: number): void {
+    const cssSize = canvas.clientWidth;
+    if (cssSize < 1) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const size = Math.round(cssSize * dpr);
+    if (canvas.width !== size || canvas.height !== size) {
+      canvas.width = size;
+      canvas.height = size;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, size, size);
+
+    const styles = getComputedStyle(panel);
+    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
+    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+
+    const mid = size / 2;
+    // sqrt(2)/2 so a hard-panned signal at full scale still lands inside.
+    const radius = mid * 0.86;
+
+    // The frame: a circle, the vertical mono axis, and the two 45-degree
+    // diagonals where a signal sits when it is entirely in one channel.
+    context.strokeStyle = `color-mix(in oklch, ${ink} 14%, transparent)`;
+    context.lineWidth = dpr;
+    context.beginPath();
+    context.arc(mid, mid, radius, 0, Math.PI * 2);
+    context.stroke();
+    context.beginPath();
+    context.moveTo(mid, mid - radius);
+    context.lineTo(mid, mid + radius);
+    context.moveTo(mid - radius, mid);
+    context.lineTo(mid + radius, mid);
+    context.stroke();
+
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+    context.fillStyle = `color-mix(in oklch, ${ink} 42%, transparent)`;
+    context.textAlign = 'center';
+    context.fillText('M', mid, mid - radius - 5 * dpr);
+    context.textAlign = 'left';
+    context.fillText('S', mid + radius + 5 * dpr, mid + 3 * dpr);
+
+    /**
+     * Points, rotated 45 degrees into mid/side.
+     *
+     * This is what makes the display readable: with raw L on one axis and R on
+     * the other, a centred mono signal draws a diagonal, which nobody can read
+     * at a glance. Rotated, mono is a vertical line and width opens it sideways,
+     * so "wider" looks like wider.
+     */
+    context.fillStyle = `color-mix(in oklch, ${hue} 70%, transparent)`;
+    const dot = Math.max(1, dpr);
+    for (let i = 0; i + 1 < pairs.length; i += 2) {
+      const m = (pairs[i]! + pairs[i + 1]!) / 2;
+      const s = ((pairs[i]! - pairs[i + 1]!) / 2) * width;
+      const x = mid + s * radius;
+      const y = mid - m * radius;
+      context.fillRect(x, y, dot, dot);
+    }
+  }
+
   let width = 1;
   let source: AudioBuffer | null = null;
   let usable = true;
@@ -262,7 +528,37 @@ const faq = [
         timer = window.setTimeout(() => runtime.refreshPreview(), 120);
       };
 
+      const scopePanel = root.querySelector<HTMLElement>('[data-scope-panel]');
+      const scopeCanvas = root.querySelector<HTMLCanvasElement>('[data-scope]');
+      const corrValue = root.querySelector<HTMLElement>('[data-corr]');
+      const corrDot = root.querySelector<HTMLElement>('[data-corr-dot]');
+      const corrNote = root.querySelector<HTMLElement>('[data-corr-note]');
+
+      scopePairs = collectPairs(ctx.buffer);
+      if (scopePanel && scopePairs.length === 0) scopePanel.hidden = true;
+
+      /** Redrawn live: 12000 points is a couple of milliseconds. */
+      const paintScope = (): void => {
+        if (!scopePanel || !scopeCanvas || !scopePairs || scopePairs.length === 0) return;
+        drawScope(scopePanel, scopeCanvas, scopePairs, width);
+
+        const corr = correlationAt(scopePairs, width);
+        if (corrValue) corrValue.textContent = corr.toFixed(2);
+        if (corrDot) corrDot.style.left = `${((corr + 1) / 2) * 100}%`;
+        if (corrNote) {
+          corrNote.textContent =
+            corr < 0
+              ? 'Below zero the channels are partly out of phase. Anything that folds this to mono — a phone speaker, a club system, a Bluetooth speaker — will cancel part of the mix.'
+              : corr < 0.3
+                ? 'Very wide. It will survive mono, but the centre is thin and the image is close to the point where it stops holding together.'
+                : corr > 0.95
+                  ? 'Effectively mono: almost everything is in the centre, so there is little side signal here to widen.'
+                  : 'A healthy stereo image. The centre stays solid and a mono fold keeps the mix intact.';
+        }
+      };
+
       const report = (): void => {
+        paintScope();
         if (!source || !usable) return;
         const stats = measure(source, width);
 
@@ -342,6 +638,11 @@ const faq = [
             'cannot do anything with it.'
         );
       }
+
+      // First paint waits for layout, since the canvas has no width until the
+      // workspace is on screen.
+      requestAnimationFrame(paintScope);
+      if (scopePanel) new ResizeObserver(paintScope).observe(scopePanel);
 
       if (wired) {
         setWidth(width, false);

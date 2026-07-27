@@ -50,7 +50,35 @@ const faq = [
     <div class="controls">
       <div class="controls__head">
         <span class="controls__title">Compressor</span>
-        <span class="hint">Preview plays the processed audio.</span>
+        <span class="hint">The curve is what your settings actually do to a level.</span>
+      </div>
+
+      {/*
+        The transfer curve: input level across, output level up.
+        A compressor is a function from one level to another, and every control
+        on this page is a parameter of that one function — which is impossible to
+        see when they are six separate numbers. Drawn, the threshold is the place
+        the line bends, the ratio is how far it flattens, and the knee is how
+        sharp the corner is. The dot is where this particular recording sits, so
+        the reduction figure is about your file rather than about compression.
+      */}
+      <div class="curve controls__full" data-curve-panel>
+        <canvas class="curve__canvas" data-curve aria-hidden="true"></canvas>
+        <dl class="curve__facts">
+          <div class="curve__fact">
+            <dt>Your material</dt>
+            <dd class="tnum" data-fact-level>—</dd>
+          </div>
+          <div class="curve__fact">
+            <dt>Gain reduction</dt>
+            <dd class="tnum" data-fact-gr>—</dd>
+          </div>
+          <div class="curve__fact">
+            <dt>Out, after makeup</dt>
+            <dd class="tnum" data-fact-out>—</dd>
+          </div>
+          <p class="curve__note" data-fact-note></p>
+        </dl>
       </div>
 
       <div class="field controls__full">
@@ -312,6 +340,73 @@ const faq = [
   </Fragment>
 </ToolPage>
 
+<style>
+  .curve {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    gap: var(--s4);
+    padding: var(--s4);
+    border-radius: var(--r-md);
+    background: var(--stage-2, var(--surface));
+  }
+
+  /* Square on purpose: input and output share one scale, and a stretched box
+     would make a 1:1 line look like something other than 45 degrees. */
+  .curve__canvas {
+    width: 300px;
+    height: 300px;
+    max-width: 100%;
+    flex: none;
+    display: block;
+  }
+
+  .curve__facts {
+    flex: 1 1 12rem;
+    display: grid;
+    align-content: start;
+    gap: var(--s3);
+    margin: 0;
+  }
+
+  .curve__fact {
+    display: grid;
+    gap: 2px;
+  }
+
+  .curve__fact dt {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--stage-ink-2, var(--ink-2));
+  }
+
+  .curve__fact dd {
+    margin: 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--stage-ink, var(--ink));
+    font-variant-numeric: tabular-nums;
+  }
+
+  .curve__note {
+    margin: 0;
+    font-size: var(--t-small);
+    line-height: 1.5;
+    color: var(--stage-ink-2, var(--ink-2));
+  }
+
+  @media (max-width: 560px) {
+    .curve__canvas {
+      width: 100%;
+      height: auto;
+      aspect-ratio: 1;
+    }
+  }
+</style>
+
 <script>
   import { createTool } from '../lib/tool';
   import { applyCompressor } from '../lib/audio/effects';
@@ -326,6 +421,151 @@ const faq = [
     makeup: number;
   }
 
+  /** Axis range, in dB. Below -60 nothing useful is happening. */
+  const FLOOR = -60;
+
+  /**
+   * The compressor's transfer function, in dB.
+   *
+   * This is the soft-knee curve the Web Audio DynamicsCompressorNode implements,
+   * written out rather than approximated: below the knee the signal passes
+   * through, above it the excess is divided by the ratio, and across the knee
+   * width the two are joined by a quadratic so the corner is smooth. Because it
+   * is the same formula the node uses, the drawing is a description of what will
+   * actually happen rather than an illustration of the idea.
+   */
+  function transfer(input: number, p: Params): number {
+    const over = input - p.threshold;
+    let out: number;
+    if (2 * over < -p.knee) {
+      out = input;
+    } else if (2 * Math.abs(over) <= p.knee) {
+      const x = over + p.knee / 2;
+      out = input + ((1 / p.ratio - 1) * x * x) / (2 * p.knee);
+    } else {
+      out = p.threshold + over / p.ratio;
+    }
+    return out + p.makeup;
+  }
+
+  /**
+   * Where this recording actually sits, as a dB level.
+   *
+   * The 95th percentile of 50 ms RMS windows rather than the peak: a compressor
+   * responds to the body of the sound, and one stray transient would put the
+   * marker somewhere the material almost never reaches. Silence is excluded so a
+   * long fade-in does not drag the answer down.
+   */
+  function typicalLevel(buffer: AudioBuffer): number {
+    const window = Math.max(1, Math.floor(buffer.sampleRate * 0.05));
+    const channel = buffer.getChannelData(0);
+    const levels: number[] = [];
+    for (let start = 0; start + window <= channel.length; start += window) {
+      let sum = 0;
+      for (let i = 0; i < window; i += 1) sum += channel[start + i]! * channel[start + i]!;
+      const rms = Math.sqrt(sum / window);
+      if (rms > 1e-5) levels.push(20 * Math.log10(rms));
+    }
+    if (levels.length === 0) return FLOOR;
+    levels.sort((a, b) => a - b);
+    return levels[Math.min(levels.length - 1, Math.floor(levels.length * 0.95))]!;
+  }
+
+  function drawCurve(canvas: HTMLCanvasElement, p: Params, level: number): void {
+    const cssSize = canvas.clientWidth;
+    if (cssSize < 1) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const size = Math.round(cssSize * dpr);
+    if (canvas.width !== size || canvas.height !== size) {
+      canvas.width = size;
+      canvas.height = size;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, size, size);
+
+    const styles = getComputedStyle(canvas.closest('[data-curve-panel]') ?? canvas);
+    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
+    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+
+    const pad = 26 * dpr;
+    const plot = size - pad * 2;
+    const x = (dB: number) => pad + ((dB - FLOOR) / -FLOOR) * plot;
+    const y = (dB: number) => pad + plot - ((Math.max(FLOOR, Math.min(0, dB)) - FLOOR) / -FLOOR) * plot;
+
+    // Grid every 12 dB, labelled down the left and along the bottom.
+    context.lineWidth = dpr;
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+    context.fillStyle = `color-mix(in oklch, ${ink} 45%, transparent)`;
+    for (let dB = FLOOR; dB <= 0; dB += 12) {
+      context.strokeStyle = `color-mix(in oklch, ${ink} 9%, transparent)`;
+      context.beginPath();
+      context.moveTo(x(dB), pad);
+      context.lineTo(x(dB), pad + plot);
+      context.moveTo(pad, y(dB));
+      context.lineTo(pad + plot, y(dB));
+      context.stroke();
+
+      context.textAlign = 'center';
+      context.fillText(String(dB), x(dB), pad + plot + 15 * dpr);
+      context.textAlign = 'right';
+      context.fillText(String(dB), pad - 6 * dpr, y(dB) + 3.5 * dpr);
+    }
+
+    // Unity, dashed: the line the signal would follow untouched. Every bend in
+    // the solid curve is readable only against it.
+    context.setLineDash([4 * dpr, 4 * dpr]);
+    context.strokeStyle = `color-mix(in oklch, ${ink} 28%, transparent)`;
+    context.beginPath();
+    context.moveTo(x(FLOOR), y(FLOOR));
+    context.lineTo(x(0), y(0));
+    context.stroke();
+    context.setLineDash([]);
+
+    // Threshold, marked on the input axis where the bend begins.
+    context.strokeStyle = `color-mix(in oklch, ${ink} 30%, transparent)`;
+    context.beginPath();
+    context.moveTo(x(p.threshold), pad);
+    context.lineTo(x(p.threshold), pad + plot);
+    context.stroke();
+    context.fillStyle = `color-mix(in oklch, ${ink} 55%, transparent)`;
+    context.textAlign = 'left';
+    context.fillText('threshold', x(p.threshold) + 5 * dpr, pad + 11 * dpr);
+
+    // The curve itself.
+    context.beginPath();
+    for (let i = 0; i <= 240; i += 1) {
+      const input = FLOOR + (i / 240) * -FLOOR;
+      const point = transfer(input, p);
+      if (i === 0) context.moveTo(x(input), y(point));
+      else context.lineTo(x(input), y(point));
+    }
+    context.strokeStyle = hue;
+    context.lineWidth = 2.5 * dpr;
+    context.lineJoin = 'round';
+    context.stroke();
+
+    // Where this file lands on it.
+    if (level > FLOOR) {
+      const out = transfer(level, p);
+      context.setLineDash([3 * dpr, 3 * dpr]);
+      context.lineWidth = dpr;
+      context.strokeStyle = `color-mix(in oklch, ${ink} 40%, transparent)`;
+      context.beginPath();
+      context.moveTo(x(level), pad + plot);
+      context.lineTo(x(level), y(out));
+      context.lineTo(pad, y(out));
+      context.stroke();
+      context.setLineDash([]);
+
+      context.beginPath();
+      context.arc(x(level), y(out), 5 * dpr, 0, Math.PI * 2);
+      context.fillStyle = ink;
+      context.fill();
+    }
+  }
+
   /** Attack and release are in milliseconds here; the node wants seconds. */
   const PRESETS: Record<string, Params> = {
     voice: { threshold: -20, ratio: 4, attack: 5, release: 120, knee: 6, makeup: 4 },
@@ -338,10 +578,58 @@ const faq = [
     suffix: 'compressed',
     defaultFormat: 'mp3',
 
-    onReady(_ctx, runtime) {
+    onReady(ctx, runtime) {
       const root = runtime.root;
       const preset = root.querySelector<HTMLSelectElement>('[data-control="preset"]');
       const setters: Record<string, (value: number) => void> = {};
+
+      const canvas = root.querySelector<HTMLCanvasElement>('[data-curve]');
+      const factLevel = root.querySelector<HTMLElement>('[data-fact-level]');
+      const factGr = root.querySelector<HTMLElement>('[data-fact-gr]');
+      const factOut = root.querySelector<HTMLElement>('[data-fact-out]');
+      const factNote = root.querySelector<HTMLElement>('[data-fact-note]');
+
+      // Measured once: the file does not change while the sliders move.
+      const level = typicalLevel(ctx.buffer);
+
+      const current = (): Params => ({
+        threshold: runtime.value('threshold', -20),
+        ratio: runtime.value('ratio', 4),
+        attack: runtime.value('attack', 5),
+        release: runtime.value('release', 120),
+        knee: runtime.value('knee', 6),
+        makeup: runtime.value('makeup', 4),
+      });
+
+      const dbText = (value: number): string =>
+        `${value < 0 ? '−' : ''}${Math.abs(value).toFixed(1)} dB`;
+
+      /** Redrawn on every move; it is 240 points of arithmetic, so it is free. */
+      const repaint = (): void => {
+        const p = current();
+        if (canvas) drawCurve(canvas, p, level);
+
+        // Reduction is measured against unity at the same input, which is the
+        // only definition that stays honest once makeup gain is in the picture.
+        const out = transfer(level, p);
+        const reduction = level + p.makeup - out;
+
+        if (factLevel) factLevel.textContent = level <= FLOOR ? '—' : dbText(level);
+        if (factGr) {
+          factGr.textContent = level <= FLOOR ? '—' : `${reduction < 0.05 ? '0.0' : `−${reduction.toFixed(1)}`} dB`;
+        }
+        if (factOut) factOut.textContent = level <= FLOOR ? '—' : dbText(out);
+        if (factNote) {
+          factNote.textContent =
+            reduction < 0.1
+              ? 'The threshold is above where this recording sits, so nothing is being compressed. Lower it until the dot crosses the bend.'
+              : out > -0.5
+                ? 'The output is at the ceiling. Lower the makeup gain or it will clip.'
+                : reduction > 12
+                  ? 'More than 12 dB of reduction is a heavy effect rather than a correction. Expect to hear it working.'
+                  : 'The dot is where this recording sits on the curve, and the drop from the dashed line is what it loses.';
+        }
+      };
 
       /** Slider and number input stay in step; the slider is authoritative. */
       const pair = (name: string, format: (value: number) => string): void => {
@@ -352,6 +640,7 @@ const faq = [
 
         const paint = (): void => {
           if (out) out.textContent = format(Number(slider.value));
+          repaint();
         };
 
         // A compressor pass is a full offline render, so it waits for the
@@ -401,8 +690,15 @@ const faq = [
         for (const [name, value] of Object.entries(chosen)) {
           setters[name]?.(value);
         }
+        repaint();
         runtime.refreshPreview();
       });
+
+      // First paint waits for layout, since the canvas has no width until the
+      // workspace is on screen.
+      requestAnimationFrame(repaint);
+      const panel = root.querySelector<HTMLElement>('[data-curve-panel]');
+      if (panel) new ResizeObserver(repaint).observe(panel);
     },
 
     preview(ctx) {

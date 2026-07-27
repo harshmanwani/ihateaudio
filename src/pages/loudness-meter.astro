@@ -115,6 +115,27 @@ const stats = [
       </div>
     </div>
 
+    {/*
+      Loudness over time, against the targets.
+      The four numbers above are the answer, but they cannot show *where* the
+      answer came from: whether a track sits at -14 all the way through or
+      averages there by alternating between -8 and -22. This plots the same
+      400 ms gating blocks the integrated figure is computed from, with the
+      platform targets drawn across them, so the gap you have to close is a
+      distance on screen rather than arithmetic.
+    */}
+    <div class="meter" data-meter-panel hidden>
+      <div class="meter__head">
+        <span class="meter__title">Loudness over time</span>
+        <span class="meter__key">
+          <span class="meter__swatch meter__swatch--curve"></span>Momentary
+          <span class="meter__swatch meter__swatch--int"></span>Integrated
+        </span>
+      </div>
+      <canvas class="meter__canvas" data-meter aria-hidden="true"></canvas>
+      <p class="meter__caption" data-meter-caption></p>
+    </div>
+
     <div class="note note--warn" data-peak-note hidden>
       <div class="note__body">
         <div class="note__title">True peak is above -1 dBTP</div>
@@ -227,6 +248,72 @@ const stats = [
   </Fragment>
 </ToolPage>
 
+<style>
+  .meter {
+    display: grid;
+    gap: var(--s3);
+    padding: var(--s4);
+    border-radius: var(--r-md);
+    background: var(--stage-2, var(--surface));
+  }
+
+  .meter__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--s3);
+    flex-wrap: wrap;
+  }
+
+  .meter__title {
+    font-size: var(--t-ui);
+    font-weight: 600;
+    color: var(--stage-ink, var(--ink));
+  }
+
+  .meter__key {
+    display: flex;
+    align-items: center;
+    gap: var(--s2);
+    font-size: 11px;
+    color: var(--stage-ink-2, var(--ink-2));
+  }
+
+  .meter__swatch {
+    width: 14px;
+    height: 3px;
+    border-radius: var(--r-full);
+    display: inline-block;
+  }
+
+  .meter__swatch--curve {
+    background: var(--cat-vivid, var(--brand));
+  }
+
+  .meter__swatch--int {
+    background: var(--stage-ink, #fff);
+  }
+
+  .meter__canvas {
+    width: 100%;
+    height: 220px;
+    display: block;
+  }
+
+  .meter__caption {
+    margin: 0;
+    font-size: var(--t-small);
+    line-height: 1.5;
+    color: var(--stage-ink-2, var(--ink-2));
+  }
+
+  @media (max-width: 560px) {
+    .meter__canvas {
+      height: 170px;
+    }
+  }
+</style>
+
 <script>
   import { createTool } from '../lib/tool';
   import { measureLoudness } from '../lib/audio/analysis';
@@ -261,6 +348,137 @@ const stats = [
       return `${delta.toFixed(1)} LU too loud. Playback normalization will turn it down by that much.`;
     }
     return `${Math.abs(delta).toFixed(1)} LU quieter than the target. Some services lift it, some do not.`;
+  }
+
+  /** The lines worth drawing: the distinct platform targets, not all eight. */
+  const MARKS = [
+    { lufs: -14, label: 'Spotify, YouTube' },
+    { lufs: -16, label: 'Apple, podcasts' },
+    { lufs: -23, label: 'EBU R128' },
+  ];
+
+  function drawMeter(
+    panel: HTMLElement,
+    canvas: HTMLCanvasElement,
+    momentary: number[],
+    step: number,
+    integrated: number
+  ): void {
+    const cssWidth = canvas.clientWidth;
+    const cssHeight = canvas.clientHeight;
+    if (cssWidth < 1 || cssHeight < 1) return;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.round(cssWidth * dpr);
+    const height = Math.round(cssHeight * dpr);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, width, height);
+
+    const styles = getComputedStyle(panel);
+    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
+    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+
+    const padL = 42 * dpr;
+    const padR = 96 * dpr;
+    const padY = 14 * dpr;
+    const plotW = width - padL - padR;
+    const plotH = height - padY * 2;
+
+    /**
+     * Range chosen from the material, clamped to something sane.
+     *
+     * A fixed -60..0 axis wastes most of its height on a region nothing occupies,
+     * and flattens the very variation the graph exists to show. The floor tracks
+     * the quietest block that is actually above the gate.
+     */
+    const audible = momentary.filter((v) => Number.isFinite(v) && v > -70);
+    const lowest = audible.length ? Math.min(...audible) : -40;
+    const top = 0;
+    const floor = Math.max(-60, Math.min(-20, Math.floor((lowest - 3) / 6) * 6));
+
+    const y = (lufs: number): number =>
+      padY + plotH - ((Math.max(floor, Math.min(top, lufs)) - floor) / (top - floor)) * plotH;
+    const x = (index: number): number =>
+      padL + (momentary.length <= 1 ? 0 : (index / (momentary.length - 1)) * plotW);
+
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+    context.lineWidth = dpr;
+
+    // Scale down the left.
+    for (let lufs = top; lufs >= floor; lufs -= 6) {
+      context.strokeStyle = `color-mix(in oklch, ${ink} 8%, transparent)`;
+      context.beginPath();
+      context.moveTo(padL, y(lufs));
+      context.lineTo(padL + plotW, y(lufs));
+      context.stroke();
+      context.fillStyle = `color-mix(in oklch, ${ink} 45%, transparent)`;
+      context.textAlign = 'right';
+      context.fillText(String(lufs), padL - 6 * dpr, y(lufs) + 3.5 * dpr);
+    }
+
+    // Momentary loudness, filled down to the floor. Gaps where a block is below
+    // the gate are real and are left as gaps rather than joined through.
+    context.beginPath();
+    let open = false;
+    for (let i = 0; i < momentary.length; i += 1) {
+      const value = momentary[i]!;
+      if (!Number.isFinite(value) || value <= -70) {
+        open = false;
+        continue;
+      }
+      if (!open) {
+        context.moveTo(x(i), y(value));
+        open = true;
+      } else {
+        context.lineTo(x(i), y(value));
+      }
+    }
+    context.strokeStyle = hue;
+    context.lineWidth = 1.5 * dpr;
+    context.lineJoin = 'round';
+    context.stroke();
+
+    // The targets, labelled in the right margin so they never sit on the curve.
+    for (const mark of MARKS) {
+      if (mark.lufs < floor) continue;
+      context.setLineDash([5 * dpr, 4 * dpr]);
+      context.strokeStyle = `color-mix(in oklch, ${ink} 30%, transparent)`;
+      context.lineWidth = dpr;
+      context.beginPath();
+      context.moveTo(padL, y(mark.lufs));
+      context.lineTo(padL + plotW, y(mark.lufs));
+      context.stroke();
+      context.setLineDash([]);
+      context.fillStyle = `color-mix(in oklch, ${ink} 55%, transparent)`;
+      context.textAlign = 'left';
+      context.fillText(mark.label, padL + plotW + 7 * dpr, y(mark.lufs) + 3.5 * dpr);
+    }
+
+    // Integrated: the number everything else on the page is about.
+    if (Number.isFinite(integrated) && integrated >= floor) {
+      context.strokeStyle = ink;
+      context.lineWidth = 2 * dpr;
+      context.beginPath();
+      context.moveTo(padL, y(integrated));
+      context.lineTo(padL + plotW, y(integrated));
+      context.stroke();
+    }
+
+    // Time along the bottom.
+    const seconds = momentary.length * step;
+    context.fillStyle = `color-mix(in oklch, ${ink} 45%, transparent)`;
+    context.textAlign = 'left';
+    context.fillText('0:00', padL, height - 2 * dpr);
+    context.textAlign = 'right';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.round(seconds % 60);
+    context.fillText(`${mins}:${String(secs).padStart(2, '0')}`, padL + plotW, height - 2 * dpr);
   }
 
   createTool({
@@ -305,6 +523,28 @@ const stats = [
               'which is above the -1 dBTP ceiling every streaming platform asks for. ' +
               'It may survive as a WAV and still clip once encoded to MP3 or AAC. ' +
               'Normalizing with a peak ceiling fixes it.';
+          }
+
+          const panel = root.querySelector<HTMLElement>('[data-meter-panel]');
+          const canvas = root.querySelector<HTMLCanvasElement>('[data-meter]');
+          const caption = root.querySelector<HTMLElement>('[data-meter-caption]');
+          if (panel && canvas && result.momentary.length > 1) {
+            panel.hidden = false;
+            const paint = (): void =>
+              drawMeter(panel, canvas, result.momentary, result.momentaryStep, result.integrated);
+            requestAnimationFrame(paint);
+            new ResizeObserver(paint).observe(panel);
+
+            if (caption) {
+              // Loudness range says how much the level moves; saying what that
+              // means for the listener is more use than the number alone.
+              caption.textContent =
+                result.range < 4
+                  ? `The level barely moves (${result.range.toFixed(1)} LU range), so the integrated figure describes the whole file. That is typical of a mastered or heavily compressed track.`
+                  : result.range > 12
+                    ? `The level swings a lot (${result.range.toFixed(1)} LU range). The integrated figure is an average of quite different passages, so normalizing to a target will still leave loud and quiet sections far apart.`
+                    : `A ${result.range.toFixed(1)} LU range: some movement between passages, which is normal for music that has not been squashed flat.`;
+            }
           }
 
           for (const target of TARGETS) {

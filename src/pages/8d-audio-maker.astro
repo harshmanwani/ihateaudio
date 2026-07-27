@@ -67,6 +67,36 @@ const faq = [
         <span class="hint">Twelve seconds per turn is the sound most 8D uploads use.</span>
       </div>
 
+      {/*
+        The orbit, seen from above.
+        Speed and distance describe a circle around a head, and two numbers is a
+        strange way to specify a circle you can simply draw. Dragging the marker
+        sets the distance directly; the marker then runs the orbit at the real
+        rate, so "twelve seconds a turn" is something you watch rather than
+        something you convert.
+      */}
+      <div class="orbit controls__full" data-orbit-panel>
+        <canvas
+          class="orbit__canvas"
+          data-orbit
+          role="slider"
+          tabindex="0"
+          aria-label="Orbit distance"
+          aria-valuemin="1"
+          aria-valuemax="8"
+          aria-valuenow="3"
+        ></canvas>
+        <div class="orbit__side">
+          <div class="orbit__fact">
+            <span class="orbit__label">Turns a minute</span>
+            <span class="orbit__value tnum" data-orbit-rpm>—</span>
+          </div>
+          <p class="orbit__note" data-orbit-hint>
+            Drag the dot to set how far away it circles. Arrow keys work too.
+          </p>
+        </div>
+      </div>
+
       <div class="field">
         <label class="label" for="eightd-speed">
           Time per turn <span class="label__value" data-out="speed">12 s</span>
@@ -196,6 +226,80 @@ const faq = [
   </Fragment>
 </ToolPage>
 
+<style>
+  .orbit {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s4);
+    padding: var(--s4);
+    border-radius: var(--r-md);
+    background: var(--stage-2, var(--surface));
+  }
+
+  .orbit__canvas {
+    width: 240px;
+    height: 240px;
+    max-width: 100%;
+    flex: none;
+    display: block;
+    cursor: grab;
+    touch-action: none;
+    border-radius: var(--r-sm);
+  }
+
+  .orbit__canvas:active {
+    cursor: grabbing;
+  }
+
+  .orbit__canvas:focus-visible {
+    outline: 2px solid var(--cat-vivid, var(--brand));
+    outline-offset: 3px;
+  }
+
+  .orbit__side {
+    flex: 1 1 11rem;
+    display: grid;
+    align-content: start;
+    gap: var(--s3);
+  }
+
+  .orbit__fact {
+    display: grid;
+    gap: 2px;
+  }
+
+  .orbit__label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--stage-ink-2, var(--ink-2));
+  }
+
+  .orbit__value {
+    font-size: 1.6rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--stage-ink, var(--ink));
+    font-variant-numeric: tabular-nums;
+  }
+
+  .orbit__note {
+    margin: 0;
+    font-size: var(--t-small);
+    line-height: 1.5;
+    color: var(--stage-ink-2, var(--ink-2));
+  }
+
+  @media (max-width: 560px) {
+    .orbit__canvas {
+      width: 100%;
+      height: auto;
+      aspect-ratio: 1;
+    }
+  }
+</style>
+
 <script>
   import { createTool } from '../lib/tool';
   import { apply8D } from '../lib/audio/effects';
@@ -284,6 +388,102 @@ const faq = [
     return apply8D(stereo, speed?.get() ?? 12, radius?.get() ?? 3);
   }
 
+  const R_MIN = 1;
+  const R_MAX = 8;
+
+  /**
+   * The orbit, from above: the listener at the centre, the source on a ring.
+   *
+   * `phase` is where the source currently is, advanced by the animation so the
+   * dot circles at the rate the tool will actually use. Drawn rather than
+   * animated by CSS because the ring radius, the trail and the head all have to
+   * agree with one number that the pointer can change mid-flight.
+   */
+  function drawOrbit(
+    panel: HTMLElement,
+    canvas: HTMLCanvasElement,
+    radiusValue: number,
+    phase: number
+  ): void {
+    const cssSize = canvas.clientWidth;
+    if (cssSize < 1) return;
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const size = Math.round(cssSize * dpr);
+    if (canvas.width !== size || canvas.height !== size) {
+      canvas.width = size;
+      canvas.height = size;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, size, size);
+
+    const styles = getComputedStyle(panel);
+    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
+    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+
+    const mid = size / 2;
+    const maxR = mid * 0.82;
+    const ring = (radiusValue / R_MAX) * maxR;
+
+    // Range rings, so the drag has something to read distance against.
+    context.lineWidth = dpr;
+    for (let r = R_MIN; r <= R_MAX; r += 1) {
+      context.strokeStyle = `color-mix(in oklch, ${ink} ${r % 2 === 0 ? 7 : 4}%, transparent)`;
+      context.beginPath();
+      context.arc(mid, mid, (r / R_MAX) * maxR, 0, Math.PI * 2);
+      context.stroke();
+    }
+
+    // The listener: a head facing up, which is what makes left and right on the
+    // ring mean left and right in the result.
+    context.fillStyle = `color-mix(in oklch, ${ink} 22%, transparent)`;
+    context.beginPath();
+    context.arc(mid, mid, 11 * dpr, 0, Math.PI * 2);
+    context.fill();
+    context.fillStyle = `color-mix(in oklch, ${ink} 40%, transparent)`;
+    context.beginPath();
+    context.moveTo(mid, mid - 15 * dpr);
+    context.lineTo(mid - 4 * dpr, mid - 9 * dpr);
+    context.lineTo(mid + 4 * dpr, mid - 9 * dpr);
+    context.closePath();
+    context.fill();
+
+    // The chosen orbit.
+    context.strokeStyle = `color-mix(in oklch, ${hue} 45%, transparent)`;
+    context.lineWidth = 1.5 * dpr;
+    context.beginPath();
+    context.arc(mid, mid, ring, 0, Math.PI * 2);
+    context.stroke();
+
+    // A trail behind the source, so direction of travel is visible in a still.
+    for (let i = 1; i <= 14; i += 1) {
+      const a = phase - i * 0.075;
+      const fade = (1 - i / 14) * 0.5;
+      context.fillStyle = `color-mix(in oklch, ${hue} ${Math.round(fade * 100)}%, transparent)`;
+      context.beginPath();
+      context.arc(mid + Math.sin(a) * ring, mid - Math.cos(a) * ring, (4 - i * 0.2) * dpr, 0, Math.PI * 2);
+      context.fill();
+    }
+
+    // The source itself.
+    const sx = mid + Math.sin(phase) * ring;
+    const sy = mid - Math.cos(phase) * ring;
+    context.fillStyle = hue;
+    context.beginPath();
+    context.arc(sx, sy, 7 * dpr, 0, Math.PI * 2);
+    context.fill();
+    context.strokeStyle = `color-mix(in oklch, ${ink} 70%, transparent)`;
+    context.lineWidth = 1.5 * dpr;
+    context.stroke();
+
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+    context.fillStyle = `color-mix(in oklch, ${ink} 42%, transparent)`;
+    context.textAlign = 'center';
+    context.fillText('front', mid, 12 * dpr);
+    context.fillText('behind', mid, size - 4 * dpr);
+  }
+
   createTool({
     suffix: '8d',
     defaultFormat: 'mp3',
@@ -314,6 +514,101 @@ const faq = [
 
       speed = bindPair(root, 'speed', (v) => `${v} s`, describe, commit);
       radius = bindPair(root, 'radius', (v) => v.toFixed(2), describe, commit);
+
+      // ---- the orbit view ----
+
+      const panel = root.querySelector<HTMLElement>('[data-orbit-panel]');
+      const canvas = root.querySelector<HTMLCanvasElement>('[data-orbit]');
+      const rpm = root.querySelector<HTMLElement>('[data-orbit-rpm]');
+
+      let phase = 0;
+      let last = 0;
+      let frame = 0;
+
+      const paintOrbit = (): void => {
+        if (!panel || !canvas) return;
+        const r = radius?.get() ?? 3;
+        drawOrbit(panel, canvas, r, phase);
+        canvas.setAttribute('aria-valuenow', r.toFixed(2));
+        canvas.setAttribute('aria-valuetext', `${r.toFixed(1)} away`);
+        if (rpm) rpm.textContent = (60 / (speed?.get() ?? 12)).toFixed(1);
+      };
+
+      /**
+       * Advances the dot at the real orbit rate.
+       *
+       * Stopped entirely under prefers-reduced-motion: the ring, the trail and
+       * the marker still say everything the control needs to, and a permanently
+       * circling dot is exactly the kind of thing that setting exists for.
+       */
+      const still = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const tick = (now: number): void => {
+        if (last === 0) last = now;
+        const seconds = Math.min(0.1, (now - last) / 1000);
+        last = now;
+        phase = (phase + (seconds / (speed?.get() ?? 12)) * Math.PI * 2) % (Math.PI * 2);
+        paintOrbit();
+        frame = requestAnimationFrame(tick);
+      };
+
+      if (still) requestAnimationFrame(paintOrbit);
+      else frame = requestAnimationFrame(tick);
+
+      // The panel outlives a reset, so the loop must not be started twice.
+      window.addEventListener('pagehide', () => cancelAnimationFrame(frame), { once: true });
+
+      if (canvas) {
+        const setFromPointer = (event: PointerEvent): void => {
+          const rect = canvas.getBoundingClientRect();
+          const dx = event.clientX - (rect.left + rect.width / 2);
+          const dy = event.clientY - (rect.top + rect.height / 2);
+          // Distance from the head maps to orbit radius; the angle is ignored
+          // because the orbit is a full circle and the start point is arbitrary.
+          const ratio = Math.hypot(dx, dy) / ((rect.width / 2) * 0.82);
+          radius?.set(clamp(ratio * R_MAX, R_MIN, R_MAX));
+          describe();
+          paintOrbit();
+        };
+
+        let dragging = false;
+        canvas.addEventListener('pointerdown', (event) => {
+          dragging = true;
+          canvas.setPointerCapture(event.pointerId);
+          setFromPointer(event);
+        });
+        canvas.addEventListener('pointermove', (event) => {
+          if (dragging) setFromPointer(event);
+        });
+        const end = (event: PointerEvent): void => {
+          if (!dragging) return;
+          dragging = false;
+          if (canvas.hasPointerCapture(event.pointerId)) {
+            canvas.releasePointerCapture(event.pointerId);
+          }
+          commit();
+        };
+        canvas.addEventListener('pointerup', end);
+        canvas.addEventListener('pointercancel', end);
+
+        canvas.addEventListener('keydown', (event) => {
+          const step = event.shiftKey ? 0.1 : 0.5;
+          const current = radius?.get() ?? 3;
+          if (event.key === 'ArrowRight' || event.key === 'ArrowUp') {
+            event.preventDefault();
+            radius?.set(clamp(current + step, R_MIN, R_MAX));
+          } else if (event.key === 'ArrowLeft' || event.key === 'ArrowDown') {
+            event.preventDefault();
+            radius?.set(clamp(current - step, R_MIN, R_MAX));
+          } else {
+            return;
+          }
+          describe();
+          paintOrbit();
+          commit();
+        });
+      }
+
+      if (panel) new ResizeObserver(paintOrbit).observe(panel);
 
       describe();
     },

@@ -50,7 +50,18 @@ const faq = [
     <div class="controls">
       <div class="controls__head">
         <span class="controls__title">Low shelf</span>
-        <span class="hint">Everything below the corner is lifted by the full amount.</span>
+        <span class="hint">The shaded area is what gets lifted, and by how much.</span>
+      </div>
+
+      {/*
+        The shelf, measured from the same biquad the render uses.
+        "+6 dB below 100 Hz" sounds precise and is not: a shelf has no edge, it
+        has a slope, and how far up the spectrum that slope reaches is the whole
+        difference between deeper bass and a muddy midrange. Drawn, the corner
+        is where the curve turns and the tail shows what else came with it.
+      */}
+      <div class="shelf controls__full" data-shelf-panel>
+        <canvas class="shelf__canvas" data-shelf aria-hidden="true"></canvas>
       </div>
 
       <div class="field">
@@ -182,11 +193,158 @@ const faq = [
   </Fragment>
 </ToolPage>
 
+<style>
+  .shelf {
+    padding: var(--s4);
+    border-radius: var(--r-md);
+    background: var(--stage-2, var(--surface));
+  }
+
+  .shelf__canvas {
+    width: 100%;
+    height: 180px;
+    display: block;
+  }
+
+  @media (max-width: 560px) {
+    .shelf__canvas {
+      height: 140px;
+    }
+  }
+</style>
+
 <script>
   import { createTool } from '../lib/tool';
   import { bassBoost, applyEq } from '../lib/audio/effects';
   import { normalizePeak } from '../lib/audio/dsp';
   import { db } from '../lib/format';
+
+  /**
+   * The shelf response, measured rather than sketched.
+   *
+   * Same approach as the equalizer: build the actual biquad and ask it, via
+   * getFrequencyResponse, what it does at each frequency. A hand-drawn "curve
+   * that looks like a shelf" would be wrong in exactly the place that matters —
+   * the slope above the corner, which is where a bass boost either stays in the
+   * bass or turns into mud.
+   */
+  const POINTS = 200;
+  const F_MIN = 20;
+  const F_MAX = 20000;
+  const shelfContext = new OfflineAudioContext(1, 1, 44100);
+  const shelfFreqs = new Float32Array(POINTS);
+  for (let i = 0; i < POINTS; i += 1) {
+    // Log spacing, because hearing is logarithmic and a linear axis would spend
+    // three quarters of its width above 5 kHz where nothing is happening.
+    shelfFreqs[i] = F_MIN * (F_MAX / F_MIN) ** (i / (POINTS - 1));
+  }
+  const shelfMag = new Float32Array(POINTS);
+  const shelfPhase = new Float32Array(POINTS);
+
+  function drawShelf(
+    panel: HTMLElement,
+    canvas: HTMLCanvasElement,
+    amount: number,
+    corner: number
+  ): void {
+    const cssWidth = canvas.clientWidth;
+    const cssHeight = canvas.clientHeight;
+    if (cssWidth < 1 || cssHeight < 1) return;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.round(cssWidth * dpr);
+    const height = Math.round(cssHeight * dpr);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, width, height);
+
+    const styles = getComputedStyle(panel);
+    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
+    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+
+    const filter = shelfContext.createBiquadFilter();
+    filter.type = 'lowshelf';
+    filter.frequency.value = corner;
+    filter.Q.value = 0.7;
+    filter.gain.value = amount;
+    filter.getFrequencyResponse(shelfFreqs, shelfMag, shelfPhase);
+
+    const padL = 34 * dpr;
+    const padR = 12 * dpr;
+    const padT = 12 * dpr;
+    const padB = 22 * dpr;
+    const plotW = width - padL - padR;
+    const plotH = height - padT - padB;
+
+    const top = 18;
+    const bottom = -6;
+    const x = (hz: number) =>
+      padL + (Math.log(hz / F_MIN) / Math.log(F_MAX / F_MIN)) * plotW;
+    const y = (dB: number) =>
+      padT + plotH - ((Math.max(bottom, Math.min(top, dB)) - bottom) / (top - bottom)) * plotH;
+
+    context.lineWidth = dpr;
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+
+    for (let dB = bottom; dB <= top; dB += 6) {
+      context.strokeStyle = `color-mix(in oklch, ${ink} ${dB === 0 ? 18 : 8}%, transparent)`;
+      context.beginPath();
+      context.moveTo(padL, y(dB));
+      context.lineTo(padL + plotW, y(dB));
+      context.stroke();
+      context.fillStyle = `color-mix(in oklch, ${ink} 45%, transparent)`;
+      context.textAlign = 'right';
+      context.fillText(`${dB > 0 ? '+' : ''}${dB}`, padL - 6 * dpr, y(dB) + 3.5 * dpr);
+    }
+
+    for (const hz of [50, 100, 200, 500, 1000, 5000, 10000]) {
+      context.strokeStyle = `color-mix(in oklch, ${ink} 7%, transparent)`;
+      context.beginPath();
+      context.moveTo(x(hz), padT);
+      context.lineTo(x(hz), padT + plotH);
+      context.stroke();
+      context.fillStyle = `color-mix(in oklch, ${ink} 42%, transparent)`;
+      context.textAlign = 'center';
+      context.fillText(hz >= 1000 ? `${hz / 1000}k` : String(hz), x(hz), height - 6 * dpr);
+    }
+
+    // The corner: where the shelf is half its full lift, which is the frequency
+    // the control is actually named after.
+    context.setLineDash([4 * dpr, 4 * dpr]);
+    context.strokeStyle = `color-mix(in oklch, ${ink} 32%, transparent)`;
+    context.beginPath();
+    context.moveTo(x(corner), padT);
+    context.lineTo(x(corner), padT + plotH);
+    context.stroke();
+    context.setLineDash([]);
+
+    const response = (i: number): number => 20 * Math.log10(Math.max(1e-6, shelfMag[i]!));
+
+    context.beginPath();
+    context.moveTo(x(shelfFreqs[0]!), y(0));
+    for (let i = 0; i < POINTS; i += 1) context.lineTo(x(shelfFreqs[i]!), y(response(i)));
+    context.lineTo(x(shelfFreqs[POINTS - 1]!), y(0));
+    context.closePath();
+    context.fillStyle = `color-mix(in oklch, ${hue} 22%, transparent)`;
+    context.fill();
+
+    context.beginPath();
+    for (let i = 0; i < POINTS; i += 1) {
+      const px = x(shelfFreqs[i]!);
+      const py = y(response(i));
+      if (i === 0) context.moveTo(px, py);
+      else context.lineTo(px, py);
+    }
+    context.strokeStyle = hue;
+    context.lineWidth = 2.5 * dpr;
+    context.lineJoin = 'round';
+    context.stroke();
+  }
 
   const tool = createTool({
     suffix: 'bass',
@@ -197,10 +355,15 @@ const faq = [
       const loud = root.querySelector<HTMLElement>('[data-loud]');
       const loudDetail = root.querySelector<HTMLElement>('[data-loud-detail]');
 
+      const shelfPanel = root.querySelector<HTMLElement>('[data-shelf-panel]');
+      const shelfCanvas = root.querySelector<HTMLCanvasElement>('[data-shelf]');
+
       const refreshWarning = (): void => {
         const amount = runtime.value('amount', 6);
         const corner = runtime.value('corner', 100);
         const heavy = amount >= 8;
+
+        if (shelfPanel && shelfCanvas) drawShelf(shelfPanel, shelfCanvas, amount, corner);
 
         if (loud) loud.hidden = !heavy;
         if (heavy && loudDetail) {
@@ -250,6 +413,11 @@ const faq = [
       root
         .querySelector<HTMLInputElement>('[data-control="fit"]')
         ?.addEventListener('change', () => runtime.refreshPreview());
+
+      // First paint waits for layout, since the canvas has no width until the
+      // workspace is on screen.
+      requestAnimationFrame(refreshWarning);
+      if (shelfPanel) new ResizeObserver(refreshWarning).observe(shelfPanel);
 
       refreshWarning();
     },

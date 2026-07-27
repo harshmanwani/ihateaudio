@@ -8,7 +8,7 @@ const tool = getTool('reverb-adder');
 const steps = [
   'Drop an audio file onto the page. It is decoded by your browser and stays on your machine, nothing is sent anywhere.',
   'Pick a space. Small room and Studio keep the source close and present; Hall, Cathedral and Canyon push it further back and hold the tail longer.',
-  'Press play to hear the reverb over the whole file, then adjust decay, mix and pre-delay until the dry sound still cuts through the wash.',
+  'Play the result below the controls to hear the reverb over the whole file, then adjust decay, mix and pre-delay until the dry sound still cuts through the wash.',
   'Choose a format and click Download. The exported file runs a little longer than the original, because the tail is written out in full instead of being chopped off.',
 ];
 
@@ -49,7 +49,30 @@ const faq = [
     <div class="controls">
       <div class="controls__head">
         <span class="controls__title">Space</span>
-        <span class="hint">Presets set all three values at once. Move any slider to go custom.</span>
+        <span class="hint">The tail is the shape these three controls make.</span>
+      </div>
+
+      {/*
+        The impulse envelope: what one clap would do in this space.
+        Decay, mix and pre-delay describe a shape in time, and three numbers is
+        a poor way to describe a shape. Drawn, pre-delay is the gap before
+        anything comes back, decay is how far the tail reaches, and mix is how
+        tall it is against the dry hit — and the -60 dB line shows where the
+        reverb has actually died rather than where the slider says it has.
+      */}
+      <div class="tail controls__full" data-tail-panel>
+        <canvas class="tail__canvas" data-tail aria-hidden="true"></canvas>
+        <div class="tail__facts">
+          <div class="tail__fact">
+            <span class="tail__label">RT60</span>
+            <span class="tail__value tnum" data-tail-rt>—</span>
+          </div>
+          <div class="tail__fact">
+            <span class="tail__label">Tail reaches</span>
+            <span class="tail__value tnum" data-tail-len>—</span>
+          </div>
+          <p class="tail__note" data-tail-verdict></p>
+        </div>
       </div>
 
       <div class="field controls__full">
@@ -224,6 +247,65 @@ const faq = [
   </Fragment>
 </ToolPage>
 
+<style>
+  .tail {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s4);
+    padding: var(--s4);
+    border-radius: var(--r-md);
+    background: var(--stage-2, var(--surface));
+  }
+
+  .tail__canvas {
+    flex: 1 1 20rem;
+    min-width: 0;
+    height: 170px;
+    display: block;
+  }
+
+  .tail__facts {
+    flex: 0 1 11rem;
+    display: grid;
+    align-content: start;
+    gap: var(--s3);
+  }
+
+  .tail__fact {
+    display: grid;
+    gap: 2px;
+  }
+
+  .tail__label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--stage-ink-2, var(--ink-2));
+  }
+
+  .tail__value {
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1.1;
+    color: var(--stage-ink, var(--ink));
+    font-variant-numeric: tabular-nums;
+  }
+
+  .tail__note {
+    margin: 0;
+    font-size: var(--t-small);
+    line-height: 1.5;
+    color: var(--stage-ink-2, var(--ink-2));
+  }
+
+  @media (max-width: 560px) {
+    .tail__canvas {
+      height: 140px;
+    }
+  }
+</style>
+
 <script>
   import { createTool } from '../lib/tool';
   import { applyReverb } from '../lib/audio/effects';
@@ -320,6 +402,131 @@ const faq = [
     preDelay: (predelay?.get() ?? 35) / 1000,
   });
 
+  /**
+   * The impulse envelope, drawn from the same curve makeImpulseResponse uses.
+   *
+   * `(1 - t) ** decayShape` over the tail, which is the exact envelope the
+   * generated impulse response is built on — so this is a picture of the
+   * reverb that will be rendered, not a generic decay curve. The dry hit is
+   * drawn at (1 - mix) and the tail scaled by mix, because that is how the wet
+   * and dry paths are summed.
+   */
+  const DECAY_SHAPE = 2.2;
+
+  function drawTail(
+    panel: HTMLElement,
+    canvas: HTMLCanvasElement,
+    decay: number,
+    mix: number,
+    preDelay: number
+  ): { rt60: number; span: number } {
+    const cssWidth = canvas.clientWidth;
+    const cssHeight = canvas.clientHeight;
+    const span = preDelay + decay;
+    if (cssWidth < 1 || cssHeight < 1) return { rt60: decay, span };
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.round(cssWidth * dpr);
+    const height = Math.round(cssHeight * dpr);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) return { rt60: decay, span };
+    context.clearRect(0, 0, width, height);
+
+    const styles = getComputedStyle(panel);
+    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
+    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+
+    const padL = 8 * dpr;
+    const padR = 8 * dpr;
+    const padT = 10 * dpr;
+    const padB = 20 * dpr;
+    const plotW = width - padL - padR;
+    const plotH = height - padT - padB;
+
+    // A little headroom past the tail so the end is visible rather than flush.
+    const viewSpan = Math.max(0.4, span * 1.08);
+    const x = (seconds: number) => padL + (seconds / viewSpan) * plotW;
+    const y = (level: number) => padT + plotH - level * plotH;
+
+    context.lineWidth = dpr;
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+
+    // Second markers along the bottom.
+    const gridStep = viewSpan > 4 ? 1 : viewSpan > 2 ? 0.5 : 0.2;
+    context.textAlign = 'center';
+    for (let t = 0; t <= viewSpan; t += gridStep) {
+      context.strokeStyle = `color-mix(in oklch, ${ink} 8%, transparent)`;
+      context.beginPath();
+      context.moveTo(x(t), padT);
+      context.lineTo(x(t), padT + plotH);
+      context.stroke();
+      context.fillStyle = `color-mix(in oklch, ${ink} 42%, transparent)`;
+      context.fillText(`${t.toFixed(gridStep < 1 ? 1 : 0)}s`, x(t), height - 5 * dpr);
+    }
+
+    // -60 dB: where the tail is considered gone. RT60 is the number rooms are
+    // described by, so marking it makes "2.5 s decay" mean something specific.
+    const minus60 = 0.001;
+    const rtLevel = Math.max(0.02, minus60 * mix);
+    context.setLineDash([4 * dpr, 4 * dpr]);
+    context.strokeStyle = `color-mix(in oklch, ${ink} 24%, transparent)`;
+    context.beginPath();
+    context.moveTo(padL, y(rtLevel));
+    context.lineTo(padL + plotW, y(rtLevel));
+    context.stroke();
+    context.setLineDash([]);
+
+    // The dry hit at t=0.
+    context.fillStyle = `color-mix(in oklch, ${ink} 65%, transparent)`;
+    context.fillRect(x(0), y(1 - mix), Math.max(2 * dpr, 3 * dpr), (1 - mix) * plotH);
+    context.textAlign = 'left';
+    context.fillText('dry', x(0) + 6 * dpr, y(1 - mix) - 4 * dpr);
+
+    // The wet tail, filled.
+    context.beginPath();
+    context.moveTo(x(preDelay), y(0));
+    const steps = 220;
+    for (let i = 0; i <= steps; i += 1) {
+      const t = i / steps;
+      const level = (1 - t) ** DECAY_SHAPE * mix;
+      context.lineTo(x(preDelay + t * decay), y(level));
+    }
+    context.lineTo(x(preDelay + decay), y(0));
+    context.closePath();
+    context.fillStyle = `color-mix(in oklch, ${hue} 26%, transparent)`;
+    context.fill();
+    context.strokeStyle = hue;
+    context.lineWidth = 2 * dpr;
+    context.stroke();
+
+    // The pre-delay gap, called out because it is the one control whose effect
+    // is a piece of silence and therefore invisible without a label.
+    if (preDelay > 0.004) {
+      context.strokeStyle = `color-mix(in oklch, ${ink} 35%, transparent)`;
+      context.lineWidth = dpr;
+      context.beginPath();
+      context.moveTo(x(0), padT + plotH * 0.12);
+      context.lineTo(x(preDelay), padT + plotH * 0.12);
+      context.stroke();
+      context.fillStyle = `color-mix(in oklch, ${ink} 50%, transparent)`;
+      context.textAlign = 'left';
+      context.fillText(
+        `${Math.round(preDelay * 1000)} ms`,
+        x(preDelay) + 4 * dpr,
+        padT + plotH * 0.12 + 3.5 * dpr
+      );
+    }
+
+    // Where the envelope actually crosses -60 dB relative to its own peak.
+    const rt60 = decay * (1 - minus60 ** (1 / DECAY_SHAPE));
+    return { rt60, span };
+  }
+
   createTool({
     suffix: 'reverb',
     defaultFormat: 'mp3',
@@ -340,12 +547,37 @@ const faq = [
         timer = window.setTimeout(() => runtime.refreshPreview(), 200);
       };
 
+      const tailPanel = root.querySelector<HTMLElement>('[data-tail-panel]');
+      const tailCanvas = root.querySelector<HTMLCanvasElement>('[data-tail]');
+      const rtOut = root.querySelector<HTMLElement>('[data-tail-rt]');
+      const lenOut = root.querySelector<HTMLElement>('[data-tail-len]');
+      const verdict = root.querySelector<HTMLElement>('[data-tail-verdict]');
+
       const describeTail = (): void => {
-        if (!tailNote) return;
-        const extra = settings().decay + settings().preDelay;
-        tailNote.textContent =
-          `The export will run about ${extra.toFixed(1)} seconds past the end of ` +
-          'the original so the tail is not cut off.';
+        const { decay, mix, preDelay } = settings();
+
+        if (tailNote) {
+          const extra = decay + preDelay;
+          tailNote.textContent =
+            `The export will run about ${extra.toFixed(1)} seconds past the end of ` +
+            'the original so the tail is not cut off.';
+        }
+
+        if (tailPanel && tailCanvas) {
+          const { rt60, span } = drawTail(tailPanel, tailCanvas, decay, mix, preDelay);
+          if (rtOut) rtOut.textContent = `${rt60.toFixed(2)} s`;
+          if (lenOut) lenOut.textContent = `${span.toFixed(2)} s`;
+          if (verdict) {
+            verdict.textContent =
+              mix > 0.6
+                ? 'Above about 60% wet the dry sound stops leading and the result reads as an effect rather than a space.'
+                : preDelay > 0.06
+                  ? 'A long pre-delay keeps the dry sound clear of the tail, which is how a vocal stays intelligible in a big space.'
+                  : decay > 4
+                    ? 'A decay this long is cathedral territory. Fine for a pad, hard work for anything with words in it.'
+                    : 'The gap before the tail is the pre-delay; the shaded shape is what one hit leaves behind.';
+          }
+        }
       };
 
       const goCustom = (): void => {
@@ -372,6 +604,11 @@ const faq = [
         describeTail();
         commit();
       });
+
+      // First paint waits for layout, since the canvas has no width until the
+      // workspace is on screen.
+      requestAnimationFrame(describeTail);
+      if (tailPanel) new ResizeObserver(describeTail).observe(tailPanel);
 
       describeTail();
     },

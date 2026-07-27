@@ -7,21 +7,21 @@ const tool = getTool('equalizer');
 
 /** Band centres, low to high. Kept in step with the list in the script below. */
 const BANDS = [
-  { hz: 60, label: '60 Hz' },
-  { hz: 150, label: '150 Hz' },
-  { hz: 400, label: '400 Hz' },
-  { hz: 1000, label: '1 kHz' },
-  { hz: 2400, label: '2.4 kHz' },
-  { hz: 6000, label: '6 kHz' },
-  { hz: 12000, label: '12 kHz' },
-  { hz: 16000, label: '16 kHz' },
+  { hz: 60, label: '60' },
+  { hz: 150, label: '150' },
+  { hz: 400, label: '400' },
+  { hz: 1000, label: '1k' },
+  { hz: 2400, label: '2.4k' },
+  { hz: 6000, label: '6k' },
+  { hz: 12000, label: '12k' },
+  { hz: 16000, label: '16k' },
 ];
 
 const steps = [
   'Drop an audio file onto the page. It is decoded by your browser, so a long DJ set opens as fast as a voice memo and nothing is uploaded.',
-  'Pick a preset as a starting point, or leave it on Flat and go straight to the sliders.',
-  'Move individual bands between -12 and +12 dB. The number beside each label is the current gain, and the box next to each slider takes an exact value if you know what you want.',
-  'Press play (the preview is re-rendered with the current curve) and compare against the original by setting the preset back to Flat.',
+  'Pick a preset as a starting point, or leave it on Flat and go straight to the faders.',
+  'Drag a fader up or down between -12 and +12 dB. The curve behind the faders is the actual filter response your settings produce. The box above each fader takes an exact value, and double-clicking a fader zeroes it.',
+  'Listen and compare. The equalised version appears as its own player under the faders, with the untouched original still in the player above.',
   'Choose an output format and click Download.',
 ];
 
@@ -79,38 +79,42 @@ const faq = [
         </select>
       </div>
 
-      {
-        BANDS.map((band) => (
-          <div class="field">
-            <label class="label" for={`eq-${band.hz}`}>
-              {band.label}
-              <span class="label__value" data-out={`hz${band.hz}`}>0.0 dB</span>
-            </label>
-            <div class="slider-row">
-              <input
-                class="slider"
-                id={`eq-${band.hz}`}
-                data-control={`hz${band.hz}`}
-                type="range"
-                min="-12"
-                max="12"
-                step="0.5"
-                value="0"
-              />
-              <input
-                class="num"
-                data-control={`hz${band.hz}-num`}
-                type="number"
-                min="-12"
-                max="12"
-                step="0.5"
-                value="0"
-                aria-label={`${band.label} gain in decibels`}
-              />
-            </div>
-          </div>
-        ))
-      }
+      {/*
+        The fader bank. A dark stage panel like the mixer, because this is an
+        audio surface, not a form: eight vertical faders over the true response
+        curve of the filters they drive. The number input above each fader is
+        the same control with a keyboard: native arrows step it, typing sets an
+        exact value, and the fader follows.
+      */}
+      <div class="eq controls__full" data-eq>
+        <div class="eq__bands">
+          {
+            BANDS.map((band) => (
+              <div class="eq__band" data-band={band.hz}>
+                <input
+                  class="eq__val tnum"
+                  type="number"
+                  min="-12"
+                  max="12"
+                  step="0.5"
+                  value="0"
+                  data-eq-val={band.hz}
+                  aria-label={`${band.label === '1k' || band.label.endsWith('k') ? band.label.replace('k', ' kHz') : `${band.label} Hz`} gain in decibels`}
+                />
+                <div class="eq__slot" data-eq-slot={band.hz}>
+                  <span class="eq__groove" aria-hidden="true" />
+                  <span class="eq__fill" data-eq-fill={band.hz} aria-hidden="true" />
+                  <span class="eq__cap" data-eq-cap={band.hz} aria-hidden="true" />
+                </div>
+                <span class="eq__hz" aria-hidden="true">{band.label}</span>
+              </div>
+            ))
+          }
+        </div>
+        {/* Behind the faders: ±12 rails, the zero detent, and the response curve
+            computed from the actual biquads — not an illustration of one. */}
+        <canvas class="eq__curve" data-eq-curve aria-hidden="true"></canvas>
+      </div>
 
       <p class="hint controls__full" data-headroom aria-live="polite">
         Flat. The export will be identical to the source apart from the format change.
@@ -184,10 +188,143 @@ const faq = [
   </Fragment>
 </ToolPage>
 
+<style>
+  .eq {
+    position: relative;
+    padding: var(--s4) var(--s4) var(--s3);
+    border-radius: var(--r-md);
+    background: var(--stage-2, var(--surface));
+    overflow: hidden;
+  }
+
+  .eq__bands {
+    position: relative;
+    display: grid;
+    grid-template-columns: repeat(8, 1fr);
+    gap: var(--s2);
+    /* Above the canvas, which is absolutely positioned behind. */
+    z-index: 1;
+  }
+
+  .eq__band {
+    display: grid;
+    justify-items: center;
+    gap: var(--s2);
+    min-width: 0;
+  }
+
+  /* The readout is a real input so the keyboard comes free: focus, arrows, type.
+     Styled as a readout rather than a form field, because sixteen bordered boxes
+     would out-shout the faders they belong to. */
+  .eq__val {
+    width: 3.2rem;
+    padding: 1px 2px;
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+    background: transparent;
+    color: var(--stage-ink, #fff);
+    font-size: 11px;
+    font-weight: 600;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
+  .eq__val::-webkit-outer-spin-button,
+  .eq__val::-webkit-inner-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+  }
+
+  .eq__val:hover {
+    border-color: color-mix(in oklch, var(--stage-ink, #fff) 25%, transparent);
+  }
+
+  .eq__val:focus-visible {
+    outline: 2px solid var(--cat-vivid, var(--brand));
+    outline-offset: 1px;
+    border-color: transparent;
+  }
+
+  /* The fader itself: a slot with a groove, a fill that grows away from the
+     centre detent, and a cap. The whole slot is the pointer target — a 10px
+     handle is a misery to grab, a 170px column is not. */
+  .eq__slot {
+    position: relative;
+    width: 100%;
+    height: 172px;
+    cursor: ns-resize;
+    touch-action: none;
+  }
+
+  .eq__groove {
+    position: absolute;
+    inset-block: 0;
+    left: 50%;
+    width: 4px;
+    transform: translateX(-50%);
+    border-radius: var(--r-full);
+    background: color-mix(in oklch, var(--stage-ink, #fff) 14%, transparent);
+  }
+
+  /* Grows from the centre line toward the cap, so a glance up the bank reads
+     boost against cut the way a hardware EQ does. */
+  .eq__fill {
+    position: absolute;
+    left: 50%;
+    width: 4px;
+    transform: translateX(-50%);
+    border-radius: var(--r-full);
+    background: var(--cat-vivid, var(--brand));
+  }
+
+  .eq__cap {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: 26px;
+    height: 14px;
+    transform: translate(-50%, -50%);
+    border-radius: 4px;
+    background: var(--stage-ink, #fff);
+    box-shadow:
+      0 2px 6px oklch(0 0 0 / 0.45),
+      inset 0 -3px 0 color-mix(in oklch, var(--stage-ink, #fff) 55%, black);
+  }
+
+  .eq__hz {
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    color: var(--stage-ink-2, var(--ink-2));
+    font-variant-numeric: tabular-nums;
+  }
+
+  .eq__curve {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+  }
+
+  @media (max-width: 720px) {
+    .eq__slot {
+      height: 132px;
+    }
+
+    .eq__val {
+      width: 2.7rem;
+    }
+  }
+</style>
+
 <script>
   import { createTool } from '../lib/tool';
   import { applyEq, type EqBand } from '../lib/audio/effects';
-  import { clamp, db, pct } from '../lib/format';
+  import { clamp, db } from '../lib/format';
 
   interface BandSpec {
     hz: number;
@@ -219,82 +356,254 @@ const faq = [
     radio: [-10, -4, 2, 5, 6, 3, -6, -12],
   };
 
-  interface Pair {
+  const RANGE = 12;
+
+  interface Fader {
     get(): number;
     set(value: number): void;
   }
 
-  function bindPair(
+  /**
+   * One fader: the slot takes the pointer, the number input takes the keyboard,
+   * and both drive the same value. The input is the canonical store, so there is
+   * no state to desynchronise.
+   */
+  function bindFader(
     root: HTMLElement,
-    name: string,
-    render: (value: number) => string,
+    hz: number,
     onLive: () => void,
     onCommit: () => void
-  ): Pair | null {
-    const slider = root.querySelector<HTMLInputElement>(`[data-control="${name}"]`);
-    const num = root.querySelector<HTMLInputElement>(`[data-control="${name}-num"]`);
-    const out = root.querySelector<HTMLElement>(`[data-out="${name}"]`);
-    if (!slider || !num) return null;
-
-    const min = Number(slider.min);
-    const max = Number(slider.max);
+  ): Fader | null {
+    const input = root.querySelector<HTMLInputElement>(`[data-eq-val="${hz}"]`);
+    const slot = root.querySelector<HTMLElement>(`[data-eq-slot="${hz}"]`);
+    const fill = root.querySelector<HTMLElement>(`[data-eq-fill="${hz}"]`);
+    const cap = root.querySelector<HTMLElement>(`[data-eq-cap="${hz}"]`);
+    if (!input || !slot || !fill || !cap) return null;
 
     const paint = (): void => {
-      slider.style.setProperty('--pct', `${pct(Number(slider.value), min, max)}%`);
-      if (out) out.textContent = render(Number(slider.value));
+      const value = Number(input.value) || 0;
+      // 0 dB is the vertical centre; +12 the top, -12 the bottom.
+      const topPct = (1 - (value + RANGE) / (2 * RANGE)) * 100;
+      cap.style.top = `${topPct}%`;
+      if (value >= 0) {
+        fill.style.top = `${topPct}%`;
+        fill.style.bottom = '50%';
+      } else {
+        fill.style.top = '50%';
+        fill.style.bottom = `${100 - topPct}%`;
+      }
     };
 
-    slider.addEventListener('input', () => {
-      num.value = slider.value;
+    const setValue = (value: number, live = true): void => {
+      const v = Math.round(clamp(value, -RANGE, RANGE) * 2) / 2;
+      input.value = String(v);
       paint();
-      onLive();
-    });
-    slider.addEventListener('change', onCommit);
+      if (live) onLive();
+    };
 
-    num.addEventListener('input', () => {
-      const raw = Number(num.value);
-      if (num.value === '' || !Number.isFinite(raw)) return;
-      slider.value = String(clamp(raw, min, max));
+    /** Pointer anywhere in the slot maps straight to a gain. */
+    const fromPointer = (event: PointerEvent): void => {
+      const rect = slot.getBoundingClientRect();
+      const ratio = clamp((event.clientY - rect.top) / rect.height, 0, 1);
+      setValue((1 - ratio) * 2 * RANGE - RANGE);
+    };
+
+    let dragging = false;
+    slot.addEventListener('pointerdown', (event) => {
+      dragging = true;
+      slot.setPointerCapture(event.pointerId);
+      fromPointer(event);
+    });
+    slot.addEventListener('pointermove', (event) => {
+      if (dragging) fromPointer(event);
+    });
+    const end = (event: PointerEvent): void => {
+      if (!dragging) return;
+      dragging = false;
+      if (slot.hasPointerCapture(event.pointerId)) slot.releasePointerCapture(event.pointerId);
+      onCommit();
+    };
+    slot.addEventListener('pointerup', end);
+    slot.addEventListener('pointercancel', end);
+
+    // The fastest route back to neutral for one band.
+    slot.addEventListener('dblclick', () => {
+      setValue(0);
+      onCommit();
+    });
+
+    input.addEventListener('input', () => {
+      const raw = Number(input.value);
+      if (input.value === '' || !Number.isFinite(raw)) return;
       paint();
       onLive();
     });
-    num.addEventListener('change', () => {
-      const value = clamp(Number(num.value), min, max);
-      num.value = String(value);
-      slider.value = String(value);
-      paint();
-      onLive();
+    input.addEventListener('change', () => {
+      setValue(Number(input.value) || 0);
       onCommit();
     });
 
     paint();
 
     return {
-      get: () => Number(slider.value),
-      set: (value: number) => {
-        const v = clamp(value, min, max);
-        slider.value = String(v);
-        num.value = String(v);
-        paint();
-      },
+      get: () => clamp(Number(input.value) || 0, -RANGE, RANGE),
+      set: (value: number) => setValue(value, false),
     };
   }
 
-  const pairs: (Pair | null)[] = [];
+  const faders: (Fader | null)[] = [];
   let wired = false;
 
   function curve(): EqBand[] {
     return BANDS.map((band, index) => ({
       frequency: band.hz,
-      gain: pairs[index]?.get() ?? 0,
+      gain: faders[index]?.get() ?? 0,
       q: band.q,
       type: band.type,
     }));
   }
 
+  /**
+   * The response curve, measured rather than sketched.
+   *
+   * Each x is mapped to a frequency by log-interpolating through the band
+   * centres — not a plain log axis, because the faders are equally spaced and a
+   * plain axis would draw a boost's bump beside the fader that made it rather
+   * than under it. Each frequency is then put through the actual biquads with
+   * getFrequencyResponse, so shelves look like shelves, the peaks have their real
+   * Q, and neighbouring bands genuinely sum. What is drawn is what will be
+   * rendered on export, not an artist's impression of it.
+   */
+  const POINTS = 160;
+  const measureContext = new OfflineAudioContext(1, 1, 44100);
+  const frequencies = new Float32Array(POINTS);
+  {
+    // Half a band of extrapolated headroom at each end, so the curve does not
+    // start and stop dead on the outer fader centres.
+    const centres = BANDS.map((band) => Math.log(band.hz));
+    const step = 1 / (BANDS.length - 1);
+    for (let i = 0; i < POINTS; i += 1) {
+      const x = (i / (POINTS - 1)) * (1 + step) - step / 2;
+      const at = clamp(x, 0, 1) * (BANDS.length - 1);
+      const low = Math.floor(at);
+      const high = Math.min(BANDS.length - 1, low + 1);
+      const frac = at - low;
+      let logHz = centres[low]! * (1 - frac) + centres[high]! * frac;
+      // Extrapolate beyond the outer centres along the edge segment's slope.
+      if (x < 0) logHz = centres[0]! + (centres[1]! - centres[0]!) * x * (BANDS.length - 1);
+      if (x > 1) {
+        const slope = centres[BANDS.length - 1]! - centres[BANDS.length - 2]!;
+        logHz = centres[BANDS.length - 1]! + slope * (x - 1) * (BANDS.length - 1);
+      }
+      frequencies[i] = Math.min(20000, Math.max(20, Math.exp(logHz)));
+    }
+  }
+  const magnitude = new Float32Array(POINTS);
+  const phase = new Float32Array(POINTS);
+  const responseDb = new Float32Array(POINTS);
+
+  function measureResponse(): Float32Array {
+    responseDb.fill(0);
+    for (const band of curve()) {
+      if (Math.abs(band.gain) < 0.01) continue;
+      const filter = measureContext.createBiquadFilter();
+      filter.type = band.type ?? 'peaking';
+      filter.frequency.value = band.frequency;
+      filter.Q.value = band.q ?? 1.1;
+      filter.gain.value = band.gain;
+      filter.getFrequencyResponse(frequencies, magnitude, phase);
+      for (let i = 0; i < POINTS; i += 1) {
+        responseDb[i] += 20 * Math.log10(Math.max(1e-6, magnitude[i]!));
+      }
+    }
+    return responseDb;
+  }
+
+  function drawCurve(panel: HTMLElement, canvas: HTMLCanvasElement): void {
+    const cssWidth = canvas.clientWidth;
+    const cssHeight = canvas.clientHeight;
+    if (cssWidth < 1 || cssHeight < 1) return;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.round(cssWidth * dpr);
+    const height = Math.round(cssHeight * dpr);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, width, height);
+
+    // The vertical span of the drawing is the slot column, read from a live
+    // fader rather than hardcoded, so the curve stays aligned through the
+    // mobile height change.
+    const slot = panel.querySelector<HTMLElement>('[data-eq-slot="60"]');
+    const bands = panel.querySelector<HTMLElement>('.eq__bands');
+    if (!slot || !bands) return;
+    const panelBox = panel.getBoundingClientRect();
+    const slotBox = slot.getBoundingClientRect();
+    const bandsBox = bands.getBoundingClientRect();
+
+    const top = (slotBox.top - panelBox.top) * dpr;
+    const bottom = (slotBox.bottom - panelBox.top) * dpr;
+    const left = (bandsBox.left - panelBox.left) * dpr;
+    const right = (bandsBox.right - panelBox.left) * dpr;
+    const middle = (top + bottom) / 2;
+    const halfSpan = (bottom - top) / 2;
+
+    const styles = getComputedStyle(panel);
+    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
+    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+
+    // Rails at ±6 and ±12, and the zero detent stronger: the grid a hardware
+    // fader bank prints on its faceplate.
+    context.lineWidth = dpr;
+    for (const dB of [-12, -6, 6, 12]) {
+      const y = middle - (dB / RANGE) * halfSpan;
+      context.strokeStyle = `color-mix(in oklch, ${ink} 8%, transparent)`;
+      context.beginPath();
+      context.moveTo(left, y);
+      context.lineTo(right, y);
+      context.stroke();
+    }
+    context.strokeStyle = `color-mix(in oklch, ${ink} 22%, transparent)`;
+    context.beginPath();
+    context.moveTo(left, middle);
+    context.lineTo(right, middle);
+    context.stroke();
+
+    const response = measureResponse();
+    const y = (index: number): number =>
+      middle - clamp(response[index]! / RANGE, -1.08, 1.08) * halfSpan;
+    const x = (index: number): number => left + (index / (POINTS - 1)) * (right - left);
+
+    // Filled to the zero line, so boost reads as area above and cut as area
+    // below — the shape of the sound, not just a contour.
+    context.beginPath();
+    context.moveTo(x(0), middle);
+    for (let i = 0; i < POINTS; i += 1) context.lineTo(x(i), y(i));
+    context.lineTo(x(POINTS - 1), middle);
+    context.closePath();
+    context.fillStyle = `color-mix(in oklch, ${hue} 20%, transparent)`;
+    context.fill();
+
+    context.beginPath();
+    for (let i = 0; i < POINTS; i += 1) {
+      if (i === 0) context.moveTo(x(i), y(i));
+      else context.lineTo(x(i), y(i));
+    }
+    context.strokeStyle = hue;
+    context.lineWidth = 2 * dpr;
+    context.lineJoin = 'round';
+    context.stroke();
+  }
+
   createTool({
     suffix: 'eq',
     defaultFormat: 'mp3',
+    previewLabel: 'Equalised',
 
     onReady(_ctx, runtime) {
       if (wired) return;
@@ -303,9 +612,16 @@ const faq = [
       const root = runtime.root;
       const select = root.querySelector<HTMLSelectElement>('[data-control="preset"]');
       const headroom = root.querySelector<HTMLElement>('[data-headroom]');
+      const panel = root.querySelector<HTMLElement>('[data-eq]');
+      const canvas = root.querySelector<HTMLCanvasElement>('[data-eq-curve]');
 
-      // Eight biquads render quickly, but replacing the transport's buffer
-      // restarts playback — so it waits until a slider is released.
+      const repaintCurve = (): void => {
+        if (panel && canvas) drawCurve(panel, canvas);
+      };
+
+      // Rendering eight biquads over a whole file is too heavy to run on every
+      // pixel of a drag, so the strip re-renders on release; the curve, which is
+      // 160 points through getFrequencyResponse, repaints live.
       let timer = 0;
       const commit = (): void => {
         window.clearTimeout(timer);
@@ -340,21 +656,26 @@ const faq = [
       const goCustom = (): void => {
         if (select) select.value = 'custom';
         describe();
+        repaintCurve();
       };
 
       for (const band of BANDS) {
-        pairs.push(
-          bindPair(root, `hz${band.hz}`, (v) => db(v), goCustom, commit)
-        );
+        faders.push(bindFader(root, band.hz, goCustom, commit));
       }
 
       select?.addEventListener('change', () => {
         const preset = PRESETS[select.value];
         if (!preset) return;
-        preset.forEach((gain, index) => pairs[index]?.set(gain));
+        preset.forEach((gain, index) => faders[index]?.set(gain));
         describe();
+        repaintCurve();
         commit();
       });
+
+      // First paint waits for layout, same reasoning as the stem panel: the
+      // canvas has no width until the workspace is visible.
+      requestAnimationFrame(repaintCurve);
+      if (panel) new ResizeObserver(repaintCurve).observe(panel);
 
       describe();
     },

@@ -275,8 +275,29 @@ const readings = [
                 ? slice(ctx.buffer, selection.start, selection.end)
                 : ctx.buffer;
 
-            const { bpm, confidence } = detectTempo(source);
+            const { bpm, confidence, beatPeriod, beatOffset } = detectTempo(source);
             const verdict = verdictFor(bpm, confidence);
+
+            /**
+             * The grid over the waveform, which is the check on the number.
+             *
+             * A tempo reading is a claim, and until now the only way to test it
+             * was to tap along. Drawn on the audio it either lands on the
+             * transients or it visibly does not — and a grid that drifts out of
+             * step across the file is the unmistakable signature of a detection
+             * that locked onto the wrong period. Offset by the selection start
+             * when measuring a selection, since the phase was found relative to
+             * that slice rather than to the file.
+             */
+            const measuredFrom =
+              useSelection?.checked && selection.end - selection.start > 2
+                ? selection.start
+                : 0;
+            runtime.setGrid(
+              bpm > 0 && confidence > 0.15
+                ? { period: beatPeriod, offset: measuredFrom + beatOffset, accent: 4 }
+                : null
+            );
 
             if (bpmOut) bpmOut.textContent = bpm > 0 ? bpm.toFixed(1) : ', ';
             if (chip) {
