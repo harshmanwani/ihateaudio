@@ -1,0 +1,327 @@
+---
+/**
+ * The primary action for tools that must run a model before there is anything to
+ * download.
+ *
+ * Every other tool on this site is one press: the export bar's button does the work
+ * and saves the file, because the work is milliseconds. The AI tools are not that.
+ * Separating a track is minutes, it has a real chance of failing, and what comes out
+ * is something you need to listen to before you keep it — so folding "run the model"
+ * and "save the file" into one button labelled with a download icon was wrong twice
+ * over. It hid a four-minute job behind a control that looks instant, and it put the
+ * progress bar up next to the dropzone, a screen away from the button that started
+ * it.
+ *
+ * So this is the first press, and it lives where the work is: under the controls
+ * that configure it, above the results it produces, with its own progress and its own
+ * cancel. The export bar keeps the second press and goes back to meaning exactly what
+ * it says.
+ */
+import Icon from './Icon.astro';
+
+interface Props {
+  /** Label on the button, e.g. "Split into stems". */
+  label: string;
+  /** One line under the button, for what pressing it will cost in time or bytes. */
+  hint?: string;
+  /** Verb shown while it runs, e.g. "Splitting". */
+  busy?: string;
+  /** Line shown once it has finished. */
+  done?: string;
+  /**
+   * 'gate' — nothing can be downloaded until this has run, so the export bar
+   * stays disabled until it finishes. For the AI tools, where the model output
+   * *is* the file.
+   *
+   * 'preview' — the download works regardless and renders on its own; this
+   * button only produces something to listen to first. For the tools whose
+   * effect is too heavy to recompute on every drag.
+   */
+  mode?: 'gate' | 'preview';
+  /**
+   * Glyph on the button. Pages pass their own tool mark, so the button carries
+   * the same symbol as the thing it belongs to — a single shared icon across
+   * six different actions said nothing about any of them.
+   */
+  icon?: string;
+}
+
+const {
+  label,
+  hint,
+  busy = 'Working',
+  done = 'Done. Listen below, then download.',
+  mode = 'gate',
+  icon = 'waveform',
+} = Astro.props;
+---
+
+{/* controls__full because this sits in the .controls grid and must span it. */}
+<div class="runner controls__full" data-runner data-state="idle" data-mode={mode}>
+  <div class="runner__idle">
+    <button type="button" class="runner__go" data-analyze>
+      <Icon name={icon} size={18} />
+      <span data-runner-label-idle>{label}</span>
+    </button>
+    {hint && <p class="runner__hint" data-runner-hint>{hint}</p>}
+  </div>
+
+  {/*
+    Stale: it has run once, then a control moved and what is on screen no longer
+    matches the settings. This state exists because the alternative — a quiet
+    button and a line of small print explaining that you have to press it — is
+    the thing nobody reads. Going back to a full-width button that says the
+    settings changed is impossible to miss.
+  */}
+  <div class="runner__stale">
+    <button type="button" class="runner__go" data-analyze>
+      <Icon name={icon} size={18} />
+      {label}
+    </button>
+    <p class="runner__note">Settings changed. Render again to hear them.</p>
+  </div>
+
+  <div class="runner__busy">
+    <div class="runner__head">
+      <span class="runner__phase" data-runner-phase>{busy}</span>
+      <span class="runner__pct tnum" data-runner-pct></span>
+    </div>
+    {/* data-indeterminate is set by the runtime for the phases that genuinely
+        cannot report a fraction, rather than showing a bar frozen at 0%. */}
+    <div class="runner__track" data-runner-track>
+      <div class="runner__bar" data-runner-bar></div>
+    </div>
+    <button type="button" class="btn btn--ghost btn--sm" data-runner-cancel>Cancel</button>
+  </div>
+
+  <div class="runner__done">
+    <span class="runner__tick" aria-hidden="true">
+      <Icon name="check-circle" weight="fill" size={19} />
+    </span>
+    <span class="runner__doneText" data-runner-done>{done}</span>
+    <button type="button" class="btn btn--quiet btn--sm" data-analyze>Run again</button>
+  </div>
+</div>
+
+<style>
+  /*
+   * Quiet by default.
+   *
+   * The first version was a tall dashed box with a centred pill in it, and next
+   * to a row of ordinary fields it read as the loudest thing on the page —
+   * shouting a step that is only one of several. What it actually needs is to be
+   * unmissable at the moment it matters, which is the stale state, and otherwise
+   * to sit down. So: no box at rest, a normal-height button, left-aligned with
+   * everything else, and the panel only grows a border when it has something to
+   * say.
+   */
+  .runner {
+    display: grid;
+    gap: var(--s2);
+    padding: var(--s1) 0;
+  }
+
+  /* One cell, four overlapping states, so switching between them never changes
+     the height of the panel and nothing below it jumps. */
+  .runner__idle,
+  .runner__stale,
+  .runner__busy,
+  .runner__done {
+    display: none;
+    width: 100%;
+    justify-items: start;
+    gap: var(--s2);
+  }
+
+  .runner[data-state='idle'] .runner__idle,
+  .runner[data-state='stale'] .runner__stale,
+  .runner[data-state='busy'] .runner__busy,
+  .runner[data-state='done'] .runner__done {
+    display: grid;
+  }
+
+  /* Only the stale state gets a card, because it is the only one making a claim
+     the reader has to act on. Done is a tick and a sentence; idle is a button.
+     --accent is what .note--warn uses, so this looks like every other heads-up
+     on the site rather than a fourth signal colour. */
+  .runner[data-state='stale'] {
+    grid-auto-flow: column;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: var(--s3);
+    padding: var(--s3);
+    border: 1px solid color-mix(in oklch, var(--accent) 30%, transparent);
+    border-radius: var(--r-md);
+    background: var(--accent-soft);
+  }
+
+  .runner[data-state='stale'] .runner__stale {
+    grid-auto-flow: column;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: var(--s3);
+  }
+
+  .runner__note {
+    margin: 0;
+    max-width: 52ch;
+    font-size: var(--t-small);
+    font-weight: 600;
+    color: var(--accent-ink);
+  }
+
+  /* ---------- idle ---------- */
+
+  .runner__go {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--s2);
+    padding: var(--s2) var(--s5);
+    min-height: 40px;
+    border: none;
+    border-radius: var(--r-full);
+    /* --brand, not the category hue. Every primary button on the site is
+       .btn--solid, which is brand green; the AI family hue is a coral, and a
+       coral primary action reads as "delete" rather than "go". The hue still
+       shows up here on the progress bar and the finished tick, where it is an
+       accent rather than a verb. */
+    background: var(--brand);
+    color: oklch(1 0 0);
+    font-size: var(--t-ui);
+    font-weight: 700;
+    cursor: pointer;
+    transition:
+      transform var(--dur-micro) var(--ease),
+      background-color var(--dur-micro) var(--ease);
+  }
+
+  .runner__go:hover {
+    transform: translateY(-1px);
+    background: var(--brand-hover);
+  }
+
+  .runner__go:active {
+    transform: translateY(0);
+  }
+
+  .runner__go:focus-visible {
+    outline: 2px solid var(--ink);
+    outline-offset: 3px;
+  }
+
+  .runner__go:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .runner__hint {
+    margin: 0;
+    max-width: 52ch;
+    font-size: var(--t-small);
+    color: var(--ink-2);
+  }
+
+  /* ---------- busy ---------- */
+
+  .runner__busy {
+    max-width: 42rem;
+  }
+
+  .runner__head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    width: 100%;
+    gap: var(--s3);
+  }
+
+  .runner__phase {
+    font-size: var(--t-ui);
+    font-weight: 600;
+    color: var(--ink);
+  }
+
+  .runner__pct {
+    font-size: var(--t-small);
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .runner__track {
+    position: relative;
+    width: 100%;
+    height: 8px;
+    border-radius: var(--r-full);
+    background: var(--line-strong);
+    overflow: hidden;
+  }
+
+  .runner__bar {
+    height: 100%;
+    width: 0%;
+    border-radius: var(--r-full);
+    /* Brand rather than the family hue for the same reason as the button: on a
+       light panel the AI coral reads as a warning bar, not a progress bar. */
+    background: var(--brand);
+    transition: width var(--dur-micro) var(--ease);
+  }
+
+  /* Loading the model and building the session report no fraction at all. A bar
+     sitting at 0% for thirty seconds reads as broken, so it says "running"
+     instead of lying about "nothing done yet". */
+  .runner__track[data-indeterminate='true'] .runner__bar {
+    width: 35%;
+    transition: none;
+    animation: runner-slide 1.4s var(--ease) infinite;
+  }
+
+  @keyframes runner-slide {
+    from {
+      transform: translateX(-100%);
+    }
+    to {
+      transform: translateX(340%);
+    }
+  }
+
+  /* ---------- done ---------- */
+
+  .runner__done {
+    grid-auto-flow: column;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    justify-content: start;
+    gap: var(--s2) var(--s3);
+  }
+
+  .runner__tick {
+    display: flex;
+    color: var(--brand);
+  }
+
+  .runner__doneText {
+    font-size: var(--t-small);
+    color: var(--ink-2);
+  }
+
+  @media (max-width: 560px) {
+    .runner__done {
+      grid-auto-flow: row;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .runner__go,
+    .runner__bar {
+      transition: none;
+    }
+
+    .runner__track[data-indeterminate='true'] .runner__bar {
+      animation: none;
+      width: 100%;
+      opacity: 0.5;
+    }
+  }
+</style>

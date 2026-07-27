@@ -5,6 +5,7 @@
  * config plus a <slot>, not a new interface.
  */
 import Icon from './Icon.astro';
+import StemPanel from './StemPanel.astro';
 import { PRIVACY_LINE } from '../consts';
 import { relatedTools, type Tool } from '../data/tools';
 
@@ -319,6 +320,15 @@ const formats = video
     }
 
     <slot />
+
+    {/*
+      Where a processed result lands. The main transport above always plays the
+      source; anything a tool renders — a live preview, a cleaned recording, an
+      extracted vocal — mounts here as its own player, the same shape as the
+      splitter's mixer. Swapping the original out from under the play button
+      looked like the file itself had changed, and made "compare" impossible.
+    */}
+    <StemPanel purpose="result" />
 
     {results && <div class="results" data-results />}
 

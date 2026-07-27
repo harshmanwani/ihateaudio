@@ -28,8 +28,9 @@ import {
   AUDIO_ACCEPT,
   MEDIA_ACCEPT,
 } from './files';
-import { timecode, filesize, outputName, duration as fmtDuration } from './format';
+import { timecode, filesize, outputName, baseName, duration as fmtDuration } from './format';
 import { track, durationBucket } from './track';
+import { mountStemPanel } from './ai/stem-panel';
 
 export interface Selection {
   start: number;
@@ -43,8 +44,8 @@ export interface ToolContext {
   buffers: AudioBuffer[];
   files: File[];
   selection: Selection;
-  /** Reports 0..1 during a long process step. */
-  progress: (ratio: number) => void;
+  /** Reports 0..1 during a long process step, with an optional phase name. */
+  progress: (ratio: number, label?: string) => void;
   signal: AbortSignal;
 }
 
@@ -82,8 +83,10 @@ export interface ToolConfig {
   onReady?: (ctx: ToolContext, tool: ToolRuntime) => void;
   /** Produces the output. Runs when the user clicks the export button. */
   process: (ctx: ToolContext) => Promise<ProcessResult> | ProcessResult;
-  /** Optional: audio the transport should play instead of the raw source. */
+  /** Optional: renders the current settings into the result strip. */
   preview?: (ctx: ToolContext) => Promise<AudioBuffer> | AudioBuffer;
+  /** Name on the result strip's row, e.g. "Equalised". Defaults to "Preview". */
+  previewLabel?: string;
 }
 
 const $ = <T extends HTMLElement>(root: ParentNode, selector: string): T | null =>
@@ -101,7 +104,6 @@ export class ToolRuntime {
   private markers: number[] = [];
   private controller: AbortController | null = null;
   private detachDrop: (() => void) | null = null;
-  private previewBuffer: AudioBuffer | null = null;
   private lastOutput: { blob: Blob; name: string } | null = null;
   /** Last playhead position, so a zoom change can reposition it. */
   private playTime = 0;
@@ -148,7 +150,25 @@ export class ToolRuntime {
     reset: HTMLButtonElement | null;
     chain: HTMLElement | null;
     results: HTMLElement | null;
+    resultPanel: HTMLElement | null;
+    runner: HTMLElement | null;
+    runnerPhase: HTMLElement | null;
+    runnerPct: HTMLElement | null;
+    runnerTrack: HTMLElement | null;
+    runnerBar: HTMLElement | null;
+    runnerCancel: HTMLButtonElement | null;
   };
+
+  /**
+   * Output of the analyse step, waiting to be downloaded.
+   *
+   * Only used by tools that render a RunAction: those run the model on the first
+   * press and save on the second, so the result has to survive in between. It is
+   * cleared whenever anything that would change it changes — a new file, a
+   * different setting — because offering a download of a result that no longer
+   * matches the controls on screen is worse than asking for another run.
+   */
+  private analyzed: ProcessResult | null = null;
 
   constructor(root: HTMLElement, config: ToolConfig) {
     this.root = root;
@@ -190,6 +210,13 @@ export class ToolRuntime {
       reset: $<HTMLButtonElement>(root, '[data-reset]'),
       chain: $(root, '[data-chain]'),
       results: $(root, '[data-results]'),
+      resultPanel: $(root, '[data-stem-panel="result"]'),
+      runner: $(root, '[data-runner]'),
+      runnerPhase: $(root, '[data-runner-phase]'),
+      runnerPct: $(root, '[data-runner-pct]'),
+      runnerTrack: $(root, '[data-runner-track]'),
+      runnerBar: $(root, '[data-runner-bar]'),
+      runnerCancel: $<HTMLButtonElement>(root, '[data-runner-cancel]'),
     };
 
     this.init();
@@ -213,6 +240,28 @@ export class ToolRuntime {
     this.el.alertClose?.addEventListener('click', () => this.hideAlert());
     this.el.format?.addEventListener('change', () => this.onFormatChange());
     this.el.quality?.addEventListener('change', () => this.updateSize());
+
+    if (this.twoPhase()) {
+      // Both the first button and the "Run again" one, which are the same action.
+      this.root
+        .querySelectorAll<HTMLButtonElement>('[data-analyze]')
+        .forEach((button) => button.addEventListener('click', () => void this.analyze()));
+
+      this.el.runnerCancel?.addEventListener('click', () => this.controller?.abort());
+
+      /**
+       * Any control the tool exposes invalidates a finished run.
+       *
+       * Ticking a different stem after a split has to send you back to the button,
+       * not leave a Download sitting there that would quietly hand over the
+       * previous selection. Listening on the root covers controls the page adds
+       * later, which the AI pages all do.
+       */
+      this.root.addEventListener('change', (event) => {
+        const target = event.target as HTMLElement | null;
+        if (target?.closest('[data-control]')) this.invalidate();
+      });
+    }
 
     this.buildFormatOptions();
     this.setupTransport();
@@ -367,6 +416,12 @@ export class ToolRuntime {
   private showWorkspace(): void {
     this.el.drop?.setAttribute('hidden', '');
     this.el.workspace?.removeAttribute('hidden');
+    // A newly loaded file has not been analysed, so the run panel starts at the
+    // button and the export bar starts disabled.
+    if (this.twoPhase()) {
+      this.analyzed = null;
+      this.setRunner('idle');
+    }
   }
 
   private updateFileMeta(): void {
@@ -730,7 +785,7 @@ export class ToolRuntime {
 
   private renderPlayhead(seconds: number, follow = true): void {
     const { playhead, time } = this.el;
-    const buffer = this.previewBuffer ?? this.buffers[0];
+    const buffer = this.buffers[0];
     this.playTime = seconds;
 
     // Zoomed in, the playhead runs off the edge within a second or two. Paging
@@ -910,6 +965,11 @@ export class ToolRuntime {
   /** Calls out spans on the waveform that the tool is about to act on. */
   setHighlights(regions: { start: number; end: number }[]): void {
     this.waveform?.setHighlights(regions);
+  }
+
+  /** Beat grid over the waveform. Null clears it. */
+  setGrid(grid: { period: number; offset: number; accent: number } | null): void {
+    this.waveform?.setGrid(grid);
   }
 
   /** Segment boundaries including the file's own start and end. */
@@ -1131,17 +1191,41 @@ export class ToolRuntime {
     });
   }
 
-  // ---------- preview ----------
+  // ---------- result strip ----------
 
-  /** Re-renders the transport's audio when controls change. */
+  /**
+   * Mounts a result as its own player under the controls.
+   *
+   * The main transport always plays the source — swapping its buffer for a
+   * preview looked like the file itself had changed, and made comparing the two
+   * a memory exercise. The strip is the same player the splitter uses, cut down
+   * to one listen-only row, so original and result sit one above the other and
+   * either can be played at will.
+   */
+  showResult(buffer: AudioBuffer, name: string): void {
+    if (!this.el.resultPanel) return;
+    mountStemPanel(this.el.resultPanel, [{ id: 'result', name, buffer }], {
+      baseName: baseName(this.files[0]?.name ?? 'result'),
+      chrome: 'listen',
+      onError: (message) => this.showNote(message, 'warn'),
+    });
+  }
+
+  /** Unmounts the strip, for when the result no longer matches the controls. */
+  hideResult(): void {
+    if (!this.el.resultPanel) return;
+    mountStemPanel(this.el.resultPanel, [], {
+      baseName: 'result',
+      chrome: 'listen',
+    });
+  }
+
+  /** Re-renders the result strip when controls change. */
   refreshPreview(): void {
     if (!this.config.preview || this.buffers.length === 0) return;
     void Promise.resolve(this.config.preview(this.context()))
       .then((buffer) => {
-        this.previewBuffer = buffer;
-        this.player?.setBuffer(buffer);
-        this.waveform?.setBuffer(buffer, true);
-        if (this.config.selection) this.player?.setRegion(this.selection);
+        this.showResult(buffer, this.config.previewLabel ?? 'Preview');
       })
       .catch(() => {
         /* Preview is a convenience; export remains the source of truth. */
@@ -1156,7 +1240,9 @@ export class ToolRuntime {
       buffers: this.buffers,
       files: this.files,
       selection: this.getSelection(),
-      progress: (ratio) => this.showProgress(ratio, 'Processing'),
+      // The label is optional so the forty non-AI tools keep calling this with a
+      // bare ratio, but the AI ones can say which stem is running.
+      progress: (ratio, label) => this.showProgress(ratio, label ?? 'Processing'),
       signal: this.controller?.signal ?? new AbortController().signal,
     };
   }
@@ -1228,13 +1314,122 @@ export class ToolRuntime {
     }
   }
 
-  async run(): Promise<void> {
+  /** True when the page renders a RunAction, i.e. model first, download second. */
+  private twoPhase(): boolean {
+    return this.el.runner !== null;
+  }
+
+  /**
+   * Whether the export bar depends on this having run.
+   *
+   * True for the AI tools, where the model output is the file. False in preview
+   * mode, where downloading renders on its own and this button only produces
+   * something to hear first — disabling Download there would be a lie.
+   */
+  private gates(): boolean {
+    return this.el.runner?.dataset.mode !== 'preview';
+  }
+
+  private setRunner(state: 'idle' | 'stale' | 'busy' | 'done'): void {
+    this.el.runner?.setAttribute('data-state', state);
+    if (this.gates() && this.el.download) {
+      this.el.download.disabled = state !== 'done';
+    }
+  }
+
+  /** Throws away a finished run, sending the user back to the button. */
+  private invalidate(): void {
+    if (!this.twoPhase() || this.analyzed === null) return;
+    this.analyzed = null;
+    // 'stale' rather than 'idle': there was a result a moment ago, and saying so
+    // is the difference between a control that looks broken and one that tells
+    // you it needs pressing again.
+    this.setRunner('stale');
+    // The result player goes too: keeping stale audio playable while the
+    // controls describe a different result is the same lie as keeping its
+    // download button enabled.
+    this.hideResult();
+  }
+
+  /**
+   * First press: run the model, keep the result, save nothing.
+   *
+   * Deliberately does not touch the export bar beyond enabling it. The point of
+   * splitting the two presses is that this one can be watched, cancelled and
+   * repeated with different settings without a file landing in the downloads
+   * folder every time.
+   */
+  async analyze(): Promise<void> {
     if (this.buffers.length === 0) return;
 
     this.controller?.abort();
     this.controller = new AbortController();
 
+    this.analyzed = null;
+    this.setRunner('busy');
+    this.runnerProgress(null, 'Starting');
+    this.clearStatus();
+
+    try {
+      const result = await this.config.process(this.context());
+      this.analyzed = result;
+
+      /**
+       * In preview mode this button's whole job is producing something to hear,
+       * so mounting it is not the page's business. The gated tools opt out
+       * because they render their own surface — the splitter's mixer would
+       * otherwise be shadowed by a second, redundant strip.
+       */
+      if (!this.gates()) {
+        const playable =
+          result instanceof AudioBuffer
+            ? result
+            : result && typeof result === 'object' && 'buffer' in result
+              ? ((result as { buffer?: AudioBuffer }).buffer ?? null)
+              : null;
+        if (playable) this.showResult(playable, this.config.previewLabel ?? 'Preview');
+      }
+
+      this.setRunner('done');
+    } catch (err) {
+      const audioErr = toAudioError(err);
+      // Back to idle either way: a cancelled or failed run leaves nothing to
+      // download, and the button that starts it again is the honest next step.
+      this.setRunner('idle');
+      if (audioErr.code !== 'cancelled') this.showError(audioErr);
+    }
+  }
+
+  async run(): Promise<void> {
+    if (this.buffers.length === 0) return;
+
     const button = this.el.download;
+
+    // Deliver what the run panel already produced, when there is something. This
+    // press says Download, so it saves what is on screen and never quietly
+    // re-runs a four-minute model. In preview mode nothing may have been run at
+    // all, and that falls through to a fresh render below — the download has to
+    // work whether or not anyone pressed Preview.
+    if (this.twoPhase() && this.analyzed !== null) {
+      this.controller?.abort();
+      this.controller = new AbortController();
+      if (button) button.dataset.loading = 'true';
+      try {
+        if (Array.isArray(this.analyzed)) await this.deliverMany(this.analyzed);
+        else await this.deliverOne(this.analyzed);
+      } catch (err) {
+        const audioErr = toAudioError(err);
+        if (audioErr.code !== 'cancelled') this.showError(audioErr);
+      } finally {
+        if (button) delete button.dataset.loading;
+        this.clearProgress();
+      }
+      return;
+    }
+
+    this.controller?.abort();
+    this.controller = new AbortController();
+
     if (button) button.dataset.loading = 'true';
     this.clearStatus();
 
@@ -1262,9 +1457,27 @@ export class ToolRuntime {
 
     let blob: Blob;
     let suffix = this.config.suffix;
+    /**
+     * Extension for an already-encoded result.
+     *
+     * A Blob coming back from process() has nothing to do with the audio format
+     * picker — it is finished output that chose its own type. Taking the
+     * extension from the export bar named a subtitle file `.mp3`, because a page
+     * with no export bar falls through to the 'mp3' default. The blob's own MIME
+     * type is the only thing that knows what it actually is.
+     */
+    let extension = spec.extension;
 
     if (result instanceof Blob) {
       blob = result;
+      const known: Record<string, string> = {
+        'text/plain': 'txt',
+        'text/vtt': 'vtt',
+        'application/x-subrip': 'srt',
+        'application/json': 'json',
+      };
+      const mime = result.type.split(';')[0]?.trim() ?? '';
+      extension = known[mime] ?? (mime.startsWith('audio/') ? spec.extension : 'txt');
     } else {
       const buffer =
         'buffer' in (result as { buffer: AudioBuffer })
@@ -1284,7 +1497,7 @@ export class ToolRuntime {
       });
     }
 
-    const name = outputName(this.files[0]?.name ?? 'audio', suffix, spec.extension);
+    const name = outputName(this.files[0]?.name ?? 'audio', suffix, extension);
     saveBlob(blob, name);
     this.lastOutput = { blob, name };
     this.markReady();
@@ -1370,7 +1583,33 @@ export class ToolRuntime {
     if (busy && label) this.showProgress(0, label);
   }
 
+  /**
+   * Progress inside the run panel, where the button that started it is.
+   *
+   * A null ratio means the phase genuinely cannot report one — fetching a model
+   * of unknown length, building an ONNX session — and the bar animates instead of
+   * sitting at 0%, which reads as stuck.
+   */
+  private runnerProgress(ratio: number | null, label: string): void {
+    const { runnerPhase, runnerPct, runnerBar, runnerTrack } = this.el;
+    const known = ratio !== null && Number.isFinite(ratio);
+    const clamped = known ? Math.min(1, Math.max(0, ratio)) : 0;
+
+    if (runnerPhase) runnerPhase.textContent = label;
+    runnerTrack?.setAttribute('data-indeterminate', String(!known));
+    if (runnerPct) runnerPct.textContent = known ? `${Math.round(clamped * 100)}%` : '';
+    if (runnerBar && known) runnerBar.style.width = `${clamped * 100}%`;
+  }
+
   private showProgress(ratio: number, label: string): void {
+    // While the run panel is working, that is where progress belongs. The bar by
+    // the dropzone is for reading files, which happens before there is a
+    // workspace to put anything in.
+    if (this.twoPhase() && this.el.runner?.dataset.state === 'busy') {
+      this.runnerProgress(ratio, label);
+      return;
+    }
+
     const status = this.el.status;
     if (!status) return;
 
@@ -1463,8 +1702,10 @@ export class ToolRuntime {
     this.buffers = [];
     this.files = [];
     this.markers = [];
-    this.previewBuffer = null;
     this.lastOutput = null;
+    this.analyzed = null;
+    this.hideResult();
+    if (this.twoPhase()) this.setRunner('idle');
 
     this.el.workspace?.setAttribute('hidden', '');
     this.el.drop?.removeAttribute('hidden');
