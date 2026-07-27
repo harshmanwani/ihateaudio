@@ -68,6 +68,23 @@ const faq = [
 
         <p class="keyout__second" data-key-second></p>
 
+        {/*
+          The Camelot wheel, with all twenty-four keys shaded by how well they
+          actually scored.
+
+          "8A" is only useful if you already know the wheel, and the whole reason
+          DJ software uses it is that the layout does the thinking: neighbours mix.
+          Drawn, the code stops being a label and becomes a position, with the
+          three keys you can move to marked. Shading every cell by its correlation
+          also shows the shape of the answer — a track that scored one cell far
+          above the rest is a different situation from one where half the wheel is
+          warm, and the confidence percentage alone cannot tell you which you have.
+        */}
+        <div class="wheel" data-wheel-panel>
+          <canvas class="wheel__canvas" data-wheel aria-hidden="true"></canvas>
+          <p class="wheel__caption" data-wheel-caption></p>
+        </div>
+
         <div class="keyout__chart">
           <span class="keyout__label">Notes in this track</span>
           <div class="chroma" data-chroma></div>
@@ -176,6 +193,37 @@ const faq = [
     gap: var(--s2);
   }
 
+  .wheel {
+    padding: var(--s4);
+    border-radius: var(--r-md);
+    background: var(--stage-2, var(--surface));
+    display: flex;
+    flex-direction: column;
+    gap: var(--s3);
+    align-items: center;
+  }
+
+  .wheel__canvas {
+    width: 100%;
+    max-width: 420px;
+    height: 340px;
+    display: block;
+  }
+
+  .wheel__caption {
+    margin: 0;
+    text-align: center;
+    font-size: var(--t-small);
+    color: var(--stage-ink-2);
+    max-width: 46ch;
+  }
+
+  @media (max-width: 560px) {
+    .wheel__canvas {
+      height: 300px;
+    }
+  }
+
   .chroma {
     display: grid;
     grid-template-columns: repeat(12, 1fr);
@@ -232,11 +280,159 @@ const faq = [
 
 <script>
   import { createTool } from '../lib/tool';
-  import { camelot, detectKey, NOTE_NAMES } from '../lib/audio/key';
+  import type { KeyCandidate } from '../lib/audio/key';
+  import { camelot, detectKey, NOTE_NAMES, rankKeys } from '../lib/audio/key';
 
   /** Semitone offsets of the notes in a major and a natural minor scale. */
   const MAJOR_SCALE = [0, 2, 4, 5, 7, 9, 11];
   const MINOR_SCALE = [0, 2, 3, 5, 7, 8, 10];
+
+  /** Splits "8A" into the wheel position and the mode letter. */
+  function readCode(code: string): { number: number; letter: string } {
+    return { number: Number.parseInt(code, 10), letter: code.slice(-1) };
+  }
+
+  /**
+   * The three keys that mix with a given one.
+   *
+   * This is the entire point of the Camelot notation: same number other letter
+   * (the relative major or minor, identical notes), and one step either way round
+   * the wheel, which is a move of a fifth. Everything else is a harder mix.
+   */
+  function neighbours(code: string): string[] {
+    const { number, letter } = readCode(code);
+    const other = letter === 'A' ? 'B' : 'A';
+    // Wheel positions are 1-based and wrap, so 12 + 1 is 1 and 1 - 1 is 12.
+    const up = (number % 12) + 1;
+    const down = ((number + 10) % 12) + 1;
+    return [`${number}${other}`, `${down}${letter}`, `${up}${letter}`];
+  }
+
+  const SECTOR = (30 * Math.PI) / 180;
+  const SECTOR_GAP = (1.8 * Math.PI) / 180;
+
+  /**
+   * The wheel, shaded by the real correlations rather than only marking a winner.
+   *
+   * Every one of the twenty-four cells is filled in proportion to how well that key
+   * actually scored, which turns the picture into an account of the answer: one hot
+   * cell means the track is unambiguous, a warm arc means it sits between related
+   * keys, and a warm cell on the opposite side usually means the analysis found two
+   * sections in different keys.
+   */
+  function drawWheel(
+    panel: HTMLElement,
+    canvas: HTMLCanvasElement,
+    ranked: KeyCandidate[],
+    best: KeyCandidate,
+    runnerUp: KeyCandidate
+  ): void {
+    const cssWidth = canvas.clientWidth;
+    const cssHeight = canvas.clientHeight;
+    if (cssWidth < 1 || cssHeight < 1) return;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.round(cssWidth * dpr);
+    const height = Math.round(cssHeight * dpr);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, width, height);
+
+    const styles = getComputedStyle(panel);
+    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
+    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+
+    const cx = width / 2;
+    const cy = height / 2;
+    const radius = Math.min(width, height) / 2 - 4 * dpr;
+
+    // Correlations sit somewhere inside -1..1 and never use the whole range, so
+    // the shading is scaled to this track's own spread. Absolute values would
+    // render almost every wheel the same shade of nothing.
+    let low = Infinity;
+    let high = -Infinity;
+    for (const candidate of ranked) {
+      low = Math.min(low, candidate.score);
+      high = Math.max(high, candidate.score);
+    }
+    const spread = high - low || 1;
+
+    const bestCode = camelot(best.tonic, best.mode);
+    const runnerCode = camelot(runnerUp.tonic, runnerUp.mode);
+    const friends = new Set(neighbours(bestCode));
+
+    context.font = `600 ${11 * dpr}px system-ui, sans-serif`;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+
+    for (const candidate of ranked) {
+      const code = camelot(candidate.tonic, candidate.mode);
+      const { number, letter } = readCode(code);
+      // B is major and rides the outside; A is minor and sits within it, which is
+      // how every printed Camelot wheel is laid out.
+      const outerRing = letter === 'B';
+      const inner = outerRing ? radius * 0.7 : radius * 0.4;
+      const outer = outerRing ? radius : radius * 0.66;
+
+      // Position 1 at twelve o'clock, running clockwise.
+      const centre = (number - 1) * SECTOR - Math.PI / 2;
+      const from = centre - SECTOR / 2 + SECTOR_GAP / 2;
+      const to = centre + SECTOR / 2 - SECTOR_GAP / 2;
+
+      const heat = (candidate.score - low) / spread;
+      const isBest = code === bestCode;
+      const isRunnerUp = code === runnerCode;
+      const isFriend = friends.has(code);
+
+      context.beginPath();
+      context.arc(cx, cy, outer, from, to);
+      context.arc(cx, cy, inner, to, from, true);
+      context.closePath();
+      context.fillStyle = `color-mix(in oklch, ${hue} ${Math.round(5 + heat * 75)}%, transparent)`;
+      context.fill();
+
+      if (isBest) {
+        context.strokeStyle = ink;
+        context.lineWidth = 2.5 * dpr;
+        context.setLineDash([]);
+        context.stroke();
+      } else if (isRunnerUp) {
+        context.strokeStyle = `color-mix(in oklch, ${ink} 55%, transparent)`;
+        context.lineWidth = 1.75 * dpr;
+        context.setLineDash([4 * dpr, 3 * dpr]);
+        context.stroke();
+        context.setLineDash([]);
+      } else if (isFriend) {
+        context.strokeStyle = `color-mix(in oklch, ${ink} 30%, transparent)`;
+        context.lineWidth = 1.25 * dpr;
+        context.stroke();
+      }
+
+      const labelRadius = (inner + outer) / 2;
+      context.fillStyle = isBest
+        ? ink
+        : `color-mix(in oklch, ${ink} ${isFriend || isRunnerUp ? 78 : 42}%, transparent)`;
+      context.fillText(
+        code,
+        cx + Math.cos(centre) * labelRadius,
+        cy + Math.sin(centre) * labelRadius
+      );
+    }
+
+    // The middle is the answer, sitting where the wheel points at it.
+    context.fillStyle = `color-mix(in oklch, ${ink} 62%, transparent)`;
+    context.font = `${12 * dpr}px system-ui, sans-serif`;
+    context.fillText(best.name, cx, cy - 12 * dpr);
+
+    context.fillStyle = hue;
+    context.font = `700 ${23 * dpr}px system-ui, sans-serif`;
+    context.fillText(bestCode, cx, cy + 10 * dpr);
+  }
 
   createTool({
     suffix: 'key',
@@ -252,6 +448,9 @@ const faq = [
       const confidenceEl = root.querySelector<HTMLElement>('[data-key-confidence]');
       const secondEl = root.querySelector<HTMLElement>('[data-key-second]');
       const chromaEl = root.querySelector<HTMLElement>('[data-chroma]');
+      const wheelPanel = root.querySelector<HTMLElement>('[data-wheel-panel]');
+      const wheelCanvas = root.querySelector<HTMLCanvasElement>('[data-wheel]');
+      const wheelCaption = root.querySelector<HTMLElement>('[data-wheel-caption]');
 
       const result = detectKey(ctx.buffer);
       const { best, runnerUp, confidence, chroma } = result;
@@ -299,6 +498,27 @@ const faq = [
       }
 
       if (out) out.hidden = false;
+
+      if (wheelPanel && wheelCanvas) {
+        // rankKeys only re-runs the correlation against the twelve-number profile
+        // that detectKey already computed. The expensive part, the chromagram, is
+        // not repeated.
+        const ranked = rankKeys(chroma);
+        const bestCode = camelot(best.tonic, best.mode);
+        const [relative, down, up] = neighbours(bestCode);
+
+        if (wheelCaption) {
+          wheelCaption.textContent =
+            `${bestCode} mixes with ${relative}, ${down} and ${up}. ` +
+            'Outer ring is major, inner ring is minor, and the dashed cell is the ' +
+            'runner-up.';
+        }
+
+        const paint = (): void => drawWheel(wheelPanel, wheelCanvas, ranked, best, runnerUp);
+        // The panel was hidden until a moment ago, so the canvas has no width yet.
+        requestAnimationFrame(paint);
+        new ResizeObserver(paint).observe(wheelPanel);
+      }
     },
 
     // Nothing to export; the reading is on the page.

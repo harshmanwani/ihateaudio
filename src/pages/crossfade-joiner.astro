@@ -66,6 +66,21 @@ const faq = [
         </p>
       </div>
 
+      {/*
+        The join, twice: where the overlaps fall across the whole run, and what
+        actually happens inside one of them.
+
+        The top half makes the cost visible — every join eats one fade length, so
+        four tracks at eight seconds is half a minute that simply is not in the
+        output. The bottom half is the argument the prose makes at length: the two
+        curves cross at 0.707 rather than 0.5, their powers sum to exactly one, and
+        the dashed line is the 3 dB hole you would get from the obvious straight
+        fade instead. Nobody believes that from a paragraph.
+      */}
+      <div class="join controls__full" data-join-panel>
+        <canvas class="join__canvas" data-join aria-hidden="true"></canvas>
+      </div>
+
       <div class="field">
         <label class="label" for="xf-length">
           Crossfade length
@@ -158,6 +173,26 @@ const faq = [
   </Fragment>
 </ToolPage>
 
+<style>
+  .join {
+    padding: var(--s4);
+    border-radius: var(--r-md);
+    background: var(--stage-2, var(--surface));
+  }
+
+  .join__canvas {
+    width: 100%;
+    height: 244px;
+    display: block;
+  }
+
+  @media (max-width: 560px) {
+    .join__canvas {
+      height: 214px;
+    }
+  }
+</style>
+
 <script>
   import { createTool } from '../lib/tool';
   import { concat } from '../lib/audio/dsp';
@@ -167,6 +202,189 @@ const faq = [
   let order: number[] = [];
   let names: string[] = [];
   let lengths: number[] = [];
+
+  /**
+   * The join diagram.
+   *
+   * Two pictures sharing one canvas because they answer the two questions the
+   * fade length raises at once: what it costs, and what it does.
+   */
+  function drawJoin(
+    panel: HTMLElement,
+    canvas: HTMLCanvasElement,
+    durations: number[],
+    fade: number
+  ): void {
+    const cssWidth = canvas.clientWidth;
+    const cssHeight = canvas.clientHeight;
+    if (cssWidth < 1 || cssHeight < 1) return;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.round(cssWidth * dpr);
+    const height = Math.round(cssHeight * dpr);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, width, height);
+
+    const styles = getComputedStyle(panel);
+    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
+    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+
+    const padL = 12 * dpr;
+    const padR = 12 * dpr;
+    const plotW = width - padL - padR;
+
+    context.textBaseline = 'middle';
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+
+    // ---- Top: where the overlaps land across the whole run. ----
+    const laneH = 26 * dpr;
+    const laneGap = 6 * dpr;
+    const timelineTop = 24 * dpr;
+
+    const starts: number[] = [];
+    let cursor = 0;
+    for (let i = 0; i < durations.length; i += 1) {
+      starts.push(cursor);
+      cursor += (durations[i] ?? 0) - (i < durations.length - 1 ? fade : 0);
+    }
+    const total = Math.max(0.001, cursor);
+    const tx = (seconds: number) => padL + (seconds / total) * plotW;
+
+    context.textAlign = 'left';
+    context.fillStyle = `color-mix(in oklch, ${ink} 55%, transparent)`;
+    context.fillText('Laid out end to end', padL, 10 * dpr);
+    context.textAlign = 'right';
+    context.fillStyle = `color-mix(in oklch, ${ink} 75%, transparent)`;
+    context.fillText(fmtDuration(total), padL + plotW, 10 * dpr);
+
+    for (let i = 0; i < durations.length; i += 1) {
+      // Alternating lanes, which is the only way an overlap can be seen as one.
+      const lane = i % 2;
+      const y = timelineTop + lane * (laneH + laneGap);
+      const x0 = tx(starts[i]!);
+      const x1 = tx(starts[i]! + (durations[i] ?? 0));
+
+      context.fillStyle = `color-mix(in oklch, ${hue} ${lane === 0 ? 30 : 20}%, transparent)`;
+      context.beginPath();
+      context.roundRect(x0, y, Math.max(2 * dpr, x1 - x0), laneH, 4 * dpr);
+      context.fill();
+
+      context.strokeStyle = `color-mix(in oklch, ${hue} 55%, transparent)`;
+      context.lineWidth = dpr;
+      context.stroke();
+
+      if (x1 - x0 > 22 * dpr) {
+        context.fillStyle = `color-mix(in oklch, ${ink} 78%, transparent)`;
+        context.textAlign = 'center';
+        context.fillText(String(i + 1), (x0 + x1) / 2, y + laneH / 2);
+      }
+    }
+
+    // The overlaps themselves, drawn over both lanes so the cost is one shape.
+    const stackBottom = timelineTop + laneH * 2 + laneGap;
+    for (let i = 0; i < durations.length - 1; i += 1) {
+      const from = tx(starts[i]! + (durations[i] ?? 0) - fade);
+      const to = tx(starts[i]! + (durations[i] ?? 0));
+      context.fillStyle = `color-mix(in oklch, ${ink} 16%, transparent)`;
+      context.fillRect(from, timelineTop, Math.max(dpr, to - from), stackBottom - timelineTop);
+    }
+
+    if (durations.length > 1) {
+      context.textAlign = 'center';
+      context.fillStyle = `color-mix(in oklch, ${ink} 48%, transparent)`;
+      context.fillText(
+        `${durations.length - 1} × ${fade.toFixed(1)} s of overlap, ${fmtDuration(
+          fade * (durations.length - 1)
+        )} shorter than the sum`,
+        padL + plotW / 2,
+        stackBottom + 12 * dpr
+      );
+    }
+
+    // ---- Bottom: inside one overlap. ----
+    const curveTop = stackBottom + 30 * dpr;
+    const curveH = height - curveTop - 22 * dpr;
+    if (curveH < 30 * dpr) return;
+
+    const cx = (t: number) => padL + t * plotW;
+    // A little headroom above 1, because the point is that nothing exceeds it.
+    const cy = (gain: number) => curveTop + curveH - (gain / 1.12) * curveH;
+
+    context.strokeStyle = `color-mix(in oklch, ${ink} 10%, transparent)`;
+    context.lineWidth = dpr;
+    for (const gain of [0, 0.5, 1]) {
+      context.beginPath();
+      context.moveTo(padL, cy(gain));
+      context.lineTo(padL + plotW, cy(gain));
+      context.stroke();
+      context.fillStyle = `color-mix(in oklch, ${ink} 34%, transparent)`;
+      context.textAlign = 'left';
+      context.fillText(gain.toFixed(1), padL + 2 * dpr, cy(gain) - 7 * dpr);
+    }
+
+    const line = (
+      value: (t: number) => number,
+      stroke: string,
+      lineWidth: number,
+      dash: number[]
+    ): void => {
+      context.beginPath();
+      for (let px = 0; px <= 200; px += 1) {
+        const t = px / 200;
+        const x = cx(t);
+        const y = cy(value(t));
+        if (px === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.strokeStyle = stroke;
+      context.lineWidth = lineWidth;
+      context.setLineDash(dash);
+      context.stroke();
+      context.setLineDash([]);
+    };
+
+    // The two gains applied at the join, and the level they add up to.
+    const out = (t: number) => Math.cos((t * Math.PI) / 2);
+    const into = (t: number) => Math.sin((t * Math.PI) / 2);
+
+    line(out, `color-mix(in oklch, ${ink} 55%, transparent)`, 1.75 * dpr, []);
+    line(into, `color-mix(in oklch, ${ink} 55%, transparent)`, 1.75 * dpr, []);
+    // cos² + sin² = 1, so this is a flat line at full level. That is the claim.
+    line(
+      (t) => Math.sqrt(out(t) ** 2 + into(t) ** 2),
+      hue,
+      2.75 * dpr,
+      []
+    );
+    // What a straight-line fade would have summed to instead.
+    line(
+      (t) => Math.sqrt((1 - t) ** 2 + t ** 2),
+      `color-mix(in oklch, ${ink} 42%, transparent)`,
+      1.75 * dpr,
+      [5 * dpr, 4 * dpr]
+    );
+
+    context.textAlign = 'center';
+    context.fillStyle = `color-mix(in oklch, ${ink} 52%, transparent)`;
+    context.fillText('−3 dB dip, straight fade', cx(0.5), cy(Math.SQRT1_2) + 13 * dpr);
+
+    context.fillStyle = hue;
+    context.font = `600 ${10 * dpr}px system-ui, sans-serif`;
+    context.fillText('level holds across the join', cx(0.5), cy(1) - 10 * dpr);
+
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+    context.fillStyle = `color-mix(in oklch, ${ink} 45%, transparent)`;
+    context.textAlign = 'left';
+    context.fillText('outgoing', padL + 2 * dpr, cy(0.94) + 14 * dpr);
+    context.textAlign = 'right';
+    context.fillText('incoming', padL + plotW - 2 * dpr, cy(0.94) + 14 * dpr);
+  }
 
   const tool = createTool({
     suffix: 'blended',
@@ -183,11 +401,23 @@ const faq = [
       names = ctx.files.map((file, index) => file?.name ?? `Track ${index + 1}`);
       lengths = ctx.buffers.map((buffer) => buffer.duration);
 
+      const joinPanel = root.querySelector<HTMLElement>('[data-join-panel]');
+      const joinCanvas = root.querySelector<HTMLCanvasElement>('[data-join]');
+
       const showTotal = (): void => {
+        const fadeNow = runtime.value('fade', 2);
+        if (joinPanel && joinCanvas) {
+          drawJoin(
+            joinPanel,
+            joinCanvas,
+            order.map((index) => lengths[index] ?? 0),
+            fadeNow
+          );
+        }
+
         if (!totalOut) return;
-        const fade = runtime.value('fade', 2);
         const sum = lengths.reduce((total, value) => total + value, 0);
-        const overlap = fade * Math.max(0, order.length - 1);
+        const overlap = fadeNow * Math.max(0, order.length - 1);
         totalOut.textContent =
           order.length === 1
             ? 'One file, add more to blend them.'
@@ -336,6 +566,10 @@ const faq = [
       fadeNum?.addEventListener('change', () => {
         if (fade && fadeNum) fadeNum.value = fade.value;
       });
+
+      // The canvas has no width until the workspace is on screen.
+      requestAnimationFrame(showTotal);
+      if (joinPanel) new ResizeObserver(showTotal).observe(joinPanel);
 
       paintFade();
     },

@@ -52,6 +52,22 @@ const faq = [
         <span class="hint" data-total>Set a count to see the resulting length.</span>
       </div>
 
+      {/*
+        The seam, magnified.
+
+        Everything above says a loop is only as good as the clip's two edges, and
+        then leaves you to find out by listening to the export. This is the same
+        claim made checkable before you download: the end of the clip and the start
+        of the next copy, side by side at a quarter of a second across, with the
+        join marked and the two levels measured. A step at the join is a click and
+        it is visible as one. Raising the gap pushes silence into the middle, which
+        is the other thing people come here to try.
+      */}
+      <div class="seam controls__full" data-seam-panel>
+        <canvas class="seam__canvas" data-seam aria-hidden="true"></canvas>
+        <p class="seam__caption" data-seam-caption>Reading the loop point…</p>
+      </div>
+
       <div class="field">
         <label class="label" for="loop-times">
           Number of repeats
@@ -177,10 +193,233 @@ const faq = [
   </Fragment>
 </ToolPage>
 
+<style>
+  .seam {
+    padding: var(--s4);
+    border-radius: var(--r-md);
+    background: var(--stage-2, var(--surface));
+    display: flex;
+    flex-direction: column;
+    gap: var(--s3);
+  }
+
+  .seam__canvas {
+    width: 100%;
+    height: 172px;
+    display: block;
+  }
+
+  .seam__caption {
+    margin: 0;
+    font-size: var(--t-small);
+    color: var(--stage-ink-2);
+    max-width: var(--prose);
+  }
+
+  @media (max-width: 560px) {
+    .seam__canvas {
+      height: 150px;
+    }
+  }
+</style>
+
 <script>
   import { createTool } from '../lib/tool';
   import { loop, slice } from '../lib/audio/dsp';
   import { duration as fmtDuration, filesize } from '../lib/format';
+
+  /** How much of each side of the join to show. */
+  const SEAM_WINDOW = 0.25;
+  /** The window the level match is measured over, short enough to be "the edge". */
+  const EDGE_WINDOW = 0.05;
+
+  /** Loudest sample in a range, across all channels. */
+  function peakBetween(buffer: AudioBuffer, from: number, to: number): number {
+    let peak = 0;
+    const start = Math.max(0, Math.min(buffer.length - 1, from));
+    const end = Math.max(start, Math.min(buffer.length, to));
+    for (let c = 0; c < buffer.numberOfChannels; c += 1) {
+      const data = buffer.getChannelData(c);
+      for (let i = start; i < end; i += 1) {
+        const value = Math.abs(data[i]!);
+        if (value > peak) peak = value;
+      }
+    }
+    return peak;
+  }
+
+  /** Average level in a range, across all channels. */
+  function rmsBetween(buffer: AudioBuffer, from: number, to: number): number {
+    const start = Math.max(0, Math.min(buffer.length - 1, from));
+    const end = Math.max(start + 1, Math.min(buffer.length, to));
+    let sum = 0;
+    let count = 0;
+    for (let c = 0; c < buffer.numberOfChannels; c += 1) {
+      const data = buffer.getChannelData(c);
+      for (let i = start; i < end; i += 1) sum += data[i]! * data[i]!;
+      count += end - start;
+    }
+    return count > 0 ? Math.sqrt(sum / count) : 0;
+  }
+
+  /** Mean sample value at one instant, which is the step the join would make. */
+  function sampleAt(buffer: AudioBuffer, index: number): number {
+    const at = Math.max(0, Math.min(buffer.length - 1, index));
+    let sum = 0;
+    for (let c = 0; c < buffer.numberOfChannels; c += 1) sum += buffer.getChannelData(c)[at]!;
+    return sum / buffer.numberOfChannels;
+  }
+
+  function drawSeam(
+    panel: HTMLElement,
+    canvas: HTMLCanvasElement,
+    buffer: AudioBuffer,
+    times: number,
+    gap: number
+  ): void {
+    const cssWidth = canvas.clientWidth;
+    const cssHeight = canvas.clientHeight;
+    if (cssWidth < 1 || cssHeight < 1) return;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.round(cssWidth * dpr);
+    const height = Math.round(cssHeight * dpr);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, width, height);
+
+    const styles = getComputedStyle(panel);
+    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
+    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+
+    const padL = 12 * dpr;
+    const padR = 12 * dpr;
+    const plotW = width - padL - padR;
+
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+    context.textBaseline = 'middle';
+
+    // ---- The run, as a strip. Thin bars, because fifty repeats is a legitimate
+    // setting and the picture should survive it. ----
+    const stripY = 8 * dpr;
+    const stripH = 16 * dpr;
+    const total = times * buffer.duration + gap * (times - 1);
+    const sx = (seconds: number) => padL + (seconds / Math.max(0.001, total)) * plotW;
+
+    for (let i = 0; i < times; i += 1) {
+      const start = i * (buffer.duration + gap);
+      const x0 = sx(start);
+      const x1 = sx(start + buffer.duration);
+      context.fillStyle = `color-mix(in oklch, ${hue} ${i === 0 ? 55 : 30}%, transparent)`;
+      context.fillRect(x0, stripY, Math.max(1.5 * dpr, x1 - x0 - dpr), stripH);
+    }
+
+    context.textAlign = 'right';
+    context.fillStyle = `color-mix(in oklch, ${ink} 60%, transparent)`;
+    context.fillText(fmtDuration(total), padL + plotW, stripY + stripH + 12 * dpr);
+    context.textAlign = 'left';
+    context.fillStyle = `color-mix(in oklch, ${ink} 45%, transparent)`;
+    context.fillText(
+      `${times} copies${gap > 0 ? ` with ${gap.toFixed(1)} s between` : ' back to back'}`,
+      padL,
+      stripY + stripH + 12 * dpr
+    );
+
+    // ---- The join itself. ----
+    const waveTop = stripY + stripH + 26 * dpr;
+    const waveH = height - waveTop - 18 * dpr;
+    if (waveH < 24 * dpr) return;
+    const mid = waveTop + waveH / 2;
+
+    const side = Math.min(SEAM_WINDOW, buffer.duration / 2);
+    const span = side * 2 + gap;
+    const jx = (seconds: number) => padL + (seconds / span) * plotW;
+
+    /** Min/max envelope for a sample range, drawn into a pixel range. */
+    const envelope = (
+      fromSample: number,
+      toSample: number,
+      x0: number,
+      x1: number,
+      colour: string
+    ): void => {
+      const columns = Math.max(1, Math.round(x1 - x0));
+      const perColumn = (toSample - fromSample) / columns;
+      context.fillStyle = colour;
+      for (let column = 0; column < columns; column += 1) {
+        const start = Math.max(0, Math.round(fromSample + column * perColumn));
+        const end = Math.min(buffer.length, Math.round(fromSample + (column + 1) * perColumn));
+        let low = 0;
+        let high = 0;
+        for (let c = 0; c < buffer.numberOfChannels; c += 1) {
+          const data = buffer.getChannelData(c);
+          for (let i = start; i < end; i += 1) {
+            const value = data[i]!;
+            if (value < low) low = value;
+            if (value > high) high = value;
+          }
+        }
+        const yTop = mid - (high * waveH) / 2;
+        const yBottom = mid - (low * waveH) / 2;
+        context.fillRect(x0 + column, yTop, 1, Math.max(dpr, yBottom - yTop));
+      }
+    };
+
+    context.strokeStyle = `color-mix(in oklch, ${ink} 12%, transparent)`;
+    context.lineWidth = dpr;
+    context.beginPath();
+    context.moveTo(padL, mid);
+    context.lineTo(padL + plotW, mid);
+    context.stroke();
+
+    if (gap > 0) {
+      context.fillStyle = `color-mix(in oklch, ${ink} 7%, transparent)`;
+      context.fillRect(jx(side), waveTop, jx(side + gap) - jx(side), waveH);
+    }
+
+    const rate = buffer.sampleRate;
+    envelope(
+      buffer.length - Math.round(side * rate),
+      buffer.length,
+      jx(0),
+      jx(side),
+      `color-mix(in oklch, ${ink} 55%, transparent)`
+    );
+    envelope(
+      0,
+      Math.round(side * rate),
+      jx(side + gap),
+      jx(span),
+      hue
+    );
+
+    // The join. With no gap it is a single line; with one it is the two edges of
+    // the silence, which is what the gap control is actually doing.
+    context.strokeStyle = `color-mix(in oklch, ${ink} 50%, transparent)`;
+    context.lineWidth = 1.5 * dpr;
+    context.setLineDash([4 * dpr, 3 * dpr]);
+    context.beginPath();
+    context.moveTo(jx(side), waveTop);
+    context.lineTo(jx(side), waveTop + waveH);
+    if (gap > 0) {
+      context.moveTo(jx(side + gap), waveTop);
+      context.lineTo(jx(side + gap), waveTop + waveH);
+    }
+    context.stroke();
+    context.setLineDash([]);
+
+    context.fillStyle = `color-mix(in oklch, ${ink} 45%, transparent)`;
+    context.textAlign = 'left';
+    context.fillText('end of the clip', padL, height - 8 * dpr);
+    context.textAlign = 'right';
+    context.fillStyle = hue;
+    context.fillText('start of the next copy', padL + plotW, height - 8 * dpr);
+  }
 
   const tool = createTool({
     suffix: 'looped',
@@ -192,12 +431,56 @@ const faq = [
       const heavy = root.querySelector<HTMLElement>('[data-heavy]');
       const heavyText = root.querySelector<HTMLElement>('[data-heavy-text]');
       const source = ctx.buffer;
+      const seamPanel = root.querySelector<HTMLElement>('[data-seam-panel]');
+      const seamCanvas = root.querySelector<HTMLCanvasElement>('[data-seam]');
+      const seamCaption = root.querySelector<HTMLElement>('[data-seam-caption]');
+
+      // Measured once: these are properties of the clip, not of the settings.
+      const rate = source.sampleRate;
+      const edge = Math.round(EDGE_WINDOW * rate);
+      const tailLevel = rmsBetween(source, source.length - edge, source.length);
+      const headLevel = rmsBetween(source, 0, edge);
+      const levelGap =
+        tailLevel > 0 && headLevel > 0
+          ? Math.abs(20 * Math.log10(headLevel / tailLevel))
+          : Infinity;
+      // The discontinuity a butt join would create, as a fraction of full scale.
+      const step = Math.abs(sampleAt(source, 0) - sampleAt(source, source.length - 1));
+      // A hard cut into silence ticks for the same reason, so the very last few
+      // milliseconds matter when a gap is in play.
+      const stopLevel = peakBetween(
+        source,
+        source.length - Math.round(0.005 * rate),
+        source.length
+      );
 
       const update = (): void => {
         const times = Math.max(2, Math.round(runtime.value('times', 2)));
         const gap = runtime.value('gap', 0);
         // The gap sits between repeats, so there are times - 1 of them.
         const total = times * source.duration + gap * (times - 1);
+
+        if (seamPanel && seamCanvas) drawSeam(seamPanel, seamCanvas, source, times, gap);
+
+        if (seamCaption) {
+          if (gap > 0) {
+            seamCaption.textContent =
+              stopLevel > 0.05
+                ? `The clip is still playing at ${Math.round(stopLevel * 100)}% of full scale when it stops, so cutting straight into ${gap.toFixed(1)} s of silence will tick. A short fade on the end fixes it.`
+                : `Silence between the repeats, so the join cannot click. The clip already stops quietly, which is what makes that work.`;
+          } else if (step > 0.03) {
+            seamCaption.textContent =
+              `The two edges are ${Math.round(step * 100)}% of full scale apart, so every ` +
+              'repeat starts with a step in the waveform, and a step is a click. Trim the ' +
+              'clip so both ends land on a zero crossing, or leave a gap.';
+          } else if (levelGap > 4) {
+            seamCaption.textContent =
+              `The clip ends about ${levelGap.toFixed(0)} dB ${headLevel > tailLevel ? 'quieter than' : 'louder than'} it starts, so each repeat restarts with an audible jump. The join itself is clean; it is the levels that do not match.`;
+          } else {
+            seamCaption.textContent =
+              `The edges meet within ${Number.isFinite(levelGap) ? levelGap.toFixed(1) : '0'} dB of each other and there is no step at the join, so this will loop without a click.`;
+          }
+        }
 
         if (totalOut) {
           totalOut.textContent = `${times} repeats · ${fmtDuration(total)} in total`;
@@ -249,6 +532,10 @@ const faq = [
 
       bindSlider('times', (value) => String(Math.round(value)));
       bindSlider('gap', (value) => `${value.toFixed(1)} s`);
+
+      // The canvas has no width until the workspace is on screen.
+      requestAnimationFrame(update);
+      if (seamPanel) new ResizeObserver(update).observe(seamPanel);
 
       update();
     },

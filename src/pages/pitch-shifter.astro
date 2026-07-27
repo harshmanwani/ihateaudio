@@ -1,6 +1,7 @@
 ---
 import ToolPage from '../layouts/ToolPage.astro';
 import ToolShell from '../components/ToolShell.astro';
+import RunAction from '../components/RunAction.astro';
 import { getTool } from '../data/tools';
 
 const tool = getTool('pitch-shifter');
@@ -9,7 +10,7 @@ const steps = [
   'Drop an audio file onto the page. It is decoded in the tab; nothing is sent anywhere.',
   'Drag the semitone slider. Each step is one half step on a piano. 12 steps is a full octave, and the interval name under the slider tells you what you have asked for.',
   'If you need to land between the notes, nudge the cents control. One hundred cents makes a semitone, so ±10 cents is about the smallest change most people can hear on a sustained note.',
-  'Click Preview the shift to render it and hear it in the player. Pitch shifting is heavy enough that it is not recomputed on every drag.',
+  'Click Preview the shift to render it. The result appears as its own player below the controls; pitch shifting is heavy enough that it is not recomputed on every drag.',
   'Choose a format and click Download. The length of the file is identical to what you started with.',
 ];
 
@@ -51,6 +52,20 @@ const faq = [
       <div class="controls__head">
         <span class="controls__title">Pitch</span>
         <span class="hint">The running time never changes, only the pitch moves.</span>
+      </div>
+
+      {/*
+        The shift as a distance on a keyboard rather than as a number.
+
+        "+7" is meaningless until you know it is a fifth, and a fifth is something
+        people can hear in their heads before pressing anything. Two octaves with
+        the origin in the middle turns the slider into a musical move: the octave
+        marks explain why 12 is special, the fine-tune needle shows cents as the
+        fraction of a key they are, and the bracket marks the range within which a
+        voice still sounds like a person rather than an effect.
+      */}
+      <div class="keys controls__full" data-keys-panel>
+        <canvas class="keys__canvas" data-keys aria-hidden="true"></canvas>
       </div>
 
       <div class="field controls__full">
@@ -121,13 +136,13 @@ const faq = [
         </span>
       </div>
 
-      <div class="field">
-        <span class="label">Audition</span>
-        <button type="button" class="btn btn--quiet" data-audition>Preview the shift</button>
-        <span class="hint" data-out="state">
-          The player holds the original until you render a preview.
-        </span>
-      </div>
+      <RunAction
+        mode="preview"
+        label="Preview the shift"
+        busy="Rendering the shift"
+        hint="Pitch shifting is heavy, so it runs when you ask rather than on every drag. Downloading works either way."
+        done="Rendered. The shifted version has its own player below; the original stays above."
+      />
     </div>
   </ToolShell>
 
@@ -190,10 +205,213 @@ const faq = [
   </Fragment>
 </ToolPage>
 
+<style>
+  .keys {
+    padding: var(--s4);
+    border-radius: var(--r-md);
+    background: var(--stage-2, var(--surface));
+  }
+
+  .keys__canvas {
+    width: 100%;
+    height: 168px;
+    display: block;
+  }
+
+  @media (max-width: 560px) {
+    .keys__canvas {
+      height: 150px;
+    }
+  }
+</style>
+
 <script>
   import { createTool } from '../lib/tool';
   import { pitchShift } from '../lib/audio/stretch';
   import { clamp, pct } from '../lib/format';
+
+  /** Semitone offsets that are white keys, counting from a C. */
+  const WHITE = new Set([0, 2, 4, 5, 7, 9, 11]);
+
+  /**
+   * Where a voice stops sounding like the same person.
+   *
+   * Formants — the resonances of a particular throat and mouth — move with the
+   * pitch when you shift a whole recording, and it is that movement rather than
+   * the pitch itself that produces the chipmunk. Around five semitones is where
+   * most listeners start hearing an effect instead of a singer.
+   */
+  const NATURAL = 5;
+
+  function drawKeys(
+    panel: HTMLElement,
+    canvas: HTMLCanvasElement,
+    semitones: number,
+    cents: number
+  ): void {
+    const cssWidth = canvas.clientWidth;
+    const cssHeight = canvas.clientHeight;
+    if (cssWidth < 1 || cssHeight < 1) return;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.round(cssWidth * dpr);
+    const height = Math.round(cssHeight * dpr);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, width, height);
+
+    const styles = getComputedStyle(panel);
+    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
+    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+
+    const padL = 10 * dpr;
+    const padR = 10 * dpr;
+    const plotW = width - padL - padR;
+
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+    context.textBaseline = 'middle';
+
+    // Two octaves with the origin in the middle. Laying it out this way means the
+    // slider's ends are octaves, which is the fact the numbers hide.
+    const lowest = -12;
+    const highest = 12;
+
+    let whiteCount = 0;
+    for (let n = lowest; n <= highest; n += 1) {
+      if (WHITE.has(((n % 12) + 12) % 12)) whiteCount += 1;
+    }
+    const whiteW = plotW / whiteCount;
+    const blackW = whiteW * 0.62;
+
+    const boardTop = 54 * dpr;
+    const boardH = height - boardTop - 26 * dpr;
+    const blackH = boardH * 0.62;
+
+    /** Left edge of each semitone's key, in canvas pixels. */
+    const keyX = new Map<number, number>();
+    let whites = 0;
+    for (let n = lowest; n <= highest; n += 1) {
+      const pitchClass = ((n % 12) + 12) % 12;
+      if (WHITE.has(pitchClass)) {
+        keyX.set(n, padL + whites * whiteW);
+        whites += 1;
+      } else {
+        // A black key straddles the boundary between the white keys either side.
+        keyX.set(n, padL + whites * whiteW - blackW / 2);
+      }
+    }
+
+    const centreOf = (n: number): number =>
+      (keyX.get(n) ?? padL) + (WHITE.has(((n % 12) + 12) % 12) ? whiteW : blackW) / 2;
+
+    // White keys, then black keys over them.
+    for (const black of [false, true]) {
+      for (let n = lowest; n <= highest; n += 1) {
+        const isWhite = WHITE.has(((n % 12) + 12) % 12);
+        if (isWhite === black) continue;
+
+        const x = keyX.get(n)!;
+        const w = isWhite ? whiteW : blackW;
+        const h = isWhite ? boardH : blackH;
+        const chosen = n === semitones;
+        const between = semitones > 0 ? n > 0 && n < semitones : n < 0 && n > semitones;
+
+        context.beginPath();
+        context.roundRect(x + dpr * 0.5, boardTop, Math.max(dpr, w - dpr), h, [
+          0,
+          0,
+          3 * dpr,
+          3 * dpr,
+        ]);
+
+        // Black keys have to be opaque and dark rather than a faint wash of the
+        // ink colour, or they read as highlights sitting on top of the white keys
+        // instead of as keys. Every state below keeps that contrast.
+        if (chosen) {
+          context.fillStyle = isWhite ? hue : `color-mix(in oklch, ${hue} 78%, black)`;
+        } else if (between) {
+          // The keys the shift travels over, so the distance has a size.
+          context.fillStyle = isWhite
+            ? `color-mix(in oklch, ${hue} 42%, white)`
+            : `color-mix(in oklch, ${hue} 48%, black)`;
+        } else {
+          context.fillStyle = isWhite
+            ? `color-mix(in oklch, ${ink} 84%, transparent)`
+            : `color-mix(in oklch, ${ink} 9%, black)`;
+        }
+        context.fill();
+
+        context.strokeStyle = 'rgba(0, 0, 0, 0.45)';
+        context.lineWidth = dpr;
+        context.stroke();
+      }
+    }
+
+    // The origin: where the recording is now.
+    context.strokeStyle = `color-mix(in oklch, ${ink} 55%, transparent)`;
+    context.lineWidth = 2 * dpr;
+    context.setLineDash([3 * dpr, 3 * dpr]);
+    context.beginPath();
+    context.moveTo(centreOf(0), boardTop - 6 * dpr);
+    context.lineTo(centreOf(0), boardTop + boardH + 4 * dpr);
+    context.stroke();
+    context.setLineDash([]);
+
+    context.textAlign = 'center';
+    context.fillStyle = `color-mix(in oklch, ${ink} 62%, transparent)`;
+    context.fillText('now', centreOf(0), height - 12 * dpr);
+
+    context.fillStyle = `color-mix(in oklch, ${ink} 45%, transparent)`;
+    context.textAlign = 'left';
+    context.fillText('octave down', padL, height - 12 * dpr);
+    context.textAlign = 'right';
+    context.fillText('octave up', padL + plotW, height - 12 * dpr);
+
+    // The bracket over the range where a voice still passes as one.
+    const from = centreOf(-NATURAL);
+    const to = centreOf(NATURAL);
+    context.strokeStyle = `color-mix(in oklch, ${ink} 26%, transparent)`;
+    context.lineWidth = dpr;
+    context.beginPath();
+    context.moveTo(from, 46 * dpr);
+    context.lineTo(from, 40 * dpr);
+    context.lineTo(to, 40 * dpr);
+    context.lineTo(to, 46 * dpr);
+    context.stroke();
+
+    context.textAlign = 'center';
+    context.fillStyle = `color-mix(in oklch, ${ink} 45%, transparent)`;
+    context.fillText('voices still sound human in here', (from + to) / 2, 30 * dpr);
+
+    // The fine tune, as the fraction of a key it actually is.
+    if (cents !== 0) {
+      const target = centreOf(semitones);
+      const stepWidth = WHITE.has(((semitones % 12) + 12) % 12) ? whiteW : blackW;
+      const needle = target + (cents / 100) * stepWidth;
+      context.strokeStyle = hue;
+      context.lineWidth = 2 * dpr;
+      context.beginPath();
+      context.moveTo(needle, boardTop - 10 * dpr);
+      context.lineTo(needle, boardTop + 4 * dpr);
+      context.stroke();
+    }
+
+    // What the move does to a concrete frequency, because ratios are abstract and
+    // A above middle C is not.
+    const ratio = 2 ** ((semitones + cents / 100) / 12);
+    context.textAlign = 'left';
+    context.fillStyle = `color-mix(in oklch, ${ink} 68%, transparent)`;
+    context.fillText(
+      `440 Hz becomes ${(440 * ratio).toFixed(1)} Hz  ·  ×${ratio.toFixed(4)}`,
+      padL,
+      12 * dpr
+    );
+  }
 
   const INTERVALS = [
     'unison',
@@ -211,8 +429,6 @@ const faq = [
     'octave',
   ];
 
-  let source: AudioBuffer | null = null;
-  let auditionBuffer: AudioBuffer | null = null;
   let wired = false;
 
   function totalSemitones(): number {
@@ -249,11 +465,9 @@ const faq = [
   const tool = createTool({
     suffix: 'pitch',
     defaultFormat: 'mp3',
+    previewLabel: 'Shifted',
 
-    onReady(ctx, runtime) {
-      source = ctx.buffer;
-      auditionBuffer = null;
-
+    onReady(_ctx, runtime) {
       const root = runtime.root;
       const steps = root.querySelector<HTMLInputElement>('[data-control="semitones"]');
       const stepsNum = root.querySelector<HTMLInputElement>('[data-control="semitones-num"]');
@@ -262,13 +476,14 @@ const faq = [
       const stepsOut = root.querySelector<HTMLElement>('[data-out="semitones"]');
       const centsOut = root.querySelector<HTMLElement>('[data-out="cents"]');
       const intervalOut = root.querySelector<HTMLElement>('[data-out="interval"]');
-      const state = root.querySelector<HTMLElement>('[data-out="state"]');
-      const button = root.querySelector<HTMLButtonElement>('[data-audition]');
+      const keysPanel = root.querySelector<HTMLElement>('[data-keys-panel]');
+      const keysCanvas = root.querySelector<HTMLCanvasElement>('[data-keys]');
       if (!steps || !cents) return;
 
       const paint = (): void => {
         const stepValue = Number(steps.value);
         const centValue = Number(cents.value);
+        if (keysPanel && keysCanvas) drawKeys(keysPanel, keysCanvas, stepValue, centValue);
         steps.style.setProperty('--pct', `${pct(stepValue, -12, 12)}%`);
         cents.style.setProperty('--pct', `${pct(centValue, -50, 50)}%`);
         if (stepsOut) {
@@ -281,45 +496,23 @@ const faq = [
         if (intervalOut) intervalOut.textContent = intervalName(totalSemitones());
       };
 
-      const invalidate = (): void => {
-        paint();
-        if (auditionBuffer) {
-          auditionBuffer = null;
-          runtime.refreshPreview();
-        }
-        if (state) state.textContent = 'Settings changed. Render the preview again to hear them.';
-      };
+      // Rendering, its progress, its failures and the stale state all belong to
+      // the run panel now, which shares one implementation with process() below
+      // instead of a second copy of the stretch here.
+      const invalidate = (): void => paint();
 
-      const audition = async (): Promise<void> => {
-        if (!source || !button) return;
-        button.dataset.loading = 'true';
-        if (state) state.textContent = 'Rendering the shift…';
-        // Yield once so the button spinner paints before the synchronous
-        // stretch takes the main thread.
-        await new Promise((resolve) => setTimeout(resolve, 0));
-        try {
-          const total = totalSemitones();
-          auditionBuffer = Math.abs(total) < 0.005 ? null : pitchShift(source, total);
-          runtime.refreshPreview();
-          if (state) {
-            state.textContent = auditionBuffer
-              ? 'Preview ready. Press play.'
-              : 'Nothing to hear, the shift is zero.';
-          }
-        } catch {
-          if (state) {
-            state.textContent = 'The preview could not be rendered. Downloading still works.';
-          }
-        } finally {
-          delete button.dataset.loading;
-        }
-      };
+      // The canvas has no width until the workspace is on screen. Attached on
+      // every ready, since a second file replaces the observed element's layout
+      // rather than the element itself.
+      requestAnimationFrame(paint);
 
       if (wired) {
         paint();
         return;
       }
       wired = true;
+
+      if (keysPanel) new ResizeObserver(paint).observe(keysPanel);
 
       const bind = (
         range: HTMLInputElement,
@@ -346,15 +539,7 @@ const faq = [
       bind(steps, stepsNum, -12, 12);
       bind(cents, centsNum, -50, 50);
 
-      button?.addEventListener('click', () => void audition());
-
       paint();
-    },
-
-    // Returns whatever the audition button last rendered, so dragging a slider
-    // never triggers a stretch on its own.
-    preview(ctx) {
-      return auditionBuffer ?? ctx.buffer;
     },
 
     async process(ctx) {

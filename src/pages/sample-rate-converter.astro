@@ -52,6 +52,23 @@ const faq = [
         <span class="hint" data-source-rate>Read from the file when it loads.</span>
       </div>
 
+      {/*
+        The file's own spectrum with the new ceiling drawn across it.
+
+        Nyquist is the one rule that decides everything on this page, and it is
+        abstract until you can see what your particular file has sitting above the
+        line. Because this converter interpolates rather than filtering first, that
+        content does not disappear — it mirrors back down into the audible range,
+        so the ghost curve shows exactly where it will land. On a voice note there
+        is nothing up there and the picture says so; on a bright mix going to
+        22 kHz it is unmistakable, which is the case the prose below is warning
+        about.
+      */}
+      <div class="spectrum controls__full" data-spectrum-panel>
+        <canvas class="spectrum__canvas" data-spectrum aria-hidden="true"></canvas>
+        <p class="spectrum__caption" data-spectrum-caption>Reading the spectrum…</p>
+      </div>
+
       <div class="field">
         <label class="label" for="target-rate">Convert to</label>
         <select class="select" id="target-rate" data-control="rate">
@@ -152,12 +169,114 @@ const faq = [
   </Fragment>
 </ToolPage>
 
+<style>
+  .spectrum {
+    padding: var(--s4);
+    border-radius: var(--r-md);
+    background: var(--stage-2, var(--surface));
+    display: flex;
+    flex-direction: column;
+    gap: var(--s3);
+  }
+
+  .spectrum__canvas {
+    width: 100%;
+    height: 190px;
+    display: block;
+  }
+
+  .spectrum__caption {
+    margin: 0;
+    font-size: var(--t-small);
+    color: var(--stage-ink-2);
+    max-width: var(--prose);
+  }
+
+  @media (max-width: 560px) {
+    .spectrum__canvas {
+      height: 160px;
+    }
+  }
+</style>
+
 <script>
   import { createTool } from '../lib/tool';
   import { resampleLinear } from '../lib/audio/dsp';
   import { nearestMp3Rate } from '../lib/audio/encode-mp3';
+  import { fft } from '../lib/audio/fft';
+  import { hannPeriodic } from '../lib/audio/stft';
 
   let sourceRate = 0;
+
+  /** Averaged magnitude spectrum of the loaded file, and the rate it was taken at. */
+  let spectrum: Float64Array | null = null;
+
+  const FFT_SIZE = 4096;
+  /**
+   * How many windows to average.
+   *
+   * Enough to be representative of the whole file rather than of its first
+   * second, few enough that a ninety-minute recording still analyses instantly.
+   * Sixty-four windows spread end to end is about a quarter of a second of audio
+   * sampled from across the entire duration.
+   */
+  const FFT_FRAMES = 64;
+
+  /**
+   * The file's long-term average spectrum.
+   *
+   * Averaged across windows taken from the whole file, because what matters here
+   * is whether the recording contains high-frequency content at all, not what it
+   * was doing at any one moment. Returns null when the file is shorter than a
+   * single window.
+   */
+  function averageSpectrum(buffer: AudioBuffer): Float64Array | null {
+    const usable = buffer.length - FFT_SIZE;
+    if (usable < 0) return null;
+
+    const half = FFT_SIZE >> 1;
+    const window = hannPeriodic(FFT_SIZE);
+    const frame = new Float64Array(2 * FFT_SIZE);
+    const spec = new Float64Array(2 * FFT_SIZE);
+    const total = new Float64Array(half);
+
+    const channels = buffer.numberOfChannels;
+    const data: Float32Array[] = [];
+    for (let c = 0; c < channels; c += 1) data.push(buffer.getChannelData(c));
+
+    const count = Math.max(1, Math.min(FFT_FRAMES, Math.floor(buffer.length / FFT_SIZE)));
+    for (let k = 0; k < count; k += 1) {
+      const start = count === 1 ? 0 : Math.floor((usable * k) / (count - 1));
+      for (let i = 0; i < FFT_SIZE; i += 1) {
+        let sum = 0;
+        for (let c = 0; c < channels; c += 1) sum += data[c]![start + i]!;
+        frame[2 * i] = (sum / channels) * window[i]!;
+        frame[2 * i + 1] = 0;
+      }
+      fft(frame, spec, FFT_SIZE);
+      for (let bin = 0; bin < half; bin += 1) {
+        const real = spec[2 * bin]!;
+        const imag = spec[2 * bin + 1]!;
+        total[bin] = total[bin]! + Math.sqrt(real * real + imag * imag);
+      }
+    }
+
+    for (let bin = 0; bin < half; bin += 1) total[bin] = total[bin]! / count;
+    return total;
+  }
+
+  /** Share of the file's total magnitude sitting above a frequency, 0..1. */
+  function shareAbove(spec: Float64Array, hz: number): number {
+    const binHz = sourceRate / FFT_SIZE;
+    let above = 0;
+    let all = 0;
+    for (let bin = 1; bin < spec.length; bin += 1) {
+      const value = spec[bin]!;
+      all += value;
+      if (bin * binHz > hz) above += value;
+    }
+    return all > 0 ? above / all : 0;
+  }
 
   /**
    * Rates are shown to three decimals when they need them: 22.05 and 11.025 are
@@ -168,6 +287,197 @@ const faq = [
     return `${Number.isInteger(value) ? value : Number(value.toFixed(3))} kHz`;
   }
 
+  const FLOOR_DB = -96;
+
+  function drawSpectrum(
+    panel: HTMLElement,
+    canvas: HTMLCanvasElement,
+    spec: Float64Array,
+    rate: number
+  ): void {
+    const cssWidth = canvas.clientWidth;
+    const cssHeight = canvas.clientHeight;
+    if (cssWidth < 1 || cssHeight < 1) return;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.round(cssWidth * dpr);
+    const height = Math.round(cssHeight * dpr);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, width, height);
+
+    const styles = getComputedStyle(panel);
+    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
+    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+    const raw = styles.getPropertyValue('--danger').trim() || '#c0392b';
+    const alarm = `color-mix(in oklch, ${raw} 62%, white)`;
+
+    const padL = 34 * dpr;
+    const padR = 12 * dpr;
+    const padT = 20 * dpr;
+    const padB = 24 * dpr;
+    const plotW = width - padL - padR;
+    const plotH = height - padT - padB;
+
+    const nyquist = rate / 2;
+    const sourceNyquist = sourceRate / 2;
+    // Room for both ceilings, so upsampling shows the empty band it is adding.
+    const fMax = Math.max(nyquist, sourceNyquist);
+    const fMin = 20;
+
+    const x = (hz: number) =>
+      padL + (Math.log(Math.max(fMin, hz) / fMin) / Math.log(fMax / fMin)) * plotW;
+    const y = (dB: number) =>
+      padT + plotH - ((Math.max(FLOOR_DB, Math.min(0, dB)) - FLOOR_DB) / -FLOOR_DB) * plotH;
+
+    const binHz = sourceRate / FFT_SIZE;
+    let peak = 0;
+    for (let bin = 1; bin < spec.length; bin += 1) peak = Math.max(peak, spec[bin]!);
+    const level = (hz: number): number => {
+      if (peak <= 0 || hz >= sourceNyquist) return FLOOR_DB;
+      const bin = Math.round(hz / binHz);
+      const value = spec[bin] ?? 0;
+      return value > 0 ? 20 * Math.log10(value / peak) : FLOOR_DB;
+    };
+
+    /**
+     * Column-wise maximum, so a narrow peak survives being squeezed onto a log
+     * axis — with interpolation underneath it.
+     *
+     * At the bottom of a log axis one bin is several pixels wide, and taking the
+     * nearest bin there draws a staircase that looks like structure the file does
+     * not have. Interpolating between neighbouring bins removes the steps without
+     * softening any peak, because the maximum still wins wherever a column spans
+     * more than one bin.
+     */
+    const columnLevel = (px: number): number => {
+      const f1 = fMin * (fMax / fMin) ** ((px - padL) / plotW);
+      const f2 = fMin * (fMax / fMin) ** ((px + 1 - padL) / plotW);
+      let value: number;
+      if (f2 - f1 >= binHz) {
+        const from = Math.max(1, Math.floor(f1 / binHz));
+        const to = Math.min(spec.length - 1, Math.max(from, Math.ceil(f2 / binHz)));
+        value = 0;
+        for (let bin = from; bin <= to; bin += 1) value = Math.max(value, spec[bin]!);
+      } else {
+        const exact = (f1 + f2) / 2 / binHz;
+        const low = Math.max(1, Math.min(spec.length - 2, Math.floor(exact)));
+        const fraction = Math.max(0, Math.min(1, exact - low));
+        value = spec[low]! * (1 - fraction) + spec[low + 1]! * fraction;
+      }
+
+      return value > 0 && peak > 0 ? 20 * Math.log10(value / peak) : FLOOR_DB;
+    };
+
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+    context.textBaseline = 'middle';
+
+    for (const dB of [-20, -40, -60, -80]) {
+      context.strokeStyle = `color-mix(in oklch, ${ink} 8%, transparent)`;
+      context.lineWidth = dpr;
+      context.beginPath();
+      context.moveTo(padL, y(dB));
+      context.lineTo(padL + plotW, y(dB));
+      context.stroke();
+      context.fillStyle = `color-mix(in oklch, ${ink} 38%, transparent)`;
+      context.textAlign = 'right';
+      context.fillText(String(dB), padL - 5 * dpr, y(dB));
+    }
+
+    for (const hz of [50, 100, 500, 1000, 5000, 10000, 20000]) {
+      if (hz > fMax) continue;
+      context.strokeStyle = `color-mix(in oklch, ${ink} 7%, transparent)`;
+      context.beginPath();
+      context.moveTo(x(hz), padT);
+      context.lineTo(x(hz), padT + plotH);
+      context.stroke();
+      context.fillStyle = `color-mix(in oklch, ${ink} 40%, transparent)`;
+      context.textAlign = 'center';
+      context.fillText(hz >= 1000 ? `${hz / 1000}k` : String(hz), x(hz), height - 9 * dpr);
+    }
+
+    const losing = nyquist < sourceNyquist;
+
+    // The band the new rate cannot hold.
+    if (losing) {
+      context.fillStyle = `color-mix(in oklch, ${alarm} 12%, transparent)`;
+      context.fillRect(x(nyquist), padT, x(fMax) - x(nyquist), plotH);
+    }
+
+    // The spectrum itself, filled to the floor.
+    context.beginPath();
+    context.moveTo(padL, padT + plotH);
+    for (let px = padL; px <= padL + plotW; px += 1) context.lineTo(px, y(columnLevel(px)));
+    context.lineTo(padL + plotW, padT + plotH);
+    context.closePath();
+    context.fillStyle = `color-mix(in oklch, ${hue} 24%, transparent)`;
+    context.fill();
+
+    context.beginPath();
+    for (let px = padL; px <= padL + plotW; px += 1) {
+      const py = y(columnLevel(px));
+      if (px === padL) context.moveTo(px, py);
+      else context.lineTo(px, py);
+    }
+    context.strokeStyle = hue;
+    context.lineWidth = 1.75 * dpr;
+    context.lineJoin = 'round';
+    context.stroke();
+
+    /*
+      Where the discarded band ends up.
+
+      This converter interpolates rather than filtering first, so content above
+      the new ceiling is not removed — it mirrors about the ceiling and lands back
+      inside the audible range as inharmonic tones. Drawing the reflection is the
+      honest version of the warning in the prose: on speech the ghost sits on the
+      floor and nothing happens, on a bright mix it rides up over the music.
+    */
+    if (losing) {
+      context.beginPath();
+      let started = false;
+      for (let px = padL; px <= x(nyquist); px += 1) {
+        const hz = fMin * (fMax / fMin) ** ((px - padL) / plotW);
+        const folded = 2 * nyquist - hz;
+        if (folded > sourceNyquist) continue;
+        const py = y(level(folded));
+        if (!started) {
+          context.moveTo(px, py);
+          started = true;
+        } else {
+          context.lineTo(px, py);
+        }
+      }
+      if (started) {
+        context.strokeStyle = alarm;
+        context.lineWidth = 1.5 * dpr;
+        context.setLineDash([4 * dpr, 3 * dpr]);
+        context.stroke();
+        context.setLineDash([]);
+      }
+    }
+
+    // The ceiling.
+    context.strokeStyle = losing ? alarm : `color-mix(in oklch, ${ink} 65%, transparent)`;
+    context.lineWidth = 2 * dpr;
+    context.beginPath();
+    context.moveTo(x(nyquist), padT);
+    context.lineTo(x(nyquist), padT + plotH);
+    context.stroke();
+
+    context.font = `600 ${10 * dpr}px system-ui, sans-serif`;
+    context.fillStyle = losing ? alarm : `color-mix(in oklch, ${ink} 65%, transparent)`;
+    const label = `${Number((nyquist / 1000).toFixed(3))} kHz ceiling`;
+    const room = x(nyquist) - padL > plotW * 0.55;
+    context.textAlign = room ? 'right' : 'left';
+    context.fillText(label, x(nyquist) + (room ? -6 : 6) * dpr, padT - 9 * dpr);
+  }
+
   const tool = createTool({
     suffix: 'resampled',
     defaultFormat: 'wav',
@@ -175,6 +485,7 @@ const faq = [
 
     onReady(ctx, runtime) {
       sourceRate = ctx.buffer.sampleRate;
+      spectrum = averageSpectrum(ctx.buffer);
 
       const info = runtime.root.querySelector<HTMLElement>('[data-source-rate]');
       if (info) {
@@ -190,6 +501,10 @@ const faq = [
         if (match) select.value = match.value;
       }
 
+      // The canvas has no width until the workspace is on screen.
+      requestAnimationFrame(sync);
+      if (specPanel) new ResizeObserver(sync).observe(specPanel);
+
       sync();
     },
 
@@ -202,6 +517,9 @@ const faq = [
   const root = tool?.root ?? null;
   const rateSel = root?.querySelector<HTMLSelectElement>('[data-control="rate"]') ?? null;
   const formatSel = root?.querySelector<HTMLSelectElement>('[data-format]') ?? null;
+  const specPanel = root?.querySelector<HTMLElement>('[data-spectrum-panel]') ?? null;
+  const specCanvas = root?.querySelector<HTMLCanvasElement>('[data-spectrum]') ?? null;
+  const specCaption = root?.querySelector<HTMLElement>('[data-spectrum-caption]') ?? null;
 
   function targetRate(): number {
     const value = Number(rateSel?.value);
@@ -211,6 +529,34 @@ const faq = [
   function sync(): void {
     if (!root) return;
     const rate = targetRate();
+
+    if (specPanel && specCanvas && spectrum && sourceRate > 0) {
+      drawSpectrum(specPanel, specCanvas, spectrum, rate);
+
+      if (specCaption) {
+        const ceiling = rate / 2;
+        if (ceiling >= sourceRate / 2) {
+          specCaption.textContent =
+            rate > sourceRate
+              ? `This file holds nothing above ${khz(sourceRate / 2)}, so the extra room ` +
+                `${khz(ceiling)} provides stays empty. Nothing is lost and nothing is gained.`
+              : 'The ceiling is not moving, so the spectrum survives intact.';
+        } else {
+          const share = shareAbove(spectrum, ceiling);
+          const percent = share < 0.005 ? '<0.5' : (share * 100).toFixed(share < 0.1 ? 1 : 0);
+          specCaption.textContent =
+            `${percent}% of this file sits above ${khz(ceiling)}. This converter ` +
+            'interpolates rather than filtering first, so that content mirrors back down ' +
+            'into the audible range instead of disappearing: the dashed line is where it ' +
+            `lands. ${
+              share < 0.01
+                ? 'At this level it is inaudible, which is why speech converts cleanly.'
+                : 'That is enough to hear, so use a converter with a proper low-pass filter ' +
+                  'if the result matters.'
+            }`;
+        }
+      }
+    }
 
     const nyquist = root.querySelector<HTMLElement>('[data-nyquist]');
     if (nyquist) {

@@ -53,6 +53,19 @@ const faq = [
         <span class="hint">Preview plays the boosted audio, not the original.</span>
       </div>
 
+      {/*
+        Headroom, drawn.
+
+        "+6 dB" is a number with no consequence attached until you know what the
+        file already peaked at, which is exactly the thing nobody checks before
+        pressing go. Two bars against one scale answer it in a glance: where the
+        audio sits now, where the setting will put it, and whether that lands past
+        the ceiling. The shaded strip on the right is the part no format can store.
+      */}
+      <div class="meter controls__full" data-meter-panel>
+        <canvas class="meter__canvas" data-meter aria-hidden="true"></canvas>
+      </div>
+
       <div class="field controls__full">
         <span class="label" id="vb-mode-label">Method</span>
         <div class="seg" role="group" aria-labelledby="vb-mode-label">
@@ -202,9 +215,29 @@ const faq = [
   </Fragment>
 </ToolPage>
 
+<style>
+  .meter {
+    padding: var(--s4);
+    border-radius: var(--r-md);
+    background: var(--stage-2, var(--surface));
+  }
+
+  .meter__canvas {
+    width: 100%;
+    height: 152px;
+    display: block;
+  }
+
+  @media (max-width: 560px) {
+    .meter__canvas {
+      height: 136px;
+    }
+  }
+</style>
+
 <script>
   import { createTool } from '../lib/tool';
-  import { applyGain, normalizePeak } from '../lib/audio/dsp';
+  import { applyGain, normalizePeak, rmsOf, toDecibels } from '../lib/audio/dsp';
   import { peakDb } from '../lib/audio/analysis';
   import { db } from '../lib/format';
 
@@ -213,6 +246,144 @@ const faq = [
   let mode: Mode = 'boost';
   /** Peak of the loaded file, in dBFS. Measured once per file. */
   let sourcePeak = -Infinity;
+  /** Average level of the loaded file, in dBFS. Also measured once. */
+  let sourceRms = -Infinity;
+
+  /**
+   * The headroom meter.
+   *
+   * Two bars on one dBFS scale: the file as it stands, and the file as the current
+   * setting would leave it. Each bar is solid up to its average level and pale from
+   * there to its peak, because that gap is the reason a quiet-sounding file can
+   * still have no room left — the average is where the loudness lives, the peak is
+   * what decides whether it fits.
+   */
+  const METER_MIN = -60;
+  const METER_MAX = 12;
+
+  function drawMeter(
+    panel: HTMLElement,
+    canvas: HTMLCanvasElement,
+    afterPeak: number,
+    afterRms: number
+  ): void {
+    const cssWidth = canvas.clientWidth;
+    const cssHeight = canvas.clientHeight;
+    if (cssWidth < 1 || cssHeight < 1) return;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.round(cssWidth * dpr);
+    const height = Math.round(cssHeight * dpr);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, width, height);
+
+    const styles = getComputedStyle(panel);
+    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
+    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+    const raw = styles.getPropertyValue('--danger').trim() || '#c0392b';
+    // The danger token is tuned for light backgrounds; on the dark stage it needs
+    // lifting or it reads as brown.
+    const alarm = `color-mix(in oklch, ${raw} 62%, white)`;
+
+    const padL = 52 * dpr;
+    const padR = 12 * dpr;
+    const padT = 10 * dpr;
+    const padB = 26 * dpr;
+    const plotW = width - padL - padR;
+    const plotH = height - padT - padB;
+
+    const x = (dB: number) =>
+      padL +
+      ((Math.max(METER_MIN, Math.min(METER_MAX, dB)) - METER_MIN) / (METER_MAX - METER_MIN)) *
+        plotW;
+
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+    context.textBaseline = 'middle';
+
+    // Everything to the right of zero is level the file cannot hold.
+    context.fillStyle = `color-mix(in oklch, ${alarm} 9%, transparent)`;
+    context.fillRect(x(0), padT, x(METER_MAX) - x(0), plotH);
+
+    for (const tick of [-60, -48, -36, -24, -18, -12, -6, 0, 6, 12]) {
+      context.strokeStyle = `color-mix(in oklch, ${tick === 0 ? alarm : ink} ${tick === 0 ? 60 : 9}%, transparent)`;
+      context.lineWidth = (tick === 0 ? 1.5 : 1) * dpr;
+      context.beginPath();
+      context.moveTo(x(tick), padT);
+      context.lineTo(x(tick), padT + plotH);
+      context.stroke();
+
+      context.fillStyle = `color-mix(in oklch, ${ink} ${tick === 0 ? 62 : 38}%, transparent)`;
+      context.textAlign = 'center';
+      context.fillText(String(tick), x(tick), height - 10 * dpr);
+    }
+
+    const rowH = 30 * dpr;
+    const rowGap = 14 * dpr;
+    const top = padT + (plotH - rowH * 2 - rowGap) / 2;
+
+    const bar = (
+      index: number,
+      title: string,
+      peak: number,
+      average: number,
+      accent: string
+    ): void => {
+      const y = top + index * (rowH + rowGap);
+
+      context.fillStyle = `color-mix(in oklch, ${ink} 60%, transparent)`;
+      context.textAlign = 'right';
+      context.fillText(title, padL - 8 * dpr, y + rowH / 2);
+
+      context.fillStyle = `color-mix(in oklch, ${ink} 6%, transparent)`;
+      context.fillRect(padL, y, plotW, rowH);
+
+      if (!Number.isFinite(peak)) {
+        context.fillStyle = `color-mix(in oklch, ${ink} 34%, transparent)`;
+        context.textAlign = 'left';
+        context.fillText('silence', padL + 8 * dpr, y + rowH / 2);
+        return;
+      }
+
+      const clipped = Math.min(peak, 0);
+
+      // Peak body, up to the ceiling.
+      context.fillStyle = `color-mix(in oklch, ${accent} 28%, transparent)`;
+      context.fillRect(padL, y, x(clipped) - padL, rowH);
+
+      // Average level, solid, because this is what the ear reports as loudness.
+      if (Number.isFinite(average)) {
+        context.fillStyle = `color-mix(in oklch, ${accent} 72%, transparent)`;
+        context.fillRect(padL, y, Math.max(0, x(Math.min(average, 0)) - padL), rowH);
+      }
+
+      // Anything past zero, in the colour of the thing it will do.
+      if (peak > 0.05) {
+        context.fillStyle = alarm;
+        context.fillRect(x(0), y, x(peak) - x(0), rowH);
+      }
+
+      context.fillStyle = peak > 0.05 ? alarm : accent;
+      context.fillRect(x(peak) - 1.5 * dpr, y - 2 * dpr, 3 * dpr, rowH + 4 * dpr);
+
+      const label = `${peak < 0 ? '−' : '+'}${Math.abs(peak).toFixed(1)}`;
+      context.textAlign = x(peak) > padL + plotW * 0.7 ? 'right' : 'left';
+      context.fillStyle = `color-mix(in oklch, ${ink} 85%, transparent)`;
+      context.fillText(
+        label,
+        x(peak) + (context.textAlign === 'right' ? -8 : 8) * dpr,
+        y + rowH / 2
+      );
+    };
+
+    bar(0, 'Now', sourcePeak, sourceRms, ink);
+    bar(1, 'After', afterPeak, afterRms, hue);
+  }
 
   /** Levels read better with a real minus sign than a hyphen. */
   function level(value: number): string {
@@ -227,10 +398,13 @@ const faq = [
     onReady(ctx, runtime) {
       const root = runtime.root;
       sourcePeak = peakDb(ctx.buffer);
+      sourceRms = toDecibels(rmsOf(ctx.buffer));
 
       const readout = root.querySelector<HTMLElement>('[data-readout]');
       const clip = root.querySelector<HTMLElement>('[data-clip]');
       const clipDetail = root.querySelector<HTMLElement>('[data-clip-detail]');
+      const meterPanel = root.querySelector<HTMLElement>('[data-meter-panel]');
+      const meterCanvas = root.querySelector<HTMLCanvasElement>('[data-meter]');
 
       if (readout) {
         readout.textContent = Number.isFinite(sourcePeak)
@@ -245,6 +419,15 @@ const faq = [
         const gain = runtime.value('gain', 0);
         const after = sourcePeak + gain;
         const clips = mode === 'boost' && Number.isFinite(sourcePeak) && after > 0.05;
+
+        if (meterPanel && meterCanvas) {
+          // Normalizing moves the peak to the target exactly, so the gain it
+          // applies is the distance between them — and the meter can show why the
+          // result never reaches the clip strip.
+          const applied =
+            mode === 'normalize' ? runtime.value('target', -1) - sourcePeak : gain;
+          drawMeter(meterPanel, meterCanvas, sourcePeak + applied, sourceRms + applied);
+        }
 
         if (clip) clip.hidden = !clips;
         if (clips && clipDetail) {
@@ -306,6 +489,10 @@ const faq = [
           runtime.refreshPreview();
         });
       });
+
+      // The canvas has no width until the workspace is on screen.
+      requestAnimationFrame(refreshWarning);
+      if (meterPanel) new ResizeObserver(refreshWarning).observe(meterPanel);
 
       refreshWarning();
     },

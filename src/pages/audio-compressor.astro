@@ -58,6 +58,22 @@ const faq = [
         <span class="hint" data-source-info>Bitrate is the lever that changes the byte count.</span>
       </div>
 
+      {/*
+        Size against bitrate, for this file, with the limits people are actually
+        up against drawn across it.
+
+        Almost everyone arrives here because something refused their file, and the
+        real question is not "what does 128 kbps sound like" but "what is the
+        highest setting that still fits". A lossy file's size is a straight line
+        through the origin, so the answer is a crossing point — and a crossing
+        point is much easier to read off a picture than to work out from two
+        numbers in a table.
+      */}
+      <div class="sizeplot controls__full" data-size-panel>
+        <canvas class="sizeplot__canvas" data-size-plot aria-hidden="true"></canvas>
+        <p class="sizeplot__caption" data-size-caption>Waiting for a file.</p>
+      </div>
+
       <div class="field">
         <label class="label" for="bitrate">
           Target bitrate
@@ -184,6 +200,36 @@ const faq = [
   </Fragment>
 </ToolPage>
 
+<style>
+  .sizeplot {
+    padding: var(--s4);
+    border-radius: var(--r-md);
+    background: var(--stage-2, var(--surface));
+    display: flex;
+    flex-direction: column;
+    gap: var(--s3);
+  }
+
+  .sizeplot__canvas {
+    width: 100%;
+    height: 200px;
+    display: block;
+  }
+
+  .sizeplot__caption {
+    margin: 0;
+    font-size: var(--t-small);
+    color: var(--stage-ink-2);
+    max-width: var(--prose);
+  }
+
+  @media (max-width: 560px) {
+    .sizeplot__canvas {
+      height: 170px;
+    }
+  }
+</style>
+
 <script>
   import { createTool } from '../lib/tool';
   import { setChannels, resampleLinear } from '../lib/audio/dsp';
@@ -192,6 +238,200 @@ const faq = [
 
   let mono = false;
   let source: { buffer: AudioBuffer; bytes: number } | null = null;
+
+  const MB = 1024 * 1024;
+
+  /**
+   * The caps people actually hit.
+   *
+   * Only drawn when they fall inside the range this file can reach, so a
+   * three-minute voice note is not cluttered with a 25 MB line it was never going
+   * to approach.
+   */
+  const LIMITS: { bytes: number; label: string }[] = [
+    { bytes: 8 * MB, label: 'Discord' },
+    { bytes: 10 * MB, label: 'Mail server' },
+    { bytes: 25 * MB, label: 'Gmail' },
+  ];
+
+  function drawSizePlot(
+    panel: HTMLElement,
+    canvas: HTMLCanvasElement,
+    bitrates: number[],
+    sizeAt: (bitrate: number) => number,
+    chosen: number,
+    originalBytes: number
+  ): void {
+    const cssWidth = canvas.clientWidth;
+    const cssHeight = canvas.clientHeight;
+    if (cssWidth < 1 || cssHeight < 1 || bitrates.length === 0) return;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.round(cssWidth * dpr);
+    const height = Math.round(cssHeight * dpr);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, width, height);
+
+    const styles = getComputedStyle(panel);
+    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
+    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+
+    const padL = 54 * dpr;
+    const padR = 14 * dpr;
+    const padT = 26 * dpr;
+    const padB = 22 * dpr;
+    const plotW = width - padL - padR;
+    const plotH = height - padT - padB;
+
+    const maxBitrate = bitrates[bitrates.length - 1]!;
+    const topSize = sizeAt(maxBitrate);
+    // The original belongs on the same scale, because "smaller than what I have"
+    // is the comparison being made.
+    const yMax = Math.max(topSize, originalBytes) * 1.12 || 1;
+
+    // Starting both axes at zero is not a stylistic choice here: a lossy file's
+    // size is proportional to its bitrate, and a line through the origin is what
+    // makes that legible.
+    const x = (bitrate: number) => padL + (bitrate / maxBitrate) * plotW;
+    const y = (bytes: number) => padT + plotH - (Math.min(bytes, yMax) / yMax) * plotH;
+
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+    context.textBaseline = 'middle';
+
+    context.textAlign = 'left';
+    context.fillStyle = `color-mix(in oklch, ${ink} 52%, transparent)`;
+    context.fillText('Output size', padL, 10 * dpr);
+    context.textAlign = 'right';
+    context.fillText('bitrate, kbps', padL + plotW, 10 * dpr);
+
+    // Size gridlines at round megabyte values, spaced so there are four or five.
+    const step = niceStep(yMax / 4);
+    for (let bytes = step; bytes <= yMax; bytes += step) {
+      context.strokeStyle = `color-mix(in oklch, ${ink} 8%, transparent)`;
+      context.lineWidth = dpr;
+      context.beginPath();
+      context.moveTo(padL, y(bytes));
+      context.lineTo(padL + plotW, y(bytes));
+      context.stroke();
+      context.fillStyle = `color-mix(in oklch, ${ink} 38%, transparent)`;
+      context.textAlign = 'right';
+      context.fillText(filesize(bytes), padL - 6 * dpr, y(bytes));
+    }
+
+    for (const bitrate of bitrates) {
+      context.strokeStyle = `color-mix(in oklch, ${ink} 7%, transparent)`;
+      context.beginPath();
+      context.moveTo(x(bitrate), padT);
+      context.lineTo(x(bitrate), padT + plotH);
+      context.stroke();
+      context.fillStyle = `color-mix(in oklch, ${ink} ${bitrate === chosen ? 85 : 38}%, transparent)`;
+      context.textAlign = 'center';
+      context.fillText(String(bitrate), x(bitrate), height - 10 * dpr);
+    }
+
+    // The size line, filled underneath so "less is under here" reads immediately.
+    context.beginPath();
+    context.moveTo(padL, y(sizeAt(0)));
+    for (const bitrate of bitrates) context.lineTo(x(bitrate), y(sizeAt(bitrate)));
+    context.lineTo(x(maxBitrate), padT + plotH);
+    context.lineTo(padL, padT + plotH);
+    context.closePath();
+    context.fillStyle = `color-mix(in oklch, ${hue} 18%, transparent)`;
+    context.fill();
+
+    context.beginPath();
+    context.moveTo(padL, y(sizeAt(0)));
+    for (const bitrate of bitrates) context.lineTo(x(bitrate), y(sizeAt(bitrate)));
+    context.strokeStyle = hue;
+    context.lineWidth = 2.5 * dpr;
+    context.lineJoin = 'round';
+    context.stroke();
+
+    /** A horizontal cap, plus where the size line crosses it. */
+    const limitLine = (bytes: number, label: string, strong: boolean): void => {
+      if (bytes <= 0 || bytes > yMax * 0.98) return;
+      context.strokeStyle = `color-mix(in oklch, ${ink} ${strong ? 42 : 26}%, transparent)`;
+      context.lineWidth = (strong ? 1.75 : 1.25) * dpr;
+      context.setLineDash([5 * dpr, 4 * dpr]);
+      context.beginPath();
+      context.moveTo(padL, y(bytes));
+      context.lineTo(padL + plotW, y(bytes));
+      context.stroke();
+      context.setLineDash([]);
+
+      context.fillStyle = `color-mix(in oklch, ${ink} ${strong ? 72 : 50}%, transparent)`;
+      context.textAlign = 'right';
+      context.font = `${strong ? '600 ' : ''}${10 * dpr}px system-ui, sans-serif`;
+      context.fillText(label, padL + plotW - 4 * dpr, y(bytes) - 9 * dpr);
+      context.font = `${10 * dpr}px system-ui, sans-serif`;
+    };
+
+    for (const limit of LIMITS) limitLine(limit.bytes, limit.label, false);
+    limitLine(originalBytes, 'Original', true);
+
+    // The current choice.
+    const size = sizeAt(chosen);
+    context.strokeStyle = `color-mix(in oklch, ${hue} 55%, transparent)`;
+    context.lineWidth = 1.5 * dpr;
+    context.setLineDash([3 * dpr, 3 * dpr]);
+    context.beginPath();
+    context.moveTo(x(chosen), y(size));
+    context.lineTo(x(chosen), padT + plotH);
+    context.moveTo(x(chosen), y(size));
+    context.lineTo(padL, y(size));
+    context.stroke();
+    context.setLineDash([]);
+
+    context.fillStyle = hue;
+    context.beginPath();
+    context.arc(x(chosen), y(size), 5 * dpr, 0, Math.PI * 2);
+    context.fill();
+
+    context.font = `600 ${11 * dpr}px system-ui, sans-serif`;
+    context.fillStyle = ink;
+    const right = x(chosen) > padL + plotW * 0.62;
+    context.textAlign = right ? 'right' : 'left';
+    context.fillText(
+      filesize(size),
+      x(chosen) + (right ? -10 : 10) * dpr,
+      y(size) - 12 * dpr
+    );
+  }
+
+  /**
+   * Gridline steps that `filesize` renders as round numbers.
+   *
+   * A decimal ladder does not work here, because file sizes are counted in
+   * multiples of 1024: a step of 500,000 bytes prints as "488 KB", which looks
+   * like a measurement rather than a gridline. These are the values that come out
+   * clean on the other side of the formatter.
+   */
+  const STEPS = [
+    50 * 1024,
+    100 * 1024,
+    250 * 1024,
+    500 * 1024,
+    MB,
+    2 * MB,
+    5 * MB,
+    10 * MB,
+    25 * MB,
+    50 * MB,
+    100 * MB,
+    250 * MB,
+    500 * MB,
+    1024 * MB,
+  ];
+
+  function niceStep(raw: number): number {
+    return STEPS.find((step) => step >= raw) ?? STEPS[STEPS.length - 1]!;
+  }
 
   const tool = createTool({
     suffix: 'smaller',
@@ -219,6 +459,9 @@ const faq = [
   const qualitySel = root?.querySelector<HTMLSelectElement>('[data-quality]') ?? null;
   const bitrateSel = root?.querySelector<HTMLSelectElement>('[data-control="bitrate"]') ?? null;
   const rateSel = root?.querySelector<HTMLSelectElement>('[data-control="rate"]') ?? null;
+  const sizePanel = root?.querySelector<HTMLElement>('[data-size-panel]') ?? null;
+  const sizeCanvas = root?.querySelector<HTMLCanvasElement>('[data-size-plot]') ?? null;
+  const sizeCaption = root?.querySelector<HTMLElement>('[data-size-caption]') ?? null;
 
   function targetRate(): number {
     const value = Number(rateSel?.value ?? 0);
@@ -267,13 +510,43 @@ const faq = [
       sampleRate: rate,
     } as AudioBuffer;
 
+    const format = formatSel?.value ?? 'mp3';
+    const chosen = Number(bitrateSel?.value) || 192;
+    const sizeAt = (bitrate: number): number =>
+      estimateSize(proxy, format, { bitrate: Math.max(1, bitrate) });
+
     let projected = 0;
     try {
-      projected = estimateSize(proxy, formatSel?.value ?? 'mp3', {
-        bitrate: Number(bitrateSel?.value) || 192,
-      });
+      projected = sizeAt(chosen);
     } catch {
       return;
+    }
+
+    if (sizePanel && sizeCanvas && bitrateSel) {
+      const bitrates = Array.from(bitrateSel.options)
+        .map((option) => Number(option.value))
+        .filter((value) => Number.isFinite(value) && value > 0);
+
+      if (bitrates.length > 0) {
+        drawSizePlot(sizePanel, sizeCanvas, bitrates, sizeAt, chosen, bytes);
+
+        if (sizeCaption) {
+          // Size is proportional to bitrate, so the highest setting that fits a
+          // cap is arithmetic rather than trial and error. Only caps the file is
+          // actually over are worth naming.
+          const binding = LIMITS.filter((limit) => bytes <= 0 || limit.bytes < bytes);
+          const lines = binding.map((limit) => {
+            const best = [...bitrates].reverse().find((rate) => sizeAt(rate) <= limit.bytes);
+            return best
+              ? `${limit.label} ${filesize(limit.bytes)}: up to ${best} kbps`
+              : `${limit.label} ${filesize(limit.bytes)}: out of reach at any bitrate, the file is too long`;
+          });
+
+          sizeCaption.textContent = lines.length
+            ? `Highest setting that still fits — ${lines.join('; ')}.`
+            : 'This file is already under every common sharing limit, so choose on quality rather than size.';
+        }
+      }
     }
 
     if (originalCell) originalCell.textContent = bytes > 0 ? filesize(bytes) : ', ';
@@ -329,6 +602,10 @@ const faq = [
         update();
       });
     });
+
+    // The canvas has no width until the workspace is on screen.
+    requestAnimationFrame(update);
+    if (sizePanel) new ResizeObserver(update).observe(sizePanel);
 
     update();
   }

@@ -9,7 +9,7 @@ const steps = [
   'Drop an audio file onto the page, or click to browse. The file is decoded by your browser and never leaves your device.',
   'Set the speed with the slider, or tap a preset. The new running time updates as you move it, so you can aim for a target length.',
   'Decide what happens to the pitch. Leave "Keep original pitch" off and the whole recording shifts up or down like a record played at the wrong speed; switch it on and the pitch stays put.',
-  'Press play to hear the result. Resampled speed changes preview instantly; the pitch-preserving mode is rendered when you download, because it is far heavier to compute.',
+  'Play the result below the controls. Resampled speed changes preview instantly; the pitch-preserving mode is rendered when you download, because it is far heavier to compute.',
   'Pick a format and click Download. The filename records the speed you chose, so 1.5x saves as song-1-5x.mp3.',
 ];
 
@@ -51,6 +51,20 @@ const faq = [
       <div class="controls__head">
         <span class="controls__title">Speed</span>
         <span class="hint">1x is the original. Below 1 is slower, above 1 is faster.</span>
+      </div>
+
+      {/*
+        One number, both of its consequences.
+
+        Speed changes the running time and, unless you stop it, the pitch — and
+        the second one is the surprise. Putting the length bars above a semitone
+        ruler makes 1.5x read as "two thirds as long, and a fifth higher", which
+        is the sentence people actually needed. The keep-pitch switch then has
+        something to move: the marker drops to zero and the position it left is
+        held as a ghost, so the switch stops being a checkbox with a caption.
+      */}
+      <div class="speedmap controls__full" data-speedmap-panel>
+        <canvas class="speedmap__canvas" data-speedmap aria-hidden="true"></canvas>
       </div>
 
       <div class="field controls__full">
@@ -179,6 +193,26 @@ const faq = [
   </Fragment>
 </ToolPage>
 
+<style>
+  .speedmap {
+    padding: var(--s4);
+    border-radius: var(--r-md);
+    background: var(--stage-2, var(--surface));
+  }
+
+  .speedmap__canvas {
+    width: 100%;
+    height: 164px;
+    display: block;
+  }
+
+  @media (max-width: 560px) {
+    .speedmap__canvas {
+      height: 150px;
+    }
+  }
+</style>
+
 <script>
   import { createTool } from '../lib/tool';
   import { changeSpeed } from '../lib/audio/dsp';
@@ -187,6 +221,192 @@ const faq = [
 
   let sourceDuration = 0;
   let wired = false;
+
+  const INTERVALS = [
+    'unison',
+    'minor second',
+    'major second',
+    'minor third',
+    'major third',
+    'perfect fourth',
+    'tritone',
+    'perfect fifth',
+    'minor sixth',
+    'major sixth',
+    'minor seventh',
+    'major seventh',
+    'octave',
+  ];
+
+  /**
+   * How far the pitch moves, named.
+   *
+   * Only named when the ratio actually lands on an interval — 2x really is an
+   * octave and 1.5x really is a fifth, and saying so is the useful part. A rate
+   * of 1.35 is not any interval, and pretending otherwise would be worse than
+   * giving the number.
+   */
+  function pitchLabel(semitones: number): string {
+    if (Math.abs(semitones) < 0.02) return 'no change';
+    const rounded = Math.round(semitones);
+    const exact = Math.abs(semitones - rounded) < 0.06;
+    const direction = semitones > 0 ? 'up' : 'down';
+    const size = Math.abs(rounded);
+    if (exact && size <= 12) {
+      return `${INTERVALS[size]} ${direction}`;
+    }
+    if (exact && size % 12 === 0) return `${size / 12} octaves ${direction}`;
+    return `${semitones > 0 ? '+' : '−'}${Math.abs(semitones).toFixed(1)} semitones`;
+  }
+
+  function drawMap(
+    panel: HTMLElement,
+    canvas: HTMLCanvasElement,
+    rate: number,
+    holdsPitch: boolean
+  ): void {
+    const cssWidth = canvas.clientWidth;
+    const cssHeight = canvas.clientHeight;
+    if (cssWidth < 1 || cssHeight < 1) return;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.round(cssWidth * dpr);
+    const height = Math.round(cssHeight * dpr);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, width, height);
+
+    const styles = getComputedStyle(panel);
+    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
+    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+
+    const padL = 56 * dpr;
+    const padR = 14 * dpr;
+    const plotW = width - padL - padR;
+
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+    context.textBaseline = 'middle';
+
+    // ---- Length. Both bars on one axis, so the ratio is the picture. ----
+    const newDuration = sourceDuration / rate;
+    const longest = Math.max(sourceDuration, newDuration) || 1;
+    const barH = 20 * dpr;
+    const barGap = 8 * dpr;
+    const barsTop = 12 * dpr;
+
+    const bar = (index: number, title: string, seconds: number, accent: string): void => {
+      const y = barsTop + index * (barH + barGap);
+      context.textAlign = 'right';
+      context.fillStyle = `color-mix(in oklch, ${ink} 55%, transparent)`;
+      context.fillText(title, padL - 10 * dpr, y + barH / 2);
+
+      context.fillStyle = `color-mix(in oklch, ${ink} 6%, transparent)`;
+      context.fillRect(padL, y, plotW, barH);
+
+      const w = Math.max(2 * dpr, (seconds / longest) * plotW);
+      context.fillStyle = accent;
+      context.beginPath();
+      context.roundRect(padL, y, w, barH, 3 * dpr);
+      context.fill();
+
+      const inside = w > 66 * dpr;
+      context.textAlign = inside ? 'right' : 'left';
+      context.fillStyle = inside
+        ? `color-mix(in oklch, ${ink} 92%, transparent)`
+        : `color-mix(in oklch, ${ink} 70%, transparent)`;
+      context.fillText(duration(seconds), padL + w + (inside ? -8 : 8) * dpr, y + barH / 2);
+    };
+
+    bar(0, 'Now', sourceDuration, `color-mix(in oklch, ${ink} 26%, transparent)`);
+    bar(1, 'After', newDuration, `color-mix(in oklch, ${hue} 70%, transparent)`);
+
+    // ---- Pitch. ----
+    const rulerTop = barsTop + barH * 2 + barGap + 34 * dpr;
+    const rulerY = rulerTop + 14 * dpr;
+    if (rulerY + 24 * dpr > height) return;
+
+    // The slider's own range, in semitones: 0.25x is two octaves down, 4x is two
+    // octaves up. Fixing the axis to that means the marker never rescales.
+    const limit = 24;
+    const px = (semitones: number) =>
+      padL + ((clamp(semitones, -limit, limit) + limit) / (limit * 2)) * plotW;
+
+    context.textAlign = 'right';
+    context.fillStyle = `color-mix(in oklch, ${ink} 55%, transparent)`;
+    context.fillText('Pitch', padL - 10 * dpr, rulerY);
+
+    context.fillStyle = `color-mix(in oklch, ${ink} 8%, transparent)`;
+    context.fillRect(padL, rulerY - 4 * dpr, plotW, 8 * dpr);
+
+    for (let semitone = -limit; semitone <= limit; semitone += 1) {
+      const octave = semitone % 12 === 0;
+      context.strokeStyle = `color-mix(in oklch, ${ink} ${octave ? 30 : 10}%, transparent)`;
+      context.lineWidth = dpr;
+      const reach = octave ? 10 * dpr : 5 * dpr;
+      context.beginPath();
+      context.moveTo(px(semitone), rulerY - reach);
+      context.lineTo(px(semitone), rulerY + reach);
+      context.stroke();
+
+      if (octave) {
+        context.textAlign = 'center';
+        context.fillStyle = `color-mix(in oklch, ${ink} 38%, transparent)`;
+        context.fillText(
+          semitone === 0 ? 'same' : `${semitone > 0 ? '+' : '−'}${Math.abs(semitone) / 12} oct`,
+          px(semitone),
+          rulerY + 22 * dpr
+        );
+      }
+    }
+
+    const moved = 12 * Math.log2(rate);
+    const landing = holdsPitch ? 0 : moved;
+
+    // With the switch on, the position the pitch would have taken is held as a
+    // ghost. That contrast is the whole content of the switch.
+    if (holdsPitch && Math.abs(moved) > 0.02) {
+      context.strokeStyle = `color-mix(in oklch, ${ink} 30%, transparent)`;
+      context.lineWidth = 1.5 * dpr;
+      context.setLineDash([3 * dpr, 3 * dpr]);
+      context.beginPath();
+      context.moveTo(px(moved), rulerY - 12 * dpr);
+      context.lineTo(px(moved), rulerY + 12 * dpr);
+      context.stroke();
+      context.setLineDash([]);
+    }
+
+    context.fillStyle = hue;
+    context.beginPath();
+    context.arc(px(landing), rulerY, 6 * dpr, 0, Math.PI * 2);
+    context.fill();
+
+    context.font = `600 ${11 * dpr}px system-ui, sans-serif`;
+    context.fillStyle = ink;
+    const right = px(landing) > padL + plotW * 0.6;
+    context.textAlign = right ? 'right' : 'left';
+    context.fillText(
+      holdsPitch ? 'held' : pitchLabel(moved),
+      px(landing) + (right ? -12 : 12) * dpr,
+      rulerY - 16 * dpr
+    );
+
+    if (holdsPitch && Math.abs(moved) > 0.02) {
+      context.font = `${10 * dpr}px system-ui, sans-serif`;
+      context.fillStyle = `color-mix(in oklch, ${ink} 45%, transparent)`;
+      const ghostRight = px(moved) > padL + plotW * 0.6;
+      context.textAlign = ghostRight ? 'right' : 'left';
+      context.fillText(
+        `would have been ${pitchLabel(moved)}`,
+        px(moved) + (ghostRight ? -10 : 10) * dpr,
+        rulerY + 22 * dpr
+      );
+    }
+  }
 
   function rateOf(): number {
     return clamp(tool?.value('speed', 1) ?? 1, 0.25, 4);
@@ -217,10 +437,13 @@ const faq = [
       const lengthHint = root.querySelector<HTMLElement>('[data-out="length-hint"]');
       const pitchHint = root.querySelector<HTMLElement>('[data-out="pitch-hint"]');
       const presets = root.querySelectorAll<HTMLButtonElement>('[data-preset]');
+      const mapPanel = root.querySelector<HTMLElement>('[data-speedmap-panel]');
+      const mapCanvas = root.querySelector<HTMLCanvasElement>('[data-speedmap]');
       if (!range) return;
 
       const paint = (): void => {
         const rate = rateOf();
+        if (mapPanel && mapCanvas) drawMap(mapPanel, mapCanvas, rate, keepsPitch());
         range.style.setProperty('--pct', `${pct(rate, 0.25, 4)}%`);
         if (readout) readout.textContent = `${rate.toFixed(2)}x`;
         if (length) length.textContent = duration(sourceDuration / rate);
@@ -248,11 +471,16 @@ const faq = [
         runtime.refreshPreview();
       };
 
+      // The canvas has no width until the workspace is on screen.
+      requestAnimationFrame(paint);
+
       if (wired) {
         paint();
         return;
       }
       wired = true;
+
+      if (mapPanel) new ResizeObserver(paint).observe(mapPanel);
 
       // Readouts follow the drag; the resample waits for the pointer to lift,
       // so dragging over a long track does not stutter.

@@ -67,6 +67,23 @@ const faq = [
         </div>
       </div>
 
+      {/*
+        What folding down would actually cost this file.
+
+        The page spends two paragraphs explaining that adding two channels can
+        produce silence, and then leaves you to find out by listening. This
+        measures it instead. The strip is phase correlation over the whole file,
+        so a passage that will cancel is a dip you can point at; the bars are the
+        share of each band's energy that lives in the difference between the
+        channels, which is precisely the part a downmix throws away. A speech
+        recording shows almost nothing. A widened pad shows most of its midrange
+        about to disappear.
+      */}
+      <div class="mono controls__full" data-mono-panel hidden>
+        <canvas class="mono__canvas" data-mono aria-hidden="true"></canvas>
+        <p class="mono__caption" data-mono-caption></p>
+      </div>
+
       <div class="controls__full">
         <div class="note note--info">
           <div class="note__body">
@@ -134,15 +151,326 @@ const faq = [
   </Fragment>
 </ToolPage>
 
+<style>
+  .mono {
+    padding: var(--s4);
+    border-radius: var(--r-md);
+    background: var(--stage-2, var(--surface));
+    display: flex;
+    flex-direction: column;
+    gap: var(--s3);
+  }
+
+  .mono__canvas {
+    width: 100%;
+    height: 228px;
+    display: block;
+  }
+
+  .mono__caption {
+    margin: 0;
+    font-size: var(--t-small);
+    color: var(--stage-ink-2);
+    max-width: var(--prose);
+  }
+
+  @media (max-width: 560px) {
+    .mono__canvas {
+      height: 204px;
+    }
+  }
+</style>
+
 <script>
   import { createTool } from '../lib/tool';
   import { setChannels, extractChannel } from '../lib/audio/dsp';
   import { baseName } from '../lib/format';
+  import { fft } from '../lib/audio/fft';
+  import { hannPeriodic } from '../lib/audio/stft';
   import type { NamedOutput } from '../lib/tool';
 
   type Mode = 'mono' | 'stereo' | 'split';
 
   let mode: Mode = 'mono';
+
+  /** Octave band centres, the standard set, trimmed to what music occupies. */
+  const BANDS = [63, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
+
+  interface MonoReport {
+    /** Phase correlation per block, −1 to 1, across the file. */
+    correlation: Float32Array;
+    /**
+     * Share of each octave band's energy that lives in the side signal, 0..1.
+     * Null where the band holds too little to give a meaningful ratio.
+     */
+    sideShare: (number | null)[];
+    /** Overall correlation, energy-weighted across the file. */
+    overall: number;
+    /** Share of the whole file's energy that a downmix discards, 0..1. */
+    lost: number;
+  }
+
+  const BLOCK_SECONDS = 0.05;
+  const MAX_BLOCKS = 600;
+  const FFT_SIZE = 4096;
+  const FFT_FRAMES = 48;
+
+  /**
+   * What a downmix would do to this file, measured.
+   *
+   * Mid/side is the right frame for the question: L and R decompose exactly into
+   * their sum and their difference, summing to mono keeps the first and discards
+   * the second, so the side energy is not an estimate of the loss — it is the
+   * loss. Correlation is reported alongside because it is the number people have
+   * seen before, on the meter in every DAW.
+   */
+  function analyseMono(buffer: AudioBuffer): MonoReport {
+    const left = buffer.getChannelData(0);
+    const right = buffer.getChannelData(1);
+    const rate = buffer.sampleRate;
+
+    // --- Correlation over time. Bounded work: a long file is sampled, not walked.
+    const blockSize = Math.max(1, Math.round(BLOCK_SECONDS * rate));
+    const available = Math.max(1, Math.floor(buffer.length / blockSize));
+    const blocks = Math.min(MAX_BLOCKS, available);
+    const correlation = new Float32Array(blocks);
+    let weighted = 0;
+    let weight = 0;
+
+    for (let b = 0; b < blocks; b += 1) {
+      const start = Math.min(
+        buffer.length - blockSize,
+        Math.floor((b * (buffer.length - blockSize)) / Math.max(1, blocks - 1))
+      );
+      let sumLR = 0;
+      let sumLL = 0;
+      let sumRR = 0;
+      for (let i = start; i < start + blockSize; i += 1) {
+        const l = left[i]!;
+        const r = right[i]!;
+        sumLR += l * r;
+        sumLL += l * l;
+        sumRR += r * r;
+      }
+      const denominator = Math.sqrt(sumLL * sumRR);
+      // A silent block has no phase relationship at all. Calling that 1 would
+      // paint every gap between words as perfectly correlated, so it reads 0 and
+      // carries no weight in the overall figure.
+      const value = denominator > 1e-12 ? sumLR / denominator : 0;
+      correlation[b] = value;
+      const energy = sumLL + sumRR;
+      weighted += value * energy;
+      weight += energy;
+    }
+
+    // --- Where the difference lives, by band.
+    const half = FFT_SIZE >> 1;
+    const window = hannPeriodic(FFT_SIZE);
+    const frame = new Float64Array(2 * FFT_SIZE);
+    const spec = new Float64Array(2 * FFT_SIZE);
+    const midEnergy = new Float64Array(half);
+    const sideEnergy = new Float64Array(half);
+
+    const usable = buffer.length - FFT_SIZE;
+    const frames = usable < 0 ? 0 : Math.max(1, Math.min(FFT_FRAMES, Math.floor(buffer.length / FFT_SIZE)));
+
+    for (let k = 0; k < frames; k += 1) {
+      const start = frames === 1 ? 0 : Math.floor((usable * k) / (frames - 1));
+
+      for (const which of ['mid', 'side'] as const) {
+        for (let i = 0; i < FFT_SIZE; i += 1) {
+          const l = left[start + i]!;
+          const r = right[start + i]!;
+          frame[2 * i] = (which === 'mid' ? (l + r) / 2 : (l - r) / 2) * window[i]!;
+          frame[2 * i + 1] = 0;
+        }
+        fft(frame, spec, FFT_SIZE);
+        const target = which === 'mid' ? midEnergy : sideEnergy;
+        for (let bin = 0; bin < half; bin += 1) {
+          const real = spec[2 * bin]!;
+          const imag = spec[2 * bin + 1]!;
+          target[bin] = target[bin]! + real * real + imag * imag;
+        }
+      }
+    }
+
+    const binHz = rate / FFT_SIZE;
+    const bandEnergy = BANDS.map((centre) => {
+      // One octave wide, which is how these bands are defined.
+      const from = Math.max(1, Math.floor(centre / Math.SQRT2 / binHz));
+      const to = Math.min(half - 1, Math.ceil((centre * Math.SQRT2) / binHz));
+      let mid = 0;
+      let side = 0;
+      for (let bin = from; bin <= to; bin += 1) {
+        mid += midEnergy[bin]!;
+        side += sideEnergy[bin]!;
+      }
+      return { mid, side };
+    });
+
+    /*
+      A band with nothing in it still has a ratio, and that ratio is noise.
+
+      Left alone, a recording that stops at 8 kHz reports its empty top octaves as
+      "half of this will be discarded", in the same alarming red as a real
+      cancellation. Anything more than 40 dB below the loudest band is reported as
+      no reading rather than as a number nobody should act on.
+    */
+    const loudestBand = Math.max(...bandEnergy.map((band) => band.mid + band.side));
+    const sideShare = bandEnergy.map((band) => {
+      const total = band.mid + band.side;
+      if (total <= 0 || total < loudestBand / 10_000) return null;
+      return band.side / total;
+    });
+
+    let totalMid = 0;
+    let totalSide = 0;
+    for (let bin = 1; bin < half; bin += 1) {
+      totalMid += midEnergy[bin]!;
+      totalSide += sideEnergy[bin]!;
+    }
+
+    return {
+      correlation,
+      sideShare,
+      overall: weight > 0 ? weighted / weight : 0,
+      lost: totalMid + totalSide > 0 ? totalSide / (totalMid + totalSide) : 0,
+    };
+  }
+
+  function drawMono(
+    panel: HTMLElement,
+    canvas: HTMLCanvasElement,
+    report: MonoReport
+  ): void {
+    const cssWidth = canvas.clientWidth;
+    const cssHeight = canvas.clientHeight;
+    if (cssWidth < 1 || cssHeight < 1) return;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.round(cssWidth * dpr);
+    const height = Math.round(cssHeight * dpr);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, width, height);
+
+    const styles = getComputedStyle(panel);
+    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
+    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+    const raw = styles.getPropertyValue('--danger').trim() || '#c0392b';
+    const alarm = `color-mix(in oklch, ${raw} 62%, white)`;
+
+    const padL = 40 * dpr;
+    const padR = 12 * dpr;
+    const plotW = width - padL - padR;
+
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+    context.textBaseline = 'middle';
+
+    // ---- Correlation over time. ----
+    const corrTop = 22 * dpr;
+    const corrH = Math.round((height - corrTop - 34 * dpr) * 0.42);
+    const zero = corrTop + corrH / 2;
+
+    context.textAlign = 'left';
+    context.fillStyle = `color-mix(in oklch, ${ink} 55%, transparent)`;
+    context.fillText('Phase correlation over the file', padL, 10 * dpr);
+
+    for (const value of [1, 0, -1]) {
+      const y = zero - (value * corrH) / 2;
+      context.strokeStyle = `color-mix(in oklch, ${ink} ${value === 0 ? 20 : 9}%, transparent)`;
+      context.lineWidth = dpr;
+      context.beginPath();
+      context.moveTo(padL, y);
+      context.lineTo(padL + plotW, y);
+      context.stroke();
+      context.fillStyle = `color-mix(in oklch, ${ink} 38%, transparent)`;
+      context.textAlign = 'right';
+      context.fillText(value > 0 ? '+1' : String(value), padL - 6 * dpr, y);
+    }
+
+    const columns = report.correlation.length;
+    const columnW = plotW / Math.max(1, columns);
+    for (let i = 0; i < columns; i += 1) {
+      const value = report.correlation[i]!;
+      const y = zero - (value * corrH) / 2;
+      // Below zero the channels are working against each other, which is the one
+      // state that actually removes audio. It gets its own colour.
+      context.fillStyle =
+        value < 0
+          ? `color-mix(in oklch, ${alarm} 75%, transparent)`
+          : `color-mix(in oklch, ${hue} 60%, transparent)`;
+      context.fillRect(
+        padL + i * columnW,
+        Math.min(y, zero),
+        Math.max(dpr, columnW),
+        Math.max(dpr, Math.abs(zero - y))
+      );
+    }
+
+    // ---- Where the difference lives. ----
+    const barsTop = corrTop + corrH + 30 * dpr;
+    const barsH = height - barsTop - 20 * dpr;
+    if (barsH < 24 * dpr) return;
+
+    context.textAlign = 'left';
+    context.fillStyle = `color-mix(in oklch, ${ink} 55%, transparent)`;
+    context.fillText('Share of each band that a downmix discards', padL, barsTop - 14 * dpr);
+
+    const slot = plotW / BANDS.length;
+    for (let i = 0; i < BANDS.length; i += 1) {
+      const share = report.sideShare[i];
+      const barW = slot * 0.62;
+      const x = padL + i * slot + (slot - barW) / 2;
+
+      context.fillStyle = `color-mix(in oklch, ${ink} 6%, transparent)`;
+      context.fillRect(x, barsTop, barW, barsH);
+
+      if (share === null || share === undefined) {
+        // Nothing in this band, so no ratio worth drawing.
+        context.textAlign = 'center';
+        context.fillStyle = `color-mix(in oklch, ${ink} 22%, transparent)`;
+        context.fillText('—', x + barW / 2, barsTop + barsH / 2);
+      } else {
+        const barH = Math.max(dpr, share * barsH);
+        // Half the energy in the side signal is the point where a downmix stops
+        // being a format change and starts being an edit.
+        context.fillStyle =
+          share > 0.5
+            ? alarm
+            : `color-mix(in oklch, ${hue} ${Math.round(45 + share * 90)}%, transparent)`;
+        context.fillRect(x, barsTop + barsH - barH, barW, barH);
+      }
+
+      context.textAlign = 'center';
+      context.fillStyle = `color-mix(in oklch, ${ink} 42%, transparent)`;
+      const hz = BANDS[i]!;
+      context.fillText(
+        hz >= 1000 ? `${hz / 1000}k` : String(hz),
+        x + barW / 2,
+        height - 8 * dpr
+      );
+    }
+
+    context.strokeStyle = `color-mix(in oklch, ${alarm} 45%, transparent)`;
+    context.lineWidth = dpr;
+    context.setLineDash([4 * dpr, 4 * dpr]);
+    context.beginPath();
+    context.moveTo(padL, barsTop + barsH / 2);
+    context.lineTo(padL + plotW, barsTop + barsH / 2);
+    context.stroke();
+    context.setLineDash([]);
+
+    context.textAlign = 'right';
+    context.fillStyle = `color-mix(in oklch, ${ink} 38%, transparent)`;
+    context.fillText('100%', padL - 6 * dpr, barsTop + 4 * dpr);
+    context.fillText('50%', padL - 6 * dpr, barsTop + barsH / 2);
+  }
 
   // No control values are read back inside process, so the runtime handle is
   // not needed here.
@@ -171,6 +499,42 @@ const faq = [
         }
       }
 
+      const monoPanel = root.querySelector<HTMLElement>('[data-mono-panel]');
+      const monoCanvas = root.querySelector<HTMLCanvasElement>('[data-mono]');
+      const monoCaption = root.querySelector<HTMLElement>('[data-mono-caption]');
+
+      // Only worth measuring when there are two channels to compare. Reported for
+      // every mode, because the cost of folding down is the thing that decides
+      // between them.
+      const report = channels >= 2 ? analyseMono(ctx.buffer) : null;
+
+      const showReport = (): void => {
+        if (!report || !monoPanel || !monoCanvas) return;
+        monoPanel.hidden = false;
+        drawMono(monoPanel, monoCanvas, report);
+
+        if (!monoCaption) return;
+        const percent = Math.round(report.lost * 100);
+        const measured = report.sideShare.map((share) => share ?? -1);
+        const worst = measured.indexOf(Math.max(...measured));
+        const worstHz = BANDS[worst] ?? 1000;
+        const worstLabel = worstHz >= 1000 ? `${worstHz / 1000} kHz` : `${worstHz} Hz`;
+
+        const verdict =
+          report.lost < 0.02
+            ? 'The two channels are all but identical, so folding to mono changes nothing audible and halves the file.'
+            : report.lost < 0.15
+              ? `About ${percent}% of this file is difference between the channels. Folding down loses the width and little else.`
+              : report.overall < 0
+                ? `${percent}% of this file lives in the difference between the channels, and the correlation goes negative in places — those passages will partly cancel rather than merely narrow. The ${worstLabel} band is worst hit.`
+                : `${percent}% of this file lives in the difference between the channels, most of it around ${worstLabel}. That part disappears in a downmix. Splitting keeps both, or keep one channel instead of averaging.`;
+
+        monoCaption.textContent =
+          mode === 'mono'
+            ? verdict
+            : `${verdict} Nothing is lost in this mode; the reading describes what folding down would cost.`;
+      };
+
       const available: Record<Mode, boolean> = {
         mono: channels > 1,
         stereo: channels === 1,
@@ -185,6 +549,7 @@ const faq = [
         buttons.forEach((button) => {
           button.setAttribute('aria-pressed', String(button.dataset.mode === next));
         });
+        showReport();
         runtime.refreshPreview();
       };
 
@@ -204,6 +569,10 @@ const faq = [
           select(value);
         });
       });
+
+      // The canvas has no width until the workspace is on screen.
+      requestAnimationFrame(showReport);
+      if (monoPanel && report) new ResizeObserver(showReport).observe(monoPanel);
 
       select(mode);
     },
