@@ -105,7 +105,14 @@ export function applyGain(
   return out;
 }
 
-function curveValue(t: number, curve: FadeCurve): number {
+/**
+ * Gain multiplier at `t` (0..1) through a fade.
+ *
+ * Exported so the fade tool can draw the exact shape it will apply. Anything
+ * else would be a second implementation of the same curve, free to drift from
+ * this one without either being obviously wrong.
+ */
+export function curveValue(t: number, curve: FadeCurve): number {
   switch (curve) {
     case 'exponential':
       // Perceptually the "natural" fade: slow at first, then rapid.

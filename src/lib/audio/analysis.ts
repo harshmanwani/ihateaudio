@@ -92,6 +92,18 @@ export interface LoudnessResult {
   truePeak: number;
   /** Sample peak in dBFS. */
   peak: number;
+  /**
+   * Momentary loudness across the file, LUFS per 400 ms block at a 100 ms hop.
+   *
+   * These are the same gating blocks the integrated figure is computed from, so
+   * a graph of them is a picture of the measurement rather than a second,
+   * differently-derived approximation of it. Empty when the file is shorter than
+   * one block or entirely silent. Blocks below the absolute gate come back as
+   * -Infinity, which a caller should skip rather than plot.
+   */
+  momentary: number[];
+  /** Seconds between consecutive momentary values. */
+  momentaryStep: number;
 }
 
 /**
@@ -129,6 +141,8 @@ export function measureLoudness(buffer: AudioBuffer): LoudnessResult {
       range: 0,
       truePeak: truePeakDb(buffer),
       peak: peakDb(buffer),
+      momentary: [],
+      momentaryStep: 0.1,
     };
   }
 
@@ -158,6 +172,8 @@ export function measureLoudness(buffer: AudioBuffer): LoudnessResult {
       range: 0,
       truePeak: truePeakDb(buffer),
       peak: peakDb(buffer),
+      momentary: [],
+      momentaryStep: 0.1,
     };
   }
 
@@ -172,6 +188,8 @@ export function measureLoudness(buffer: AudioBuffer): LoudnessResult {
 
   return {
     integrated,
+    momentary: blockPower.map(loudnessOf),
+    momentaryStep: stepSamples / rate,
     range: loudnessRange(weighted, channels, rate, buffer.length),
     truePeak: truePeakDb(buffer),
     peak: peakDb(buffer),
@@ -295,6 +313,19 @@ export interface TempoResult {
   bpm: number;
   /** 0..1 — how clearly the autocorrelation peaked. */
   confidence: number;
+  /**
+   * Seconds between beats at the reported BPM, and seconds from the start of the
+   * file to the first one.
+   *
+   * Autocorrelation finds the beat *period* on its own; the phase has to be
+   * recovered separately, by asking which alignment of a pulse train at that
+   * period collects the most onset energy. Both are needed to draw a grid over
+   * the waveform, which is the only way to tell "120 BPM" from "120 BPM, and
+   * here is where the beats are" — the second can be checked by eye, the first
+   * has to be believed. Zero when nothing was detected.
+   */
+  beatPeriod: number;
+  beatOffset: number;
 }
 
 /**
@@ -308,7 +339,7 @@ export function detectTempo(buffer: AudioBuffer, minBpm = 60, maxBpm = 200): Tem
   const rate = buffer.sampleRate;
   const frame = Math.max(1, Math.round(rate * 0.01)); // 10 ms
   const frames = Math.floor(buffer.length / frame);
-  if (frames < 64) return { bpm: 0, confidence: 0 };
+  if (frames < 64) return { bpm: 0, confidence: 0, beatPeriod: 0, beatOffset: 0 };
 
   const channels = buffer.numberOfChannels;
   const energy = new Float32Array(frames);
@@ -350,7 +381,7 @@ export function detectTempo(buffer: AudioBuffer, minBpm = 60, maxBpm = 200): Tem
   const framesPerSecond = rate / frame;
   const minLag = Math.floor((60 / maxBpm) * framesPerSecond);
   const maxLag = Math.ceil((60 / minBpm) * framesPerSecond);
-  if (maxLag >= frames) return { bpm: 0, confidence: 0 };
+  if (maxLag >= frames) return { bpm: 0, confidence: 0, beatPeriod: 0, beatOffset: 0 };
 
   let bestLag = 0;
   let bestScore = 0;
@@ -369,7 +400,7 @@ export function detectTempo(buffer: AudioBuffer, minBpm = 60, maxBpm = 200): Tem
     }
   }
 
-  if (bestLag === 0 || bestScore <= 0) return { bpm: 0, confidence: 0 };
+  if (bestLag === 0 || bestScore <= 0) return { bpm: 0, confidence: 0, beatPeriod: 0, beatOffset: 0 };
 
   const average = total / count;
   // How much the winning lag stands out from every other candidate.
@@ -386,7 +417,35 @@ export function detectTempo(buffer: AudioBuffer, minBpm = 60, maxBpm = 200): Tem
   while (bpm < 70) bpm *= 2;
   while (bpm > 180) bpm /= 2;
 
-  return { bpm: Math.round(bpm * 10) / 10, confidence };
+  /**
+   * Phase: which alignment of a pulse train at the beat period lands on the
+   * most onset energy.
+   *
+   * Tried against the folded BPM rather than bestLag, so the grid matches the
+   * number on screen. Halving the tempo doubles the spacing, and a grid drawn
+   * at the un-folded period would be twice as dense as the reading it claims to
+   * illustrate.
+   */
+  const period = (60 / bpm) * framesPerSecond;
+  let bestOffset = 0;
+  let bestPhase = -1;
+  for (let offset = 0; offset < Math.ceil(period); offset += 1) {
+    let sum = 0;
+    for (let at = offset; at < frames; at += period) {
+      sum += onset[Math.round(at)] ?? 0;
+    }
+    if (sum > bestPhase) {
+      bestPhase = sum;
+      bestOffset = offset;
+    }
+  }
+
+  return {
+    bpm: Math.round(bpm * 10) / 10,
+    confidence,
+    beatPeriod: 60 / bpm,
+    beatOffset: bestOffset / framesPerSecond,
+  };
 }
 
 export interface WaveformData {

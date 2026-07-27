@@ -41,6 +41,15 @@ export interface WaveformRegion {
   end: number;
 }
 
+export interface WaveformGrid {
+  /** Seconds between lines. */
+  period: number;
+  /** Seconds from the file start to the first line. */
+  offset: number;
+  /** Draw every nth line stronger, e.g. 4 for a downbeat. 0 for no accent. */
+  accent: number;
+}
+
 export interface WaveformView {
   start: number;
   end: number;
@@ -124,6 +133,7 @@ export class Waveform {
   private region: WaveformRegion | null = null;
   private markers: number[] = [];
   private highlights: WaveformRegion[] = [];
+  private grid: WaveformGrid | null = null;
   private view: WaveformView = { start: 0, end: 0 };
   private observer: ResizeObserver | null = null;
   private frame = 0;
@@ -224,6 +234,19 @@ export class Waveform {
    */
   setHighlights(regions: WaveformRegion[]): void {
     this.highlights = regions;
+    this.scheduleRender();
+  }
+
+  /**
+   * A repeating grid of vertical lines, for a detected beat.
+   *
+   * Drawn here rather than as a separate canvas over the top so it inherits the
+   * viewport: zoom into one bar and the grid zooms with the audio, which is the
+   * only way to check whether the lines actually land on the transients. Pass
+   * null to clear.
+   */
+  setGrid(grid: WaveformGrid | null): void {
+    this.grid = grid;
     this.scheduleRender();
   }
 
@@ -419,6 +442,7 @@ export class Waveform {
 
     this.paintSegments(width, height, toX);
     this.paintHighlights(height, toX);
+    this.paintBeatGrid(height, toX);
     this.paintGrid(width, height);
 
     // Centreline: gives silence a visible spine instead of a blank gap.
@@ -470,6 +494,38 @@ export class Waveform {
       if (i % 2 === 1) continue;
       ctx.globalAlpha = 0.05;
       ctx.fillRect(edges[i], 0, edges[i + 1] - edges[i], height);
+    }
+    ctx.restore();
+  }
+
+  /**
+   * The beat grid.
+   *
+   * Every `period` seconds from `offset`, with every `accent`-th line drawn
+   * stronger so bars are countable rather than an undifferentiated comb. Only
+   * the lines inside the current view are computed, so zooming out on a long
+   * track costs the same as zooming in.
+   */
+  private paintBeatGrid(height: number, toX: (seconds: number) => number): void {
+    const grid = this.grid;
+    if (!grid || grid.period <= 0) return;
+
+    const { ctx } = this;
+    const { start, end } = this.view;
+    // Start at the first line at or after the left edge of the view.
+    const first = Math.max(0, Math.ceil((start - grid.offset) / grid.period));
+    const last = Math.floor((end - grid.offset) / grid.period);
+    // A grid finer than a few pixels is a solid wash, so stop drawing it.
+    if (toX(grid.offset + grid.period) - toX(grid.offset) < 3) return;
+
+    ctx.save();
+    ctx.fillStyle = this.style.flag;
+    for (let n = first; n <= last; n += 1) {
+      const time = grid.offset + n * grid.period;
+      const x = Math.round(toX(time));
+      const accented = grid.accent > 0 && n % grid.accent === 0;
+      ctx.globalAlpha = accented ? 0.75 : 0.3;
+      ctx.fillRect(x, accented ? 0 : height * 0.12, 1, accented ? height : height * 0.76);
     }
     ctx.restore();
   }
