@@ -6,7 +6,7 @@ import { getTool } from '../data/tools';
 const tool = getTool('audio-joiner');
 
 const steps = [
-  'Drop every file you want to merge onto the page in one go. They are decoded on your machine. Nothing is sent anywhere, and there is no queue to wait in.',
+  'Drop the files you want to merge onto the page. They are decoded on your machine. Nothing is sent anywhere, and there is no queue to wait in. You can add more later without losing the ones already loaded.',
   'Put them in the order you want. Drag a row by its handle, or use the up and down buttons on each row if you would rather not drag. Row one plays first.',
   'Set a gap if you want a pause between tracks. Zero joins them with no space at all, which is what you want for segments of one continuous recording.',
   'Pick an output format and download. The merged file is written from the decoded samples, so the parts line up exactly where the list says they will.',
@@ -27,7 +27,7 @@ const faq = [
   },
   {
     q: 'Can I add more files after the first batch has loaded?',
-    a: 'Not to the existing list. Dropping files again starts over with the new set. Select everything you want in one go from the file picker, or drag them all in together. Reordering afterwards is free, so the order you pick them in does not matter.',
+    a: 'Yes. Add files, next to Clear at the top of the workspace, appends to what is already there rather than replacing it, and the new ones land at the end of the list. Any order you had already set is kept. Clear is still there if you want to start over instead.',
   },
   {
     q: 'How many files can I merge, and how long can the result be?',
@@ -64,6 +64,20 @@ const faq = [
           The player above previews the first file only. The merged result is built when you
           download.
         </p>
+      </div>
+
+      {/*
+        The running order as a length, not a list.
+
+        The rows above say what order the files are in; they say nothing about
+        proportion, which is the thing people are usually checking — that the
+        two-minute intro really is a tenth of the episode, or that the file
+        someone added by mistake is the twelve-second one. Widths make that
+        answerable without arithmetic, and raising the gap shows what it costs
+        across the whole run rather than per join.
+      */}
+      <div class="runline controls__full" data-runline-panel>
+        <canvas class="runline__canvas" data-runline aria-hidden="true"></canvas>
       </div>
 
       <div class="field">
@@ -155,15 +169,151 @@ const faq = [
   </Fragment>
 </ToolPage>
 
+<style>
+  .runline {
+    padding: var(--s4);
+    border-radius: var(--r-md);
+    background: var(--stage-2, var(--surface));
+  }
+
+  .runline__canvas {
+    width: 100%;
+    height: 108px;
+    display: block;
+  }
+
+  @media (max-width: 560px) {
+    .runline__canvas {
+      height: 96px;
+    }
+  }
+</style>
+
 <script>
   import { createTool } from '../lib/tool';
   import { concat, padSilence } from '../lib/audio/dsp';
   import { duration as fmtDuration } from '../lib/format';
 
+  /**
+   * The run, to scale.
+   *
+   * Alternating tints rather than one colour per file: with eight segments a
+   * palette stops being informative and starts being decoration, and all that is
+   * needed here is to see where one ends and the next begins.
+   */
+  function drawRunline(
+    panel: HTMLElement,
+    canvas: HTMLCanvasElement,
+    parts: { name: string; seconds: number }[],
+    gap: number
+  ): void {
+    const cssWidth = canvas.clientWidth;
+    const cssHeight = canvas.clientHeight;
+    if (cssWidth < 1 || cssHeight < 1) return;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.round(cssWidth * dpr);
+    const height = Math.round(cssHeight * dpr);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    const context = canvas.getContext('2d');
+    if (!context) return;
+    context.clearRect(0, 0, width, height);
+
+    const styles = getComputedStyle(panel);
+    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
+    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+
+    const padL = 12 * dpr;
+    const padR = 12 * dpr;
+    const plotW = width - padL - padR;
+
+    const audio = parts.reduce((sum, part) => sum + part.seconds, 0);
+    const spacing = gap * Math.max(0, parts.length - 1);
+    const total = Math.max(0.001, audio + spacing);
+    const x = (seconds: number) => padL + (seconds / total) * plotW;
+
+    context.font = `${10 * dpr}px system-ui, sans-serif`;
+    context.textBaseline = 'middle';
+
+    context.textAlign = 'left';
+    context.fillStyle = `color-mix(in oklch, ${ink} 55%, transparent)`;
+    context.fillText(
+      spacing > 0
+        ? `${parts.length} files plus ${fmtDuration(spacing)} of silence`
+        : `${parts.length} files, no gaps`,
+      padL,
+      11 * dpr
+    );
+    context.textAlign = 'right';
+    context.fillStyle = `color-mix(in oklch, ${ink} 78%, transparent)`;
+    context.fillText(fmtDuration(total), padL + plotW, 11 * dpr);
+
+    const barTop = 26 * dpr;
+    const barH = 34 * dpr;
+
+    let cursor = 0;
+    parts.forEach((part, index) => {
+      const from = x(cursor);
+      const to = x(cursor + part.seconds);
+      const w = Math.max(1.5 * dpr, to - from);
+
+      context.fillStyle = `color-mix(in oklch, ${hue} ${index % 2 === 0 ? 62 : 38}%, transparent)`;
+      context.beginPath();
+      context.roundRect(from, barTop, w, barH, 3 * dpr);
+      context.fill();
+
+      if (w > 26 * dpr) {
+        context.fillStyle = `color-mix(in oklch, ${ink} 88%, transparent)`;
+        context.textAlign = 'center';
+        context.font = `600 ${10 * dpr}px system-ui, sans-serif`;
+        context.fillText(String(index + 1), from + w / 2, barTop + barH / 2);
+        context.font = `${10 * dpr}px system-ui, sans-serif`;
+      }
+
+      cursor += part.seconds;
+
+      // The gap after this file, which the last one does not get.
+      if (gap > 0 && index < parts.length - 1) {
+        const gapFrom = x(cursor);
+        const gapTo = x(cursor + gap);
+        context.fillStyle = `color-mix(in oklch, ${ink} 12%, transparent)`;
+        context.fillRect(gapFrom, barTop, Math.max(dpr, gapTo - gapFrom), barH);
+        cursor += gap;
+      }
+    });
+
+    // A duration scale under the bar, so a width can be read as a time.
+    context.strokeStyle = `color-mix(in oklch, ${ink} 14%, transparent)`;
+    context.lineWidth = dpr;
+    context.fillStyle = `color-mix(in oklch, ${ink} 40%, transparent)`;
+    context.textAlign = 'center';
+    const step = niceTimeStep(total);
+    for (let mark = 0; mark <= total + 0.001; mark += step) {
+      context.beginPath();
+      context.moveTo(x(mark), barTop + barH);
+      context.lineTo(x(mark), barTop + barH + 5 * dpr);
+      context.stroke();
+      context.fillText(fmtDuration(mark), x(mark), barTop + barH + 15 * dpr);
+    }
+  }
+
+  /** A tick spacing that gives roughly five labels at a round interval. */
+  function niceTimeStep(total: number): number {
+    const ladder = [1, 5, 10, 15, 30, 60, 120, 300, 600, 900, 1800, 3600];
+    const wanted = total / 5;
+    return ladder.find((step) => step >= wanted) ?? 3600;
+  }
+
   /** Indices into ctx.buffers. The buffer array is fixed; this is the order. */
   let order: number[] = [];
   let names: string[] = [];
   let lengths: number[] = [];
+  /** Set once the controls are bound, so adding files does not bind them twice. */
+  let wired = false;
 
   const tool = createTool({
     suffix: 'merged',
@@ -176,13 +326,34 @@ const faq = [
       const totalOut = root.querySelector<HTMLElement>('[data-total]');
       if (!list) return;
 
-      order = ctx.buffers.map((_, index) => index);
+      // Adding files re-runs onReady; keep the arrangement and append the rest.
+      const known = order.filter((index) => index < ctx.buffers.length);
+      order = [
+        ...known,
+        ...ctx.buffers.map((_, index) => index).filter((index) => !known.includes(index)),
+      ];
       names = ctx.files.map((file, index) => file?.name ?? `Track ${index + 1}`);
       lengths = ctx.buffers.map((buffer) => buffer.duration);
 
+      const runlinePanel = root.querySelector<HTMLElement>('[data-runline-panel]');
+      const runlineCanvas = root.querySelector<HTMLCanvasElement>('[data-runline]');
+
       const showTotal = (): void => {
+        const gapNow = runtime.value('gap', 0);
+        if (runlinePanel && runlineCanvas) {
+          drawRunline(
+            runlinePanel,
+            runlineCanvas,
+            order.map((index) => ({
+              name: names[index] ?? '',
+              seconds: lengths[index] ?? 0,
+            })),
+            gapNow
+          );
+        }
+
         if (!totalOut) return;
-        const gap = runtime.value('gap', 0);
+        const gap = gapNow;
         const sum = lengths.reduce((total, value) => total + value, 0);
         const spacing = gap * Math.max(0, order.length - 1);
         totalOut.textContent =
@@ -305,19 +476,31 @@ const faq = [
         showTotal();
       };
 
-      gap?.addEventListener('input', () => {
-        if (gapNum) gapNum.value = gap.value;
-        paintGap();
-      });
+      // The canvas has no width until the workspace is on screen. Runs on every
+      // ready, because adding a file changes what there is to draw.
+      requestAnimationFrame(showTotal);
 
-      gapNum?.addEventListener('input', () => {
-        if (gap) gap.value = gapNum.value;
-        paintGap();
-      });
+      // onReady runs again whenever files are added, and the slider is the same
+      // element each time — binding again would stack a second handler on it.
+      if (!wired) {
+        wired = true;
 
-      gapNum?.addEventListener('change', () => {
-        if (gap && gapNum) gapNum.value = gap.value;
-      });
+        gap?.addEventListener('input', () => {
+          if (gapNum) gapNum.value = gap.value;
+          paintGap();
+        });
+
+        gapNum?.addEventListener('input', () => {
+          if (gap) gap.value = gapNum.value;
+          paintGap();
+        });
+
+        gapNum?.addEventListener('change', () => {
+          if (gap && gapNum) gapNum.value = gap.value;
+        });
+
+        if (runlinePanel) new ResizeObserver(showTotal).observe(runlinePanel);
+      }
 
       paintGap();
     },
