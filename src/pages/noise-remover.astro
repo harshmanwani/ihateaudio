@@ -1,25 +1,26 @@
 ---
 import ToolPage from '../layouts/ToolPage.astro';
 import ToolShell from '../components/ToolShell.astro';
+import RunAction from '../components/RunAction.astro';
 import { getTool } from '../data/tools';
 
 const tool = getTool('noise-remover');
 
 const steps = [
-  'Drop the recording in. There is no model to download for this one — the network is small enough to ship with the site, so it starts working straight away.',
-  'Press Clean. The whole file is processed faster than real time, so even a long interview is done in seconds rather than minutes.',
-  'Compare before and after with the amount slider. Full strength is not always best: on a recording where the room is part of the atmosphere, leaving a little of the original in sounds more natural.',
-  'Download when it sounds right. If this is going on to a transcriber, run it through cleaned — speech recognition is noticeably more accurate once the hiss is gone.',
+  'Drop the recording in. There is no model to download for this one: it is small enough to ship with the site, so it starts working straight away.',
+  'Press Clean. The whole file is processed about eighty times faster than real time, so even a long interview is done in seconds rather than minutes.',
+  'Listen, and compare. The cleaned version appears as its own player under the controls, with the original still in the player above, so you can play one against the other and hear exactly what left. Full strength is not always best: on a recording where the room is part of the atmosphere, leaving a little of the original in sounds more natural.',
+  'Download when it sounds right. If this is going on to a transcriber, run it through cleaned first: speech recognition is noticeably more accurate once the hiss is gone.',
 ];
 
 const faq = [
   {
     q: 'What kind of noise does this remove?',
-    a: 'Steady background noise: air conditioning, computer fans, traffic hum through a window, tape hiss, the general roar of a room. It is very good at anything continuous and unchanging. It is much less good at sudden noises — a door slamming, a cough, a chair scraping — because those look like part of the speech to a model trained to separate voice from steady background.',
+    a: 'Steady background noise: air conditioning, computer fans, traffic hum through a window, tape hiss, the general roar of a room. It is very good at anything continuous and unchanging. It is much less good at sudden noises (a door slamming, a cough, a chair scraping) because those look like part of the speech to a model trained to separate voice from steady background.',
   },
   {
     q: 'Why is there nothing to download here when the other AI tools need 40 or 64 MB?',
-    a: 'Because this network is tiny. RNNoise is about 150 KB, which is smaller than most photographs, and it ships with the site like any other asset. It manages that by being narrow: it does one job, on speech, at one sample rate, and it was designed in an era when running a neural network on a phone meant making it small enough to fit. The separation models are large because they are doing something far harder.',
+    a: 'Because this model is tiny. RNNoise is about 150 KB, which is smaller than most photographs, and it ships with the site like any other asset. It manages that by being narrow: it does one job, on speech, at one sample rate, and it was designed in an era when running an AI model on a phone meant making it small enough to fit. The separation models are large because they are doing something far harder.',
   },
   {
     q: 'It made the voice sound thin or underwater.',
@@ -27,7 +28,7 @@ const faq = [
   },
   {
     q: 'Can it remove music from behind speech?',
-    a: 'Not well — that is a different problem. This is trained to tell voice from steady noise, and music is neither steady nor noise. If there is music under the dialogue, the vocal remover does a far better job, because separating a voice from an arrangement is exactly what it was built for.',
+    a: 'Not well, and it is a different problem. This is trained to tell voice from steady noise, and music is neither steady nor noise. If there is music under the dialogue, the vocal remover does a far better job, because separating a voice from an arrangement is exactly what it was built for.',
   },
   {
     q: 'Does it work on singing?',
@@ -35,7 +36,7 @@ const faq = [
   },
   {
     q: 'Why does the file come back at a different quality?',
-    a: 'It should not, but there is a small unavoidable round trip: the network runs at 48 kHz, so a 44.1 kHz recording is resampled up, processed, and resampled back. Both conversions use the browser’s own resampler with a proper filter, so the loss is far below anything audible, but it is not literally bit-identical in the passages where nothing was removed.',
+    a: 'It should not, but there is a small unavoidable round trip: the model runs at 48 kHz, so a 44.1 kHz recording is resampled up, processed, and resampled back. Both conversions use the browser’s own resampler with a proper filter, so the loss is far below anything audible, but it is not literally bit-identical in the passages where nothing was removed.',
   },
 ];
 ---
@@ -46,7 +47,7 @@ const faq = [
       <div class="controls__head">
         <span class="controls__title">Cleanup</span>
         <span class="hint">
-          A neural denoiser, running on your machine. Nothing to download first.
+          An AI denoiser, running on your device. Nothing to download first.
         </span>
       </div>
 
@@ -83,6 +84,14 @@ const faq = [
         </p>
       </div>
 
+      <RunAction
+        icon="wind"
+        label="Clean the recording"
+        busy="Cleaning"
+        hint="Runs in seconds. Listen before you download, and change the strength if the voice sounds thin."
+        done="Cleaned. The result has its own player below — compare it with the original above, then download."
+      />
+
       <div class="note note--info controls__full" data-report hidden>
         <div class="note__body" data-report-text></div>
       </div>
@@ -90,18 +99,18 @@ const faq = [
   </ToolShell>
 
   <Fragment slot="about">
-    <h2>How a 150 KB network does this</h2>
+    <h2>How a 150 KB model does this</h2>
     <p>
       Most noise reduction works by subtraction: measure the noise during a silent
       passage, then subtract that profile from the whole recording. It works, and
-      its failure mode is famous — the musical-noise artefact, a shimmering of
+      its failure mode is famous: the musical-noise artefact, a shimmering of
       little tones where the subtraction left uneven residue behind.
     </p>
     <p>
       RNNoise does something different. It splits the signal into a couple of dozen
       frequency bands and, for every 10-millisecond frame, asks a small recurrent
-      network how much of each band is voice. The answer is a gain per band, and the
-      gains are applied smoothly. Because the network carries state from one frame to
+      model how much of each band is voice. The answer is a gain per band, and the
+      gains are applied smoothly. Because the model carries state from one frame to
       the next, it knows whether it is in the middle of a word or in a gap, which is
       the information a static noise profile does not have.
     </p>
@@ -128,7 +137,7 @@ const faq = [
     <h2>When to leave it alone</h2>
     <p>
       Anything where the background is content. Ambience recorded deliberately, a
-      live room you wanted the sound of, a field recording — this will strip exactly
+      live room you wanted the sound of, a field recording: this will strip exactly
       the thing you went there for.
     </p>
     <p>
@@ -152,6 +161,7 @@ const faq = [
       const slider = root.querySelector<HTMLInputElement>('[data-control="amount"]');
       const num = root.querySelector<HTMLInputElement>('[data-control="amount-num"]');
       const out = root.querySelector<HTMLElement>('[data-out="amount"]');
+      const report = root.querySelector<HTMLElement>('[data-report]');
 
       const paint = (): void => {
         if (!slider) return;
@@ -171,6 +181,17 @@ const faq = [
         paint();
       });
 
+      /**
+       * A strength change makes the report stale along with the result the
+       * runtime is already discarding, so the card goes too. `change` rather
+       * than `input`, matching when the runtime invalidates.
+       */
+      const stale = (): void => {
+        if (report) report.hidden = true;
+      };
+      slider?.addEventListener('change', stale);
+      num?.addEventListener('change', stale);
+
       paint();
     },
 
@@ -181,8 +202,13 @@ const faq = [
       const cleaned = await denoise(ctx.buffer, {
         amount,
         signal: ctx.signal,
-        onProgress: (ratio) => ctx.progress(ratio),
+        onProgress: (ratio) => ctx.progress(ratio, 'Cleaning'),
       });
+
+      // The result gets its own player under the controls: the original stays in
+      // the main transport, the cleaned version lands here, and comparing them is
+      // playing one then the other.
+      runtime?.showResult(cleaned, 'Cleaned');
 
       // A number is more use than a tick: it says whether anything was actually
       // there to remove, which is the question people have when a recording still
@@ -196,8 +222,8 @@ const faq = [
             ? 'Almost nothing was removed, which usually means the recording was already ' +
               'clean — or that the noise is not the steady kind this handles.'
             : `The result is about ${removed.toFixed(1)} dB quieter overall, which is the ` +
-              'noise that came out. Listen before downloading: if the voice sounds thin, ' +
-              'lower the strength.';
+              'noise that came out. If the voice sounds thin, lower the strength and run ' +
+              'it again.';
       }
       if (report) report.hidden = false;
 

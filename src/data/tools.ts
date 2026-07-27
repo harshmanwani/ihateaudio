@@ -809,7 +809,7 @@ export const TOOLS: Tool[] = [
     keywords: [
       'audio to text transcribe transcription speech to text whisper convert voice to text dictation interview transcript free',
     ],
-    related: ['subtitle-generator', 'vocal-remover', 'silence-remover', 'voice-recorder'],
+    related: ['subtitle-generator', 'noise-remover', 'silence-remover', 'voice-recorder'],
     instant: false,
     ai: true,
     modelBytes: 40_843_851,
@@ -828,10 +828,31 @@ export const TOOLS: Tool[] = [
     keywords: [
       'subtitle generator srt vtt captions auto subtitles caption maker video subtitles timed transcript free auto captions',
     ],
-    related: ['audio-transcriber', 'video-to-audio', 'vocal-remover', 'silence-remover'],
+    related: ['audio-transcriber', 'video-to-audio', 'noise-remover', 'silence-remover'],
     instant: false,
     ai: true,
     modelBytes: 40_843_851,
+  },
+  {
+    slug: 'noise-remover',
+    name: 'Background Noise Remover',
+    title: 'Remove Background Noise From Audio Free',
+    description:
+      'Clean hiss, hum, fans and room noise out of a recording with an AI denoiser. No download to wait for, nothing uploaded, and it runs in seconds.',
+    tagline: "Take the room out and leave the voice.",
+    short: "Clean hiss, hum and room noise off a recording.",
+    category: 'ai',
+    icon: 'wind',
+    icon3d: true,
+    keywords: [
+      'noise remover remove background noise denoise clean audio hiss hum fan reduce noise voice cleanup ai denoiser',
+    ],
+    related: ['audio-transcriber', 'silence-remover', 'volume-booster', 'equalizer'],
+    // The denoising model is small enough to ship with the site, so this one
+    // needs no download at all and behaves like the instant tools.
+    instant: true,
+    ai: true,
+    modelBytes: 0,
   },
 ];
 

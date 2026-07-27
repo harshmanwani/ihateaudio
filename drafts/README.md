@@ -32,32 +32,58 @@ If a future tool needs WebGPU or a newer architecture, revisiting 4.x is a versi
 bump plus an API adjustment rather than a rewrite — the worker structure is what
 makes that cheap.
 
-## The noise remover
+## Resolved: the noise remover
 
-`noise-remover.astro` is complete, as is `src/lib/ai/denoise.ts`. It is parked
-because it returns **silence**, not cleaned audio.
+Shipped. The suspicion was right — `RnnoiseWorkletNode` does produce nothing
+inside an `OfflineAudioContext` — and so was the second fallback listed here:
+calling the wasm frame by frame and skipping the wrapper entirely.
 
-Measured: input RMS 0.119, output RMS 0.000, over a fixture of speech with pink
-noise mixed in. The file is the right length and a perfectly valid WAV.
+The mechanism turned out to be a race, which is why it looked deterministic. The
+packaged processor loads its wasm in an async IIFE from its constructor, and its
+`process()` reads:
 
-The cause is almost certainly that `RnnoiseWorkletNode` produces nothing inside an
-`OfflineAudioContext`. At full strength the dry path is muted, so an empty wet path
-means an empty result, and the worklet reports no failure of its own.
+```js
+process(inputs, outputs) {
+  return ... || !this.processor || this.processor.process(inputs[0], outputs[0]), true
+}
+```
 
-Two things were fixed on the way to finding this, and both are worth keeping:
+Until the wasm finishes instantiating, `this.processor` is undefined, the
+expression short-circuits, and **the output array is never written**, so it stays
+zeros. On a live AudioContext that is a few milliseconds of silence nobody hears.
+`startRendering()` runs the whole file as fast as the machine allows and finishes
+long before the wasm is ready, so every frame takes the short-circuit and the
+entire result is silence. There is no readiness signal to wait on, so the worklet
+had to go.
 
-- `reductionDb` returned 0 for silent output, which the page rendered as "almost
-  nothing was removed — the recording was already clean". A tool that destroys the
-  file and then reassures you about it is the worst failure available. It now
-  returns Infinity for silence.
-- `denoise()` now refuses to return a silent buffer at all, throwing instead.
+`src/lib/ai/rnnoise.ts` now instantiates `rnnoise.wasm` directly. It exports
+`malloc`, `free` and the four `rnnoise_*` entry points and imports only three
+trivial `env` functions, so it needs no Emscripten glue and no audio graph — it
+was never anything but a pure frame function. No new dependency: the same wasm the
+package already shipped, minus the wrapper.
 
-Next: confirm the worklet runs offline by rendering a known tone through it and
-checking the output is non-zero. If AudioWorklet genuinely does not run under
-OfflineAudioContext in this browser, the fallbacks are a real-time render through a
-regular AudioContext (slow, but correct), or calling the RNNoise wasm frame by
-frame directly and skipping the worklet wrapper entirely — 480-sample frames at
-48 kHz, which is a small amount of code.
+Three things fell out of doing it this way:
+
+- **Real progress and a working cancel.** `OfflineAudioContext` gives no progress
+  events; a plain loop that yields every couple of seconds of audio gives both.
+- **The delay was wrong before.** Measured by cross-correlation, RNNoise runs one
+  frame (480 samples) behind. The old code blended an undelayed dry path against a
+  delayed wet one, so every strength below 100% was a comb filter rather than a
+  blend. The output is now shifted back and the blend is real.
+- **It is testable in Node.** `tests/unit/rnnoise.test.ts` runs the actual model
+  against the fixtures, so "returns silence" can never come back unnoticed.
+
+Verified in a browser on speech with noise: noise-only passages down 15.2 dB, the
+voice within 0.23 dB of where it started, 4 seconds of audio in 83 ms.
+
+One loose end: there is no `public/icons3d/noise-remover.png`, so this is the only
+AI tool falling back to its glyph. Regenerate with
+`FAL_KEY=... node scripts/generate-tool-icons.mjs noise-remover`.
+
+The two guards found on the way here are still in place and still worth keeping:
+`reductionDb` returns Infinity rather than 0 for silent output, and `denoise()`
+refuses to return a silent buffer — though it now only throws when the *input* had
+signal, since a silent file legitimately denoises to a silent file.
 
 ## Still open
 

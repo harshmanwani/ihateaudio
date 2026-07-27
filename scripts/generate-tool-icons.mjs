@@ -177,8 +177,20 @@ const SUBJECTS = {
     'a single chunky rounded warm cream speech bubble standing upright with three thick solid mint green horizontal bars inside it like lines of text, strictly only cream and mint green colours, no pink, no purple, no blue, one object only',
   'subtitle-generator':
     'a chunky rounded cream rectangular screen standing upright with two thick solid mint green horizontal bars across its lower third, like a caption box on a video frame',
+  /**
+   * Took three attempts, and both failures are worth recording.
+   *
+   * "A handheld brush sweeping" came back as a banana on a green plate — a
+   * described real-world implement gives the model too much room, and every
+   * subject that works in this file is simple solid geometry instead. A stack of
+   * bars fixed the shape but landed on a pink podium and read as a near-copy of
+   * stem-splitter, which is the exact failure the note above this group warns
+   * about. A single wavy ribbon is the one shape no other tool here uses, and the
+   * base has to be ruled out by several names because "no base" alone does not
+   * take.
+   */
   'noise-remover':
-    'a chunky rounded cream handheld brush sweeping, with three small soft mint green rounded specks lifting away from its bristles, simple toy object',
+    'one single chunky rounded warm cream wavy ribbon lying flat and horizontal like a smooth clean sound wave, with three small solid mint green rounded specks drifting up and away from its right end, strictly only mint green and deep forest green and warm cream colours, absolutely no pink, no purple, no blue, the object floats freely with nothing underneath it, no plate, no disc, no podium, no pedestal, no circular base, no tray, nothing else in frame',
 };
 
 const targets = process.argv.slice(2).length
