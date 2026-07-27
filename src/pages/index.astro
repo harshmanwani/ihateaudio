@@ -83,9 +83,23 @@ const schema = [
       the site's green: a different product should not look like another tool in
       this set, and the blue is the fastest way to say so without a label.
     */}
+    {/*
+      Campaign params rather than anything cleverer.
+
+      The two sites are separate PostHog projects, so there is no shared person
+      database to stitch a visitor across — an identity handed over in the URL
+      would land in a project that has never heard of it. Campaign params are
+      what does work: posthog-js reads them off the landing URL and attaches
+      them to the events it captures there, so supercut can segment on
+      utm_source without either side writing any code.
+
+      The referrer alone would name ihateaudio.com, but it cannot say which
+      placement sent them, and it is the first thing a browser drops. utm_content
+      is here so a second link later is distinguishable from this one.
+    */}
     <a
       class="crosspromo"
-      href="https://www.supercut.cc"
+      href="https://www.supercut.cc/?utm_source=ihateaudio&utm_medium=referral&utm_campaign=crosspromo&utm_content=home-hero"
       target="_blank"
       rel="noopener"
       data-crosspromo
@@ -348,8 +362,9 @@ const schema = [
        hue, so a small share of blue over it still reads mint, which is exactly
        the impression this pill exists to avoid. */
     background: color-mix(in oklch, var(--sc) 11%, white);
-    color: var(--ink-2);
-    font-size: var(--t-small);
+    color: var(--ink);
+    font-size: var(--t-ui);
+    font-weight: 500;
     line-height: 1.3;
     text-decoration: none;
     position: relative;
@@ -359,10 +374,19 @@ const schema = [
       transform var(--dur) var(--ease);
   }
 
-  /* Same ring as the AI pill: one conic gradient rotating behind a masked
-     border, which is a single animated property on a single element rather than
-     a keyframed border. The angle property and the keyframes are already
-     registered globally, so this only restates the colour. */
+  /* A travelling highlight along the border.
+
+     The AI pill does this with a rotating conic gradient, and copying that here
+     looked broken: a conic sweeps its angle around the element's centre, so on a
+     90px circle-ish pill the arc moves evenly, but on a 340x36 one it spends
+     most of the cycle parked on the short left and right edges and then crosses
+     the long top edge in a few frames. Measured, the angle was advancing exactly
+     on schedule; it simply was not somewhere you could see it.
+
+     A linear gradient swept horizontally travels at a constant speed along the
+     long edges regardless of aspect ratio, which is what a wide pill needs. The
+     static hairline underneath means the border never disappears between
+     passes. */
   .crosspromo + .hero {
     padding-block-start: var(--s5);
   }
@@ -373,15 +397,17 @@ const schema = [
     inset: -1px;
     border-radius: inherit;
     padding: 1px;
-    background: conic-gradient(
-      from var(--shimmer-angle, 0deg),
-      transparent 0deg,
-      transparent 250deg,
-      var(--sc) 310deg,
-      color-mix(in oklch, var(--sc) 50%, white) 340deg,
-      var(--sc) 350deg,
-      transparent 360deg
-    );
+    background:
+      linear-gradient(
+          100deg,
+          transparent 38%,
+          color-mix(in oklch, var(--sc) 60%, white) 46%,
+          var(--sc) 50%,
+          color-mix(in oklch, var(--sc) 60%, white) 54%,
+          transparent 62%
+        )
+        0 0 / 260% 100% no-repeat,
+      linear-gradient(color-mix(in oklch, var(--sc) 34%, white) 0 0);
     -webkit-mask:
       linear-gradient(#000 0 0) content-box,
       linear-gradient(#000 0 0);
@@ -390,9 +416,23 @@ const schema = [
       linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
-    animation: pill-shimmer 4s linear infinite;
+    animation: crosspromo-sweep 3.4s linear infinite;
     pointer-events: none;
     z-index: -1;
+  }
+
+  @keyframes crosspromo-sweep {
+    from {
+      background-position:
+        160% 0,
+        0 0;
+    }
+
+    to {
+      background-position:
+        -60% 0,
+        0 0;
+    }
   }
 
   .crosspromo:hover {
@@ -419,7 +459,7 @@ const schema = [
 
   .crosspromo__text strong {
     color: var(--sc-ink);
-    font-weight: 600;
+    font-weight: 700;
   }
 
   .crosspromo__go {
@@ -430,7 +470,7 @@ const schema = [
 
   @media (max-width: 480px) {
     .crosspromo {
-      font-size: 0.8125rem;
+      font-size: var(--t-small);
       padding: 5px 10px 5px 6px;
     }
   }
@@ -438,7 +478,7 @@ const schema = [
   @media (prefers-reduced-motion: reduce) {
     .crosspromo::before {
       animation: none;
-      background: color-mix(in oklch, var(--sc) 45%, transparent);
+      background: color-mix(in oklch, var(--sc) 40%, white);
     }
 
     .crosspromo:hover {
@@ -448,6 +488,23 @@ const schema = [
 </style>
 
 <script>
+  import { track } from '../lib/track';
+
+  /*
+    The click, counted on this side too.
+
+    The campaign params tell supercut who arrived; they cannot tell this site how
+    many people set off, and the gap between those two numbers is the useful one
+    — it separates "nobody is interested" from "the link is being clicked and
+    something downstream is losing them". Carries no file data, which is the
+    only rule this event set has.
+  */
+  document
+    .querySelector<HTMLAnchorElement>('[data-crosspromo]')
+    ?.addEventListener('click', () => {
+      track('crosspromo_click', { to: 'supercut', placement: 'home-hero' });
+    });
+
   const search = document.querySelector<HTMLInputElement>('#tool-search');
   const tiles = Array.from(document.querySelectorAll<HTMLElement>('[data-tile]'));
   const sections = Array.from(
