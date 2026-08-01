@@ -9,6 +9,7 @@
 export type ToolCategory =
   | 'cut'
   | 'convert'
+  | 'send'
   | 'volume'
   | 'speed'
   | 'effects'
@@ -33,6 +34,12 @@ export const CATEGORIES: CategoryMeta[] = [
     name: 'Convert',
     blurb:
       "Get your file into whatever format the thing you're using demands. MP3 and WAV are instant; the rarer ones grab a converter once and then fly.",
+  },
+  {
+    id: 'send',
+    name: 'Send it somewhere',
+    blurb:
+      "Every app has a size limit and none of them tell you what to do about it. These work out what fits, then make it fit.",
   },
   {
     id: 'volume',
@@ -370,6 +377,68 @@ export const TOOLS: Tool[] = [
     keywords: ['resample 44100 48000 22050 16khz 8khz hz sample rate change'],
     related: ['audio-compressor', 'audio-converter', 'wav-converter'],
     instant: true,
+  },
+
+  /**
+   * Send it somewhere.
+   *
+   * The slugs name the job rather than the mechanism, which breaks the
+   * noun-phrase convention every other page here follows. It is deliberate:
+   * the search intent for these is a verb — people type "how to send long
+   * audio on whatsapp", not "whatsapp audio compressor" — and the three read
+   * as a set on the homepage because of it.
+   */
+  // ---------------- Send it somewhere ----------------
+  {
+    slug: 'send-audio-on-whatsapp',
+    name: 'Send Audio on WhatsApp',
+    title: 'Send Long Audio on WhatsApp: Fit the 16 MB Limit',
+    description:
+      'WhatsApp caps audio at 16 MB. Drop a file and get back the shortest route under it, recompressed or cut into parts at natural pauses. Nothing is uploaded.',
+    tagline: "16 MB is the cap. This works out how to get under it.",
+    short: "Get a recording under WhatsApp's 16 MB audio limit.",
+    category: 'send',
+    icon: 'whatsapp-logo',
+    icon3d: true,
+    keywords: [
+      'whatsapp 16mb limit too big audio file send long voice note document compress split',
+    ],
+    related: ['audio-compressor', 'audio-splitter', 'send-audio-on-discord'],
+    instant: false,
+  },
+  {
+    slug: 'send-audio-on-discord',
+    name: 'Send Audio on Discord',
+    title: 'Send Audio on Discord: Beat the 10 MB Upload Limit',
+    description:
+      'Discord allows 10 MB free, more with Nitro or server boosts. Pick your real ceiling and get the shortest route under it. Runs entirely in your browser.',
+    tagline: "10 MB free, and it never tells you what to do about it.",
+    short: "Fit a track under Discord's upload limit, free or Nitro.",
+    category: 'send',
+    icon: 'discord-logo',
+    icon3d: true,
+    keywords: [
+      'discord 10mb 25mb upload limit nitro boost too big file compress audio split',
+    ],
+    related: ['audio-compressor', 'send-audio-on-whatsapp', 'audio-splitter'],
+    instant: false,
+  },
+  {
+    slug: 'send-audio-by-email',
+    name: 'Send Audio by Email',
+    title: 'Email a Large Audio File: Fit Gmail and Outlook Limits',
+    description:
+      'Attachments are encoded on the way out, so Gmail’s 25 MB is really about 18 MB. This works out what actually fits and gets you under it.',
+    tagline: "Gmail says 25 MB. The real ceiling is nearer 18.",
+    short: "Get an attachment under the limit, the real one.",
+    category: 'send',
+    icon: 'envelope-simple',
+    icon3d: true,
+    keywords: [
+      'email attachment too large gmail 25mb outlook 20mb limit bounced audio compress base64',
+    ],
+    related: ['audio-compressor', 'send-audio-on-whatsapp', 'audio-splitter'],
+    instant: false,
   },
 
   // ---------------- Volume & loudness ----------------

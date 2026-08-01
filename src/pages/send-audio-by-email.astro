@@ -1,0 +1,113 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import SendPanel from '../components/SendPanel.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('send-audio-by-email');
+
+const steps = [
+  'Pick whose limit you are actually up against. Your own provider caps what you can send, but the recipient\'s caps what can arrive, and the smaller of the two is the one that decides.',
+  'Drop the recording onto the page. The budget shown is the real one, already adjusted for the encoding overhead that makes a 25 MB limit behave like an 18 MB one.',
+  'Check whether it read the file as speech or music. A voice recording survives far more compression than a mix does, and correcting a wrong guess takes one tap.',
+  'Pick a route, and use "Hear it first" to check fifteen seconds at those settings if the file matters.',
+  'Download and attach it. If the result is several parts, send them as separate messages rather than one. A single message carrying all of them is back over the limit.',
+];
+
+const faq = [
+  {
+    q: 'Why is a 25 MB file too big for a 25 MB limit?',
+    a: 'Because attachments are not sent as raw bytes. Email was designed to carry text, so anything binary is re-encoded into text using base64 before it goes out, and that encoding inflates it by about a third. A 25 MB file becomes roughly 33 MB of actual message, which is over the cap it appeared to fit. The practical ceiling for Gmail is nearer 18 MB, and that is the number this page budgets against.',
+  },
+  {
+    q: 'Whose limit matters, mine or theirs?',
+    a: 'Both, and the smaller one wins. Your provider decides whether the message leaves; theirs decides whether it arrives. Gmail allows 25 MB out and 50 MB in, Outlook allows 20 MB, and corporate mail servers are frequently set to 10 MB without telling anyone. If you do not know where it is going, the work-address option is the safe assumption. A message that bounces after you have moved on is worse than one you made slightly smaller than necessary.',
+  },
+  {
+    q: 'Gmail offers to upload it to Drive. Why not let it?',
+    a: 'Often you should. But it changes what you are sending from a file into a permission, and permissions expire, get revoked, and fail for people outside your organisation or reading on a phone. A Drive link also does not survive being forwarded to someone you never granted access to. When the recipient needs the actual audio, whether that is a client, an editor, a transcriptionist or anyone who will open it in another program, an attachment that simply arrives is more reliable.',
+  },
+  {
+    q: 'Should I zip it first?',
+    a: 'It will not help. Zip works by finding repetition, and an MP3, M4A or Opus file has already had every scrap of redundancy squeezed out of it by the encoder. Zipping one typically saves under two percent, and the resulting archive still gets base64-encoded on the way out, so the overhead returns anyway. The only thing that meaningfully reduces a compressed audio file is re-encoding it or shortening it.',
+  },
+  {
+    q: 'Which format is safest for someone I do not know?',
+    a: 'MP3. It is not the most efficient, since M4A is better at the same size and Opus is better still, but it is the only one you can attach without wondering what the recipient has installed. This page offers M4A and MP3 for email and deliberately leaves Opus out, because a mail attachment gets opened by whatever happens to be on the other person\'s machine, and .opus is still the format most likely to produce a shrug on a work laptop.',
+  },
+  {
+    q: 'It split my recording into three files. Can I attach them all to one email?',
+    a: 'Not to the same message. The limit applies to the whole message, so three 17 MB parts in one email is a 51 MB message that will bounce exactly as the original would have. Send them as three messages, numbered as the filenames are. The parts are cut at natural pauses rather than at exact clock intervals, so each one starts and ends somewhere sensible.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell
+    tool={tool}
+    action="Make it fit"
+    results={true}
+    dropTitle="Drop the attachment that bounced"
+    dropHint="any size. It is read on your device, not uploaded"
+  >
+    <SendPanel destination="email" />
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>The third that disappears</h2>
+    <p>
+      Email attachment limits are the only ones on the internet that lie to you,
+      and they do it for a reason that is nearly fifty years old. Email was
+      designed to carry text, specifically seven-bit ASCII, and it has never
+      stopped being that underneath. Anything that is not text has to be
+      translated into text before it can travel, and the scheme used for that,
+      base64, represents every three bytes of your file as four characters.
+    </p>
+    <p>
+      That is a 33% increase, before headers. So a 25 MB audio file leaves your
+      outbox as roughly 33 MB of message and is refused by a server that would
+      have happily accepted 25. The limit was never lying about its number; it was
+      measuring the message, and you were measuring the file. The real ceiling
+      behind Gmail's 25 MB is about 18 MB of actual audio, and behind Outlook's
+      20 MB it is closer to 14.
+    </p>
+    <p>
+      This page budgets against the real number rather than the advertised one,
+      which is why the limit it shows is smaller than the one your provider
+      quotes. It is the same arithmetic every other destination here uses, with
+      one extra multiplier applied.
+    </p>
+
+    <h2>Two limits, and the one you cannot see</h2>
+    <p>
+      The other trap is that sending an email involves two policies, not one. Your
+      provider decides whether the message may leave. The recipient's provider
+      decides whether it may arrive. They are set independently, and you can only
+      see one of them.
+    </p>
+    <p>
+      Gmail and Outlook are generous by modern standards. Corporate mail servers
+      frequently are not. A 10 MB inbound cap is common, and it is enforced
+      silently, so the first you hear about it is a bounce message some hours
+      later, or nothing at all. If you are sending to an address at a company you
+      do not administer, assuming 10 MB costs you a slightly smaller file and buys
+      you a message that actually lands.
+    </p>
+    <p>
+      Where audio is concerned this is less painful than it sounds, because speech
+      compresses extraordinarily well. An hour of interview or dictation fits
+      inside 18 MB at a bitrate that stays perfectly intelligible, and often
+      inside 10 MB. Music is the harder case: it needs several times the bitrate
+      before it stops sounding degraded, so a full mix frequently cannot be
+      attached at all without either splitting it or accepting real quality loss.
+      When that happens, a link genuinely is the better answer, and it is worth
+      saying so rather than pretending otherwise.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createSendTool } from '../lib/send';
+
+  createSendTool('email');
+</script>

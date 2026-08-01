@@ -1,0 +1,114 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import SendPanel from '../components/SendPanel.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('send-audio-on-discord');
+
+const steps = [
+  'Set your actual ceiling first. It is the one setting this page cannot work out for you, because it depends on your Nitro tier and on the server you are posting in.',
+  'Drop the track onto the page. Its length and real size appear straight away, measured against the limit you picked.',
+  'Glance at the speech-or-music line. A produced track and a voice recording get held to very different bitrate floors, and correcting a wrong guess takes one tap.',
+  'Choose a route, then use "Hear it first" if you want to check fifteen seconds at those exact settings before committing.',
+  'Download and drag the result into the channel. Anything Discord can play shows up with an inline player rather than as a bare attachment.',
+];
+
+const faq = [
+  {
+    q: 'What is the Discord upload limit now?',
+    a: 'Ten megabytes on a free account. It was 25 MB for years and was cut to 8 MB, then settled at 10 MB in September 2024, which is why so much advice about it is out of date. Nitro Basic raises it to 50 MB and full Nitro to 500 MB. It is the tightest cap of any major platform, which is why a five-minute track at a normal bitrate will not go.',
+  },
+  {
+    q: 'Why does the limit seem different in different servers?',
+    a: 'Because two separate things raise it and they do not work the same way. Nitro is attached to you and travels with you into every server. Server boosts are attached to the server and apply to everyone posting there, paying or not. Level 2 lifts a server to 50 MB and level 3 to 100 MB. So the same file can upload fine in one channel and be rejected in the next, and the number that matters is whichever of the two is higher where you are posting.',
+  },
+  {
+    q: 'Why not just use a file host and paste a link?',
+    a: 'For a large project file, that is genuinely the better answer. For audio it usually is not, because a link is something people have to decide to click, while an uploaded file gets an inline player they can hit play on without leaving the conversation. In a channel where you are sharing a work in progress and hoping for reactions, that difference is most of the point. It is worth doing when the file is genuinely large and the alternative is shredding the quality.',
+  },
+  {
+    q: 'Which format should I upload for feedback on a mix?',
+    a: 'Whatever survives the cap at the highest bitrate, and for music that usually means Opus. At 96 to 128 kbps it holds up well enough that mix decisions are still audible, where MP3 at the same size is noticeably duller in the top end. What you should avoid is uploading something so squeezed that people end up commenting on compression artefacts rather than on your mix, which is the failure mode this page is trying to prevent.',
+  },
+  {
+    q: 'Does Discord re-encode what I upload?',
+    a: 'No. Unlike the image and video pipeline, an audio attachment is stored and served as the exact bytes you uploaded, and the inline player streams that file. Whatever you make here is what everyone in the channel hears, with no second round of quality loss to account for.',
+  },
+  {
+    q: 'The parts option gives me four files. Is that really better?',
+    a: 'Sometimes, and the page shows both so you can judge. Four files at a bitrate that sounds right is the better answer for something people will listen to properly: a set, a podcast, a long take. One heavily squeezed file is better when the point is a quick reference that just needs to be audible. The route list is ordered by fewest files, but a rough single file is always offered too, because "good enough right now" is a legitimate thing to want.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell
+    tool={tool}
+    action="Make it fit"
+    results={true}
+    dropTitle="Drop the file Discord rejected"
+    dropHint="any size. It is read on your device, not uploaded"
+  >
+    <SendPanel destination="discord" />
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>The tightest cap of any platform, and the most confusing</h2>
+    <p>
+      Discord's upload limit is unusual in two ways. It is genuinely small, since
+      ten megabytes on a free account is under a third of what Gmail allows and
+      well below WhatsApp's sixteen, and it is the only one that changes depending on
+      where you are standing. The same file, from the same account, can upload in
+      one server and fail in the next.
+    </p>
+    <p>
+      That is because two independent things raise the ceiling. Nitro belongs to
+      the account: Basic lifts you to 50 MB, full Nitro to 500 MB, everywhere you
+      go. Server boosts belong to the server: at boost level 2 the cap becomes
+      50 MB for everyone posting there, and at level 3 it becomes 100 MB,
+      including for people who have never paid Discord anything. Your effective
+      limit is whichever of the two is higher, which is why the picker at the top
+      of this page is the first thing to set. Everything below it is arithmetic
+      against that number.
+    </p>
+    <p>
+      The history explains the confusion. The free limit was 8 MB for years, then
+      briefly 25 MB, and was cut to 10 MB in September 2024. Most advice online
+      was written under one of the earlier regimes, so it is common to find a
+      confident guide quoting a number that has not been right for years.
+    </p>
+
+    <h2>What ten megabytes buys you</h2>
+    <p>
+      At the 128 kbps that most people think of as normal, 10 MB is about ten
+      minutes of audio. A single track usually fits. A DJ set, a podcast episode,
+      a rehearsal recording or a long take does not, and no amount of tweaking
+      changes that, because a lossy file's size is its bitrate multiplied by its
+      duration and nothing else.
+    </p>
+    <p>
+      What does change is how much quality each of those bits buys. This is where
+      codec choice stops being pedantry: Opus at 96 kbps is closer to transparent
+      than MP3 at 160, and for spoken material the gap is wider still. On a
+      platform this constrained, choosing the better codec is often the difference
+      between a single clean file and three compromised ones. The trade is that
+      Opus needs a converter downloaded once before it can run, which is why every
+      route list here also contains an MP3 option that works instantly.
+    </p>
+    <p>
+      For music specifically, there is a floor worth respecting. Below about
+      96 kbps, compression artefacts stop being subtle and start being the thing
+      people comment on, and if you are posting a mix for feedback, feedback
+      about your encoder is worse than useless. When the maths says a single file
+      would land under that floor, this page recommends splitting instead. Several
+      files that sound like your work beat one that does not.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createSendTool } from '../lib/send';
+
+  createSendTool('discord');
+</script>

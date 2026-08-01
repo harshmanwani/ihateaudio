@@ -191,6 +191,23 @@ const SUBJECTS = {
    */
   'noise-remover':
     'one single chunky rounded warm cream wavy ribbon lying flat and horizontal like a smooth clean sound wave, with three small solid mint green rounded specks drifting up and away from its right end, strictly only mint green and deep forest green and warm cream colours, absolutely no pink, no purple, no blue, the object floats freely with nothing underneath it, no plate, no disc, no podium, no pedestal, no circular base, no tray, nothing else in frame',
+
+  /**
+   * Send it somewhere. All three are about one idea — this does not fit — so
+   * the risk is three pictures of the same squeeze. Each gets a different
+   * physical way of not fitting: too wide for a funnel, too big for a slot, too
+   * tall for an envelope. None may reuse the compressor's vise.
+   */
+  'send-audio-on-whatsapp':
+    'a chunky rounded warm cream funnel standing upright, one large mint green ball resting in its wide top opening and one much smaller mint green ball dropping out of its narrow spout underneath, simple solid toy objects, nothing else in frame',
+  // "A parcel with a ribbon beside a postbox" came back as a birthday present
+  // next to a mailbox: the bow read as gift wrapping, and two objects of
+  // similar height showed no mismatch at all. Wedging one object in another
+  // makes not-fitting the subject rather than an implication.
+  'send-audio-on-discord':
+    'one large chunky rounded mint green ball resting on top of the narrow round mouth of a much smaller warm cream jar, the ball obviously far too wide to drop in and sitting stuck on the rim, simple solid toy objects, absolutely no ribbon, no bow, no gift wrap, nothing else in frame',
+  'send-audio-by-email':
+    'a chunky rounded warm cream envelope standing upright with its flap open at the top, and one thick solid mint green bar sticking straight up out of the opening, the bar far too tall to fit inside the envelope, two simple solid toy objects only, nothing else in frame',
 };
 
 const targets = process.argv.slice(2).length

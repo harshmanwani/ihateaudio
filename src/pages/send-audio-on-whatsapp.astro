@@ -1,0 +1,121 @@
+---
+import ToolPage from '../layouts/ToolPage.astro';
+import ToolShell from '../components/ToolShell.astro';
+import SendPanel from '../components/SendPanel.astro';
+import { getTool } from '../data/tools';
+
+const tool = getTool('send-audio-on-whatsapp');
+
+const steps = [
+  "Drop the recording onto the page. Its length and true size appear immediately, along with whether it is already under WhatsApp's 16 MB.",
+  'Check the line about speech or music. Everything underneath depends on which it is, and if the guess is wrong, one tap corrects it.',
+  'Pick a route. The pre-selected one is whichever gets you the fewest files without sounding bad; the others are listed because sometimes a different trade is the right one.',
+  'Press "Hear it first" to encode fifteen seconds at exactly those settings and play it back before you commit to the whole file.',
+  'Download, then attach it in WhatsApp using Audio rather than Document. Otherwise it arrives as a file card instead of something you can tap and play.',
+];
+
+const faq = [
+  {
+    q: 'Is the WhatsApp audio limit still 16 MB?',
+    a: 'Yes. It has not moved, and it applies to everything sent as media: photos, video and audio alike, on every platform. The 2 GB figure that circulates is real but belongs to a different path: it is the cap on documents, not on media. Nothing you send as a playable audio message can exceed 16 MB.',
+  },
+  {
+    q: 'If documents can be 2 GB, why not always send audio that way?',
+    a: 'You can, and for a file you cannot bear to compress it is the right answer. The cost is how it arrives. A document shows up as a file card with a name and a size; the recipient taps it, waits for a download, and opens it in whatever player their phone chooses. An audio message appears in the thread with a play button and a scrubber. For a two-minute clip that difference is the whole experience, which is why this page treats the document route as an option rather than the default.',
+  },
+  {
+    q: 'Can this turn my file into a real voice note?',
+    a: 'No, and neither can anything else. WhatsApp decides whether something is a voice note from how it was created, not from what is inside it. Voice notes are the ones recorded with the microphone button, and the app marks them as such at that moment. A file you attach arrives as an audio message: it still plays inline with a waveform, but it will not have the blue-dot behaviour of a note you recorded in the app. Any tool claiming otherwise is describing an old workaround that no longer works.',
+  },
+  {
+    q: 'Why does it want to split my file instead of just compressing harder?',
+    a: 'Because past a certain point, compressing harder stops being a trade and starts being damage. A lossy file is bitrate times duration, so a three-hour recording forced under 16 MB lands around 12 kbps, which is below where even speech holds together. The split routes encode at a bitrate that still sounds like the original and accept more files as the price. When one file is genuinely achievable at a decent bitrate, that is what gets recommended instead.',
+  },
+  {
+    q: 'Will an Opus file play for whoever I send it to?',
+    a: 'Yes. Opus is not an exotic choice here. It is the codec WhatsApp already uses for every voice note in the app, and its media specification lists OGG/Opus explicitly. That is why it is offered: at 32 kbps mono it is roughly as intelligible as MP3 at three times the size, which is often the difference between one file and three. If you would rather not rely on it, every route list here includes an MP3 option, and MP3 needs no converter download either.',
+  },
+  {
+    q: 'It decided my file was music, but it is a podcast. Does that matter?',
+    a: 'It matters a lot, which is why the guess is shown rather than applied silently. Music is kept in stereo and held to a much higher bitrate floor, so a spoken recording misread as music produces a bigger file, more parts, or both. Tapping the correction re-runs the whole plan. The reverse mistake is the more damaging one, so when the evidence is genuinely ambiguous this errs towards music deliberately: being wrong that way costs you file size, and being wrong the other way costs you a recording that sounds hollow.',
+  },
+  {
+    q: 'Does WhatsApp compress it again after I send it?',
+    a: 'Not for audio files. Photos and video get re-encoded on the way through, which is why a photo sent through WhatsApp comes out softer than the original. Audio attachments are passed along as-is, so what the person receives is the file you made here, byte for byte. That also means there is no second round of quality loss to budget for.',
+  },
+];
+---
+
+<ToolPage slug={tool.slug} steps={steps} faq={faq}>
+  <ToolShell
+    tool={tool}
+    action="Make it fit"
+    results={true}
+    dropTitle="Drop the file WhatsApp refused"
+    dropHint="any size. It is read on your device, not uploaded"
+  >
+    <SendPanel destination="whatsapp" />
+  </ToolShell>
+
+  <Fragment slot="about">
+    <h2>Where the 16 megabytes comes from</h2>
+    <p>
+      WhatsApp has two entirely separate ceilings, and almost every argument about
+      its limits comes from people standing on different ones. Anything sent as
+      <em>media</em>, meaning a photo, a video, or an audio file attached with the
+      audio button, is capped at 16 MB. Anything sent as a <em>document</em> can be up
+      to 2 GB. Same app, same chat, same file, two different answers depending on
+      which attachment menu you used.
+    </p>
+    <p>
+      That cap is old, and it has survived because it is not really about storage.
+      WhatsApp delivers to phones on networks that are still metered and slow
+      across much of the world, and 16 MB is roughly what can be pushed to a
+      handset without the transfer becoming its own event. It is a delivery
+      decision rather than a technical one, which is also why it has not risen the
+      way the document limit did.
+    </p>
+    <p>
+      In practice the cap translates to about seventeen minutes of ordinary
+      128 kbps stereo audio. That is enough for a song and not remotely enough for
+      a lecture, a sermon, an interview, or any of the other things people
+      actually try to send. The arithmetic is unforgiving because a lossy file's
+      size is simply its bitrate multiplied by its duration: halve the bitrate and
+      you halve the bytes, with no cleverness available in between.
+    </p>
+
+    <h2>Why speech and music get treated so differently</h2>
+    <p>
+      The single biggest lever is what kind of recording it is. Speech occupies a
+      narrow band of frequencies, contains long pauses, and carries almost nothing
+      useful in the stereo image, which means an encoder can describe it with
+      remarkably few bits. Music does none of those things. It is wide, dense,
+      continuous, and often depends on stereo placement for instruments to stay
+      distinguishable.
+    </p>
+    <p>
+      This is why folding a recording to mono is worth doing for a voice memo and
+      damaging for a song. Mono does not make a lossy file any smaller, since
+      bitrate times duration is still the whole story, but it lets the encoder spend
+      every one of those bits on a single channel instead of splitting them across
+      two. At low bitrates that is close to doubling the quality for free. On
+      music, the same operation can make instruments vanish where the two channels
+      cancel.
+    </p>
+    <p>
+      The practical effect is a large gap in what fits. Speech encoded as mono
+      Opus stays clean down to around 32 kbps, which puts roughly an hour inside
+      WhatsApp's 16 MB. Music needs something closer to 96 kbps before it stops
+      sounding compressed, which puts the same limit at about twenty minutes.
+      Splitting only becomes necessary past those points, and it is the honest
+      answer when it does: three files that sound right are better than one that
+      does not.
+    </p>
+  </Fragment>
+</ToolPage>
+
+<script>
+  import { createSendTool } from '../lib/send';
+
+  createSendTool('whatsapp');
+</script>

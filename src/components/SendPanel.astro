@@ -1,0 +1,86 @@
+---
+/**
+ * The destination panel, shared by the three "send it somewhere" tools.
+ *
+ * Same split as ConversionPanel and conversion.ts: the markup lives here, the
+ * judgement lives in lib/audio/fit.ts, and the wiring between them in
+ * lib/send.ts. A page is then a destination id plus its own prose.
+ *
+ * The route list is built at runtime rather than templated because its length
+ * depends on the file, which is why its classes sit in tool.css instead of a
+ * scoped block here — Astro would scope them to elements this template never
+ * renders.
+ */
+import { DESTINATIONS } from '../lib/audio/fit';
+
+interface Props {
+  /** Key into DESTINATIONS. */
+  destination: string;
+}
+
+const { destination } = Astro.props;
+const dest = DESTINATIONS[destination];
+if (!dest) throw new Error(`SendPanel: no destination "${destination}"`);
+---
+
+<div class="controls" data-send data-destination={destination}>
+  <div class="controls__head">
+    <span class="controls__title">Getting it under the limit</span>
+    {/* Stated as a fact about the destination, so it stays true after a file lands. */}
+    <span class="hint" data-send-hint>{dest.hint}</span>
+  </div>
+
+  {
+    dest.ceilings.length > 1 && (
+      <div class="field">
+        <label class="label" for="ceiling">
+          Your actual limit
+        </label>
+        <select class="select" id="ceiling" data-control="ceiling">
+          {dest.ceilings.map((ceiling) => (
+            <option value={ceiling.id}>{ceiling.label}</option>
+          ))}
+        </select>
+        <p class="hint" data-ceiling-note />
+      </div>
+    )
+  }
+
+  {/*
+    The verdict. States what the file is and what was assumed about it, with
+    the evidence in plain words — a guess you can see the reasoning for is one
+    you can correct in a second, and this one is wrong often enough to matter.
+  */}
+  <div class="verdict" data-verdict hidden>
+    <p class="verdict__head" data-verdict-head></p>
+    <p class="verdict__why">
+      <span data-verdict-why></span>
+      <button type="button" class="verdict__flip" data-kind-flip></button>
+    </p>
+  </div>
+
+  {/*
+    Every width here comes from the same byte arithmetic the export runs, so
+    the picture cannot disagree with the result. The compressor plots a curve
+    because its question is "what bitrate"; this one packs blocks because its
+    question is "does it fit, and in how many pieces".
+  */}
+  <div class="fitbar controls__full" data-fit-panel>
+    <canvas class="fitbar__canvas" data-fit-plot aria-hidden="true"></canvas>
+    <p class="fitbar__caption" data-fit-caption>Waiting for a file.</p>
+  </div>
+
+  <div class="field controls__full">
+    <span class="label" id="route-label">How to send it</span>
+    <div class="routes" data-routes role="radiogroup" aria-labelledby="route-label"></div>
+  </div>
+
+  <div class="auditbar">
+    <button type="button" class="btn btn--quiet btn--sm" data-audition disabled>
+      Hear it first
+    </button>
+    <span class="hint" data-audition-note>
+      Encodes fifteen seconds at these exact settings, so you can check before committing.
+    </span>
+  </div>
+</div>
