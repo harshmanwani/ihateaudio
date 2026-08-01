@@ -14,7 +14,7 @@ pages, 0 errors, 0 warnings.**
 **Per-page metadata.** Every page has a unique title under 60 characters, a
 unique description in the 70–160 range, exactly one `<h1>`, an absolute
 canonical, and a `lang` attribute. Uniqueness is enforced by tests, not just
-convention, because duplicate descriptions across 39 near-neighbour tool pages
+convention, because duplicate descriptions across near-neighbour tool pages
 is the most likely way this site would get flattened in search.
 
 **Structured data**, emitted on every page:
@@ -52,7 +52,7 @@ It leads with the facts that are easiest to get wrong: nothing is uploaded,
 there is no account, the real limit is device memory rather than policy, most
 tools need no download, and the loudness figures follow ITU-R BS.1770-4. Then it
 lists every tool with a one-line summary, and points at the reference pages as
-citable material. A test asserts all 39 tools appear, so an assistant cannot
+citable material. A test asserts every tool appears, so an assistant cannot
 learn a subset.
 
 **`/tools.json`** is a machine-readable index: flat fields, absolute URLs, no
@@ -80,7 +80,7 @@ documents. A test enforces a floor of 450 words of unique prose per tool page.
 **Reference pages as link bait.** Tool pages rarely earn links.
 `/loudness-targets` and `/audio-formats` are written to be cited: a table of
 every platform's LUFS target, and an honest format comparison. These are the
-pages that lift domain authority for the other 39.
+pages that lift domain authority for the tool pages.
 
 **Search intent in the copy.** Every tool carries a `keywords` field of real
 search vocabulary ("mp4 to mp3", "sped up", "lufs"), used both by on-site search

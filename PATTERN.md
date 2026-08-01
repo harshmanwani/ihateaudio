@@ -189,5 +189,5 @@ Tone: plain, direct, no marketing. No exclamation marks. No "simply" or
 5. Only import what you use; the tool chunk should stay small.
 6. TypeScript is strict. Null-check DOM queries.
 7. Do not edit shared files (`src/lib/**`, `src/styles/**`, `src/data/tools.ts`,
-   layouts, components) — they are shared across all 39 pages. If you believe
+   layouts, components) — they are shared across every page. If you believe
    one needs a change, note it in your report instead.

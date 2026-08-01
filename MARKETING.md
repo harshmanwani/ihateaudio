@@ -9,7 +9,7 @@ with sources inline so future decisions argue with evidence instead of vibes.
 - Live at ihateaudio.com. 44 pages, on-site SEO clean, analytics + Search Console wired.
 - Last 30 days: **30 visitors, 85 pageviews**. Some of that is us.
 - Zero external footprint. No backlinks, no mentions, the brand name returns nothing in search.
-- Strong assets already built: 39 working tool pages with unique prose and schema, two
+- Strong assets already built: 49 working tool pages with unique prose and schema, two
   citation-bait reference pages (/loudness-targets, /audio-formats), 42 unique OG cards,
   offline PWA, 55 KB pages against the incumbents' 2–4 MB.
 - One blocker: the **noise remover is parked** (returned silence, fix in progress).
@@ -36,7 +36,7 @@ Five findings everything else hangs on:
    commenters say it outright: *"I don't trust claims like this unless the source code is
    available"* ([thread](https://news.ycombinator.com/item?id=45693904)). The wedge is
    not saying private. It is **proving it** (wifi-off demo, empty network tab), plus
-   breadth (39 tools, one brand) and generosity (no caps, no watermark, no meter).
+   breadth (49 tools, one brand) and generosity (no caps, no watermark, no meter).
 3. **The winners in this exact niche are SEO + brand-recall stories, not launch stories.**
    vocalremover.org: free suite, no ads, Patreon-funded, millions of visits/month with
    ~49% arriving direct — it became the name people remember
@@ -109,7 +109,7 @@ Reddit's 2026 spam detection bans exactly the behaviour that looks like a campai
 
 ### Week 2 — pages that earn their keep, first pitches (~12–15 h)
 
-New pages (each must clear the same bar as the 39: real value, unique prose, no filler):
+New pages (each must clear the same bar as the rest: real value, unique prose, no filler):
 
 - **Alternative pages** for brands with real search volume: 123apps /
   online-audio-converter, vocalremover.org, media.io, "Audacity online". Honest
@@ -147,7 +147,7 @@ Pitches (one good email each, proof demo attached, no follow-up spam):
 
 The highest-EV free channel for this product, and it gets one shot per ~6 months.
 
-- **Title** (engineering-led, factual): `Show HN: 39 audio tools in the browser – 55KB
+- **Title** (engineering-led, factual): `Show HN: 49 audio tools in the browser – 55KB
   pages, ffmpeg.wasm only when needed`. Not "private". Not "AI". The genre evidence is
   unambiguous: craft wins, adjectives lose.
 - **First comment** ready before posting: the backstory (built out of frustration with
@@ -196,7 +196,7 @@ The highest-EV free channel for this product, and it gets one shot per ~6 months
 ### Week 5 — Product Hunt + the big-sub shot (launch day + ~6 h)
 
 - **Product Hunt**, prepared during weeks 3–4: gallery from the OG cards + proof demo,
-  tagline `Audio editing is miserable. These 39 free tools make it less so.`, maker
+  tagline `Audio editing is miserable. These 49 free tools make it less so.`, maker
   comment = the founder story. The differentiated framing in 2026's AI-fatigued feed is
   exactly "no AI hype, no signup, it just works" (the AI tools are a bullet, not the
   headline). Expectations: credibility + a backlink + a few hundred visitors unless
@@ -278,7 +278,7 @@ The 2026 failure modes are well documented; all of these are hard rules:
 
 ## Copy assets (ready to adapt, not to paste blindly)
 
-**Show HN title:** `Show HN: 39 audio tools in the browser – 55KB pages, ffmpeg.wasm only when needed`
+**Show HN title:** `Show HN: 49 audio tools in the browser – 55KB pages, ffmpeg.wasm only when needed`
 
 **Show HN first comment (skeleton):** frustration origin → tier table (0 KB Web Audio /
 55 KB MP3 encoder / 31 MB self-hosted ffmpeg.wasm, chosen per output format) → local
@@ -286,7 +286,7 @@ Whisper + source separation, weights fetched once → "load any tool, turn off w
 still works; the analytics never see a filename" → invite questions on WSOLA, the iOS
 memory guards, BS.1770 loudness.
 
-**PH tagline:** `Audio editing is miserable. These 39 free tools make it less so.`
+**PH tagline:** `Audio editing is miserable. These 49 free tools make it less so.`
 
 **Forum answer shape:** [answer the actual question completely] → [all methods, including
 competitors, with honest tradeoffs] → [ours as one option + "I built this" + the one

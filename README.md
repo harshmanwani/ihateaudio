@@ -1,6 +1,6 @@
 # ihateaudio
 
-39 free audio tools that run entirely in the browser. No upload, no account, no
+49 free audio tools that run entirely in the browser. No upload, no account, no
 ads, no watermark, no file-size limit.
 
 See [PRODUCT.md](PRODUCT.md) for what this is and who it is for,
@@ -73,7 +73,7 @@ src/
 ```
 
 Adding a tool is an entry in `src/data/tools.ts` plus one page file. Everything
-else is shared, which is why all 39 behave identically.
+else is shared, which is why they all behave identically.
 
 ## Deploying
 
@@ -159,7 +159,7 @@ network access or a running server.
 
 | Command | Produces | When to run |
 |---|---|---|
-| `FAL_KEY=... npm run icons` | The 39 3D tool icons in `public/icons3d` | When a tool is added or its art is wrong |
+| `FAL_KEY=... npm run icons` | The 3D tool icons in `public/icons3d` | When a tool is added or its art is wrong |
 | `npm run shots` | The 2 install-dialog screenshots (needs `npm run dev`) | When the tool UI changes shape |
 | `npm run appicons` | Favicon, app icons, 11 launch images, `splash-links.html` | Automatic, part of `npm run build` |
 | `node scripts/generate-og-images.mjs` | The 42 social cards | Automatic, part of `npm run build` |

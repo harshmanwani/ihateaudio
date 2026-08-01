@@ -6,7 +6,7 @@
  * controls it has, and what it does to the audio. Intake, decoding, the
  * waveform, the transport, selection, export, error handling and chaining all
  * live here — which is why adding a tool is a config plus a process function,
- * and why a user who learns one tool has learned all forty.
+ * and why a user who learns one tool has learned them all.
  */
 import { decodeFile } from './audio/decode';
 import { AudioError, toAudioError } from './audio/errors';
@@ -1273,7 +1273,7 @@ export class ToolRuntime {
       buffers: this.buffers,
       files: this.files,
       selection: this.getSelection(),
-      // The label is optional so the forty non-AI tools keep calling this with a
+      // The label is optional so the non-AI tools keep calling this with a
       // bare ratio, but the AI ones can say which stem is running.
       progress: (ratio, label) => this.showProgress(ratio, label ?? 'Processing'),
       signal: this.controller?.signal ?? new AbortController().signal,
@@ -1307,7 +1307,7 @@ export class ToolRuntime {
 
   /**
    * WAV bit depth comes from a page control rather than the shared export bar,
-   * because it only applies to two of the forty tools. A page opts in by
+   * because it only applies to two of them. A page opts in by
    * rendering `data-control="bitdepth"`; everything else gets the default.
    */
   private bitDepth(): 16 | 24 | 32 {

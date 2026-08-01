@@ -139,9 +139,9 @@ const onTool = path !== '/' && !['/about', '/privacy'].includes(path);
       });
     });
 
-    // The 39 pieces of tool art are lazy so they cost nothing on a page nobody
+    // The tool art is lazy so it costs nothing on a page nobody
     // opens the menu on. Hovering or focusing the button is enough intent to
-    // start fetching them, which is what stops the panel opening onto 39 empty
+    // start fetching them, which is what stops the panel opening onto empty
     // squares on the first click.
     const warm = (): void => {
       nav

@@ -13,7 +13,7 @@ web
 
 ## What it is
 
-A suite of ~40 single-purpose audio tools that run entirely in the browser. No upload,
+A suite of ~50 single-purpose audio tools that run entirely in the browser. No upload,
 no server processing, no account, no ads, no watermark, no file-size gate. You drop a
 file, it works, you download it.
 
@@ -66,7 +66,7 @@ Copy is plain and short. No exclamation marks, no "Awesome!", no mascot.
    needs it. Nothing blocks the first interaction.
 2. **The file never leaves the device — and we prove it.** Say it on every page, and make
    it checkable (works offline, nothing in the network tab).
-3. **One design, forty times.** Every tool uses the same shell, dropzone, transport,
+3. **One design, fifty times.** Every tool uses the same shell, dropzone, transport,
    waveform, and export bar. A user who learns one tool has learned all of them.
 4. **Design the failure path first.** Real audio files are broken in strange ways. A tool
    that says exactly what went wrong beats a tool that spins forever.

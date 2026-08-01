@@ -1,9 +1,20 @@
+import { TOOLS } from './data/tools';
+
+/**
+ * How many tools a visitor can actually reach, counted rather than typed.
+ *
+ * The number used to be written by hand into the site description, the README
+ * and the launch copy, and it had drifted seven behind the registry before
+ * anyone noticed. Deriving it means adding a tool updates every place that
+ * quotes it, and the number can never be wrong again.
+ */
+export const TOOL_COUNT = TOOLS.filter((tool) => !tool.secondary).length;
+
 export const SITE = {
   name: 'ihateaudio',
   url: 'https://ihateaudio.com',
   tagline: 'Audio tools that just work',
-  description:
-    "39 free audio tools that run right in your browser. Trim, convert, merge, boost, whatever you need. Nothing is uploaded and there is no signup.",
+  description: `${TOOL_COUNT} free audio tools that run right in your browser. Trim, convert, merge, boost, whatever you need. Nothing is uploaded and there is no signup.`,
   locale: 'en',
   email: 'support@ihateaudio.com',
 } as const;
