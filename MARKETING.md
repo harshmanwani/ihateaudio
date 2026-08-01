@@ -6,7 +6,7 @@ with sources inline so future decisions argue with evidence instead of vibes.
 
 ## Where this stands (27 July 2026)
 
-- Live at ihateaudio.com. 44 pages, on-site SEO clean, analytics + Search Console wired.
+- Live at ihateaudio.com. 54 pages, on-site SEO clean, analytics + Search Console wired.
 - Last 30 days: **30 visitors, 85 pageviews**. Some of that is us.
 - Zero external footprint. No backlinks, no mentions, the brand name returns nothing in search.
 - Strong assets already built: 49 working tool pages with unique prose and schema, two
@@ -82,7 +82,7 @@ Reddit's 2026 spam detection bans exactly the behaviour that looks like a campai
 
 ### Week 1 — foundations and the quiet listings (~8–10 h)
 
-- **Search Console:** confirm all 44 pages indexed, request indexing for stragglers.
+- **Search Console:** confirm all 54 pages indexed, request indexing for stragglers.
   Turn on the weekly metrics sheet (template in Measurement below). GSC now has a
   Generative AI performance report — watch it from day one.
 - **Record the proof demo.** 15-second screen capture: open audio-trimmer, drop a file,
