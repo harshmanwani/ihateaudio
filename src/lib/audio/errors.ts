@@ -17,7 +17,8 @@ export type AudioErrorCode =
   | 'no-audio-track'
   | 'encode-failed'
   | 'ffmpeg-load-failed'
-  | 'cancelled';
+  | 'cancelled'
+  | 'unknown-error';
 
 export class AudioError extends Error {
   readonly code: AudioErrorCode;
@@ -77,6 +78,10 @@ const COPY: Record<AudioErrorCode, { message: string; fix: string }> = {
     message: 'Cancelled.',
     fix: 'Nothing was changed.',
   },
+  'unknown-error': {
+    message: 'Something went wrong processing that file.',
+    fix: 'Try a different file, or reload the page and try once more.',
+  },
 };
 
 /** Builds a known error with its standard copy, optionally overriding the fix. */
@@ -99,9 +104,9 @@ export function toAudioError(err: unknown): AudioError {
     return audioError('decode-failed');
   }
 
-  return new AudioError(
-    'decode-failed',
-    'Something went wrong processing that file.',
-    'Try a different file, or reload the page and try once more.'
-  );
+  // Anything that reaches here is unrecognised, which in practice means one of
+  // our own bugs. It must not borrow 'decode-failed': that code is the signal
+  // for "the file is broken", and folding crashes into it made the two
+  // indistinguishable in analytics, where the code is all we send.
+  return audioError('unknown-error');
 }

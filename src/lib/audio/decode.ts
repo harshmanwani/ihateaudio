@@ -262,16 +262,25 @@ export async function decodeFile(
 async function decodeAt(bytes: ArrayBuffer, rate: number | null): Promise<AudioBuffer> {
   // decodeAudioData detaches the input, so hand each attempt its own copy.
   const copy = bytes.slice(0);
+  const ctx = rate !== null ? new OfflineAudioContext(1, 1, rate) : getAudioContext();
 
-  if (rate !== null) {
-    const offline = new OfflineAudioContext(1, 1, rate);
-    return offline.decodeAudioData(copy);
-  }
+  const buffer = await decodeOn(ctx, copy);
+  // A browser that took the callback path and handed back nothing would
+  // otherwise return undefined from here and fail much later, at the first
+  // property read on the "buffer", as a null dereference with no useful shape.
+  if (!buffer) throw audioError('decode-failed');
+  return buffer;
+}
 
-  const ctx = getAudioContext();
-  // Safari's older signature is callback-only; the promise form is absent.
+/**
+ * Safari's older signature is callback-only and returns undefined rather than a
+ * promise. Both context types need that treatment: an OfflineAudioContext is
+ * not exempt, and the rate-guess path used to assume the promise form purely
+ * because it was written second.
+ */
+function decodeOn(ctx: BaseAudioContext, bytes: ArrayBuffer): Promise<AudioBuffer> {
   return new Promise<AudioBuffer>((resolve, reject) => {
-    const maybe = ctx.decodeAudioData(copy, resolve, reject);
+    const maybe = ctx.decodeAudioData(bytes, resolve, reject);
     if (maybe && typeof maybe.then === 'function') maybe.then(resolve, reject);
   });
 }

@@ -43,6 +43,68 @@
   // ---- PostHog ----
   if (!phKey || !phHost) return;
 
+  /**
+   * Exception scrubbing.
+   *
+   * Replay and autocapture are off on this site because a filename is content.
+   * An exception message is the one remaining path a filename could take to the
+   * wire, and it only takes one `new Error('could not read ' + file.name)` added
+   * later to open it. Nothing in the tree does that today; this is what keeps
+   * that true without anyone having to remember it.
+   *
+   * Stack frames are left alone deliberately — those paths are our own bundle,
+   * and they are the entire reason for turning capture on.
+   *
+   * The two markers below are load-bearing: tests/unit/analytics-scrub.test.ts
+   * slices this block out of the file and exercises the real thing, because a
+   * privacy guarantee nobody tests is a privacy hope.
+   */
+  /* scrub:start */
+  // No /g: this one is only ever tested, and a global regex carries lastIndex
+  // between calls, which would make every second test miss.
+  var FILEISH =
+    /\.(?:mp3|wav|m4a|m4p|m4b|aac|ogg|oga|opus|flac|weba|webm|mp4|m4v|mov|avi|mkv|wma|aif|aiff|amr|ape|ac3|dts|3gp|caf|aax|aa)\b/i;
+  var URLISH = /\b(?:blob|data|file):[^\s)"']+/gi;
+
+  function scrubText(text) {
+    if (typeof text !== 'string') return text;
+
+    var cleaned = text.replace(URLISH, '<url>');
+
+    // Real filenames contain spaces — "Voice Memo 3.m4a", "WhatsApp Audio
+    // 2026-07-31 at 22.05.10.opus" — so there is no boundary a regex can find
+    // to redact just the name. Trying leaves the front half of it behind, which
+    // is the leak this exists to stop. So drop the whole message instead: the
+    // exception type and the full stack survive untouched on their own fields,
+    // and those are what a bug is actually read from. Only free text mentioning
+    // a media extension is lost, which is the trade worth making here.
+    if (FILEISH.test(cleaned)) return '<redacted: possible filename>';
+
+    return cleaned;
+  }
+
+  function scrubException(event) {
+    try {
+      if (!event || event.event !== '$exception') return event;
+
+      var props = event.properties || {};
+      var list = props.$exception_list;
+      if (list && list.length) {
+        for (var i = 0; i < list.length; i++) {
+          if (list[i]) list[i].value = scrubText(list[i].value);
+        }
+      }
+      if (props.$exception_message) {
+        props.$exception_message = scrubText(props.$exception_message);
+      }
+      return event;
+    } catch (err) {
+      // Fail closed. An event that could not be scrubbed is not worth sending.
+      return null;
+    }
+  }
+  /* scrub:end */
+
   // The official stub, so calls made before array.js lands are queued.
   !(function (t, e) {
     var o, n, p, r;
@@ -100,6 +162,12 @@
     // Named events only. Blanket autocapture also records the contents of any
     // input we add later, which is exactly the mistake to avoid on this site.
     autocapture: false,
+    // Unhandled errors, which the named events cannot see. Without these, a bug
+    // in our own code arrives as a tool_error carrying nothing but a code, and
+    // is indistinguishable from a genuinely broken file. Scrubbed on the way
+    // out by before_send.
+    capture_exceptions: true,
+    before_send: scrubException,
     capture_pageview: 'history_change',
     capture_pageleave: true,
     respect_dnt: true,
