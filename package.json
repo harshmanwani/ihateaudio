@@ -7,9 +7,10 @@
     "node": ">=22.12.0"
   },
   "scripts": {
-    "postinstall": "node scripts/sync-ffmpeg-core.mjs",
+    "sync": "node scripts/sync-ffmpeg-core.mjs && node scripts/sync-onnx-runtime.mjs && node scripts/sync-transformers.mjs",
+    "postinstall": "npm run sync",
     "dev": "astro dev",
-    "prebuild": "node scripts/sync-ffmpeg-core.mjs",
+    "prebuild": "npm run sync",
     "build": "node scripts/check-registry.mjs && astro check && tsc -p worker && astro build && node scripts/check-csp.mjs && node scripts/check-assets.mjs",
     "build:fast": "node scripts/check-registry.mjs && astro build",
     "preview": "astro preview",
