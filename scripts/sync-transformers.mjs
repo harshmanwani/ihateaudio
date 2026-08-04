@@ -30,7 +30,7 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 let packageDir;
 let version;
 try {
-  packageDir = join(root, 'node_modules', '@xenova', 'transformers');
+  packageDir = join(root, 'node_modules', '@huggingface', 'transformers');
   version = JSON.parse(readFileSync(join(packageDir, 'package.json'), 'utf8')).version;
 } catch {
   console.warn(
@@ -41,28 +41,35 @@ try {
 }
 
 /**
- * The minified web build, which is the one meant to be loaded directly by a
- * browser. The unminified `transformers.web.js` is for bundlers to consume, and
- * consuming it with a bundler is the thing being avoided here.
- */
-/**
- * The library plus the ONNX Runtime binaries it expects beside itself.
+ * The library, plus the ONNX Runtime build it insists on.
  *
- * v2 resolves its runtime from `env.backends.onnx.wasm.wasmPaths` as a directory
- * and picks a file by capability, so both the SIMD and the plain build have to be
- * there or a browser without SIMD gets a 404 rather than a fallback. The threaded
- * pair is deliberately left out: it needs helper files this dist does not ship, and
- * the worker runs single-threaded anyway because it is already off the UI thread.
+ * `transformers.min.js` is the only dist here a browser can load directly.
+ * `transformers.web.min.js` looks like the browser one and is not: it carries a
+ * bare `onnxruntime-web/webgpu` import for a bundler to resolve, and loading it by
+ * URL fails on the module specifier before anything else happens.
+ *
+ * That build has ONNX Runtime compiled in with WebGPU support, and it resolves its
+ * WebAssembly to the asyncify variant unconditionally — asking for the plain build
+ * by pointing wasmPaths at a directory holding only that one just 404s. So the
+ * asyncify pair is what has to be here, and it comes from onnxruntime-web rather
+ * than from this package, which ships no .wasm at all.
+ *
+ * It is 23.1 MB against the 10.5 MB a v2 visitor fetched, and it buys roughly twice
+ * the transcription speed — measured at 4.0 s versus 2.1 s on thirty seconds of
+ * audio. The runtime is cached on a versioned path and the model is four times its
+ * size, so the extra megabytes are paid once and repaid on the first clip.
  */
-const FILES = ['transformers.min.js', 'ort-wasm-simd.wasm', 'ort-wasm.wasm'];
+const FILES = ['transformers.min.js'];
+const ORT_FILES = ['ort-wasm-simd-threaded.asyncify.mjs', 'ort-wasm-simd-threaded.asyncify.wasm'];
 
+const ortDir = join(root, 'node_modules', 'onnxruntime-web', 'dist');
 const target = join(root, 'public', 'lib', 'transformers', version);
 mkdirSync(target, { recursive: true });
 
 let copied = 0;
 let bytes = 0;
-for (const file of FILES) {
-  const from = join(packageDir, 'dist', file);
+for (const file of [...FILES, ...ORT_FILES]) {
+  const from = FILES.includes(file) ? join(packageDir, 'dist', file) : join(ortDir, file);
   if (!existsSync(from)) {
     console.error(`[transformers] missing ${from}`);
     process.exit(1);
@@ -93,5 +100,6 @@ if (!existsSync(versionFile) || readFileSync(versionFile, 'utf8') !== generated)
 
 console.log(
   `[transformers] ${version} in public/lib/transformers/${version}/ ` +
-    `(${copied} of ${FILES.length} copied, ${(bytes / 1048576).toFixed(1)} MB total)`
+    `(${copied} of ${FILES.length + ORT_FILES.length} copied, ` +
+    `${(bytes / 1048576).toFixed(1)} MB total)`
 );

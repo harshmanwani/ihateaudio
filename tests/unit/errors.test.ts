@@ -82,7 +82,7 @@ describe('toAudioError', () => {
   it('recognises a runtime that failed to load, rather than blaming the file', () => {
     for (const text of [
       // Chrome, Firefox and Safari each word a failed dynamic import differently.
-      'Failed to fetch dynamically imported module: https://ihateaudio.com/lib/transformers/2.17.2/transformers.min.js',
+      'Failed to fetch dynamically imported module: https://ihateaudio.com/lib/transformers/4.2.0/transformers.min.js',
       'error loading dynamically imported module',
       'Importing a module script failed.',
       // transformers.js, when a weight file is not where it was told to look.

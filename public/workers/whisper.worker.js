@@ -21,6 +21,14 @@
 
 let pipelinePromise = null;
 let loadedFor = null;
+/**
+ * The imported module, kept because the streamer class is needed at call time.
+ *
+ * v2 reported chunk progress with a `chunk_callback` option on the call. v4 removed
+ * it, and the replacement is WhisperTextStreamer, which has to be constructed with
+ * the pipeline's own tokenizer — so the module has to outlive the import.
+ */
+let lib = null;
 
 /**
  * Builds the pipeline, importing the library by the URL the page supplied.
@@ -35,7 +43,8 @@ async function getPipeline(config, onProgress) {
 
   loadedFor = key;
   pipelinePromise = (async () => {
-    const { pipeline, env } = await import(config.libUrl);
+    lib = await import(config.libUrl);
+    const { pipeline, env } = lib;
 
     // Our own origin, never huggingface.co. The privacy page says no third party
     // learns which tool you opened, and that has to cover the weights too.
@@ -45,13 +54,14 @@ async function getPipeline(config, onProgress) {
     env.allowRemoteModels = true;
 
     const wasm = env.backends.onnx.wasm;
-    // A directory, not a single file: this version picks its runtime binary by
-    // capability at load time, choosing the SIMD build where available and the
-    // plain one otherwise, so both sit alongside the library.
+    // A directory. This build has ONNX Runtime compiled in with WebGPU support and
+    // resolves its binary to the asyncify variant, so that is the pair the sync
+    // script puts here — pointing this at a directory holding the plain build
+    // instead just 404s on ort-wasm-simd-threaded.asyncify.mjs.
     wasm.wasmPaths = config.wasmDir;
-    // Already off the UI thread, so there is nothing to gain from the runtime
-    // spawning further workers, and the threaded build needs helper files the dist
-    // bundle does not ship.
+    // The binary is the threaded build, but threads need SharedArrayBuffer and that
+    // needs the page to be cross-origin isolated, which this site is not. Saying so
+    // explicitly beats letting the runtime discover it.
     wasm.numThreads = 1;
     wasm.proxy = false;
 
@@ -69,9 +79,24 @@ async function getPipeline(config, onProgress) {
     let highWater = 0;
 
     return pipeline('automatic-speech-recognition', config.modelDir, {
-      // This version selects the quantized graphs with a boolean rather than the
-      // dtype string later releases use. It is what the 41 MB figure refers to.
-      quantized: true,
+      // 'q8' names the same *_quantized.onnx graphs the boolean `quantized: true`
+      // selected in v2, so the weights already in R2 are the weights this fetches.
+      // It is what the 41 MB figure refers to.
+      dtype: 'q8',
+      /**
+       * WASM rather than WebGPU, and that was measured rather than assumed.
+       *
+       * WebGPU on these weights is slower: 2.45 s against 2.14 s on thirty seconds
+       * of audio, because int8 does not map onto the GPU and the work bounces back.
+       * The best combination that does run — an fp16 encoder with the q8 decoder —
+       * came to 2.06 s, a five percent gain for six more megabytes of download and
+       * a second set of weights to host.
+       *
+       * whisper-tiny is simply too small to pay for a GPU: the decoder is
+       * sequential, one token at a time, and at this size the launch overhead is
+       * most of the work. A larger model would change that answer.
+       */
+      device: 'wasm',
       progress_callback: (event) => {
         if (!event || !event.file) return;
         if (event.status === 'progress') {
@@ -132,14 +157,29 @@ self.addEventListener('message', async ({ data }) => {
 
     post({ type: 'progress', stage: 'listening', ratio: 0 });
 
+    /**
+     * Chunk progress, which v4 reports through a streamer rather than a callback.
+     *
+     * on_chunk_start fires as each window begins, so counting completed windows
+     * means counting starts after the first. Without this the bar sat at zero for
+     * the whole run and only moved when the transcript appeared, which on a long
+     * recording is indistinguishable from being hung.
+     */
+    const streamer = new lib.WhisperTextStreamer(asr.tokenizer, {
+      on_chunk_start: () => {
+        post({ type: 'progress', stage: 'listening', ratio: Math.min(0.98, done / expected) });
+        done += 1;
+      },
+      on_chunk_end: () => {
+        post({ type: 'progress', stage: 'listening', ratio: Math.min(0.98, done / expected) });
+      },
+    });
+
     const result = await asr(audio, {
       chunk_length_s: 30,
       stride_length_s: 5,
       return_timestamps: data.timestamps ? true : false,
-      chunk_callback: () => {
-        done += 1;
-        post({ type: 'progress', stage: 'listening', ratio: Math.min(0.98, done / expected) });
-      },
+      streamer,
     });
 
     const chunks = (result.chunks || []).map((chunk) => ({

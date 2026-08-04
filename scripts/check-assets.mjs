@@ -103,10 +103,16 @@ const splash = [...splashLinks.matchAll(/href="\/([^"]+)"/g)].map((match) => mat
 const REQUIRED = [
   // Whisper's library, imported by URL from public/workers/whisper.worker.js.
   { rel: `lib/transformers/${transformersVersion}/transformers.min.js`, fix: 'npm run sync' },
-  // Both runtime builds: v2 picks one by capability at load time, so a browser
-  // without SIMD needs the plain one to be there rather than 404.
-  { rel: `lib/transformers/${transformersVersion}/ort-wasm-simd.wasm`, fix: 'npm run sync' },
-  { rel: `lib/transformers/${transformersVersion}/ort-wasm.wasm`, fix: 'npm run sync' },
+  // Its runtime. That build resolves to the asyncify variant and nothing else, so
+  // the glue and the binary are both required and both come from onnxruntime-web.
+  {
+    rel: `lib/transformers/${transformersVersion}/ort-wasm-simd-threaded.asyncify.mjs`,
+    fix: 'npm run sync',
+  },
+  {
+    rel: `lib/transformers/${transformersVersion}/ort-wasm-simd-threaded.asyncify.wasm`,
+    fix: 'npm run sync',
+  },
   // The separation tools' runtime. The loader and the binary it loads must both
   // be present, and from the same version.
   { rel: `ort/${ortVersion}/ort-wasm-simd-threaded.mjs`, fix: 'npm run sync' },

@@ -7,4 +7,4 @@
  * It is served as a static file and imported by URL rather than bundled — see the
  * script for the bug that forces this.
  */
-export const TRANSFORMERS_VERSION = '2.17.2';
+export const TRANSFORMERS_VERSION = '4.2.0';

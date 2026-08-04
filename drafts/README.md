@@ -19,18 +19,40 @@ same failure under Turbopack.
 
 **Changing library version.** The above alone did not fix it — with the bundler
 completely out of the path, `@huggingface/transformers@4.2.0` still failed. That
-was the decisive evidence that the version itself was broken here rather than the
-build. `@xenova/transformers@2.17.2`, the configuration proven in production in
-CapCut GPT, works.
+was read at the time as the version being broken here, and
+`@xenova/transformers@2.17.2` was adopted instead.
 
-Worth knowing: 2.17.2 is the older name and major of the same project, not an
-older model — the weights are the same Whisper `tiny.en`. What it lacks is WebGPU
-and fine-grained dtype control. WebGPU is moot here anyway, because it needs the
-`.jsep` runtime build at 25.6 MB, over Cloudflare's 25 MiB per-asset ceiling.
+**That diagnosis was wrong, and the site is back on 4.2.0.** What 4.x failed on
+was a missing file, not a broken library. Its standalone build has ONNX Runtime
+compiled in with WebGPU support and resolves its WebAssembly to the *asyncify*
+variant — `ort-wasm-simd-threaded.asyncify.{mjs,wasm}`. The sync script was
+copying v2's `ort-wasm-simd.wasm` and `ort-wasm.wasm`, so the file it actually
+wanted 404'd, and what surfaced was:
 
-If a future tool needs WebGPU or a newer architecture, revisiting 4.x is a version
-bump plus an API adjustment rather than a rewrite — the worker structure is what
-makes that cheap.
+```
+no available backend found. ERR: [wasm] TypeError: Failed to fetch dynamically
+imported module: .../ort-wasm-simd-threaded.asyncify.mjs
+```
+
+which names the missing file plainly but reads like the backend is unavailable.
+Copy that pair in and 4.2.0 runs first try.
+
+It is worth roughly twice the speed: 4.0 s against 2.1 s on thirty seconds of
+audio, measured back to back in one tab. Real speech runs about 4.8× faster than
+real time, so the "ten minute recording takes a couple of minutes" line in the
+setup panel is now true rather than optimistic. The cost is the runtime download,
+23.6 MB against 10.5 MB, cached on a versioned path and repaid within one clip.
+
+**WebGPU is still not worth it, for a different reason than recorded here.** The
+`.jsep` build at 25.6 MB is over Cloudflare's ceiling, but that never comes up —
+the standalone bundle wants asyncify at 23.1 MB, which fits. The real reason is
+that it is not faster: 2.45 s against 2.14 s on the q8 weights, because int8 does
+not map onto the GPU. The best combination that runs at all, an fp16 encoder with
+the q8 decoder, managed 2.06 s — five percent, for six more megabytes and a second
+set of weights to host. An fp16 decoder does not load at all: ORT rejects the
+merged graph over a subgraph output. whisper-tiny is too small to pay for a GPU,
+its decoder being sequential and the launch overhead being most of the work. A
+larger model would change that answer; this one does not.
 
 ## Resolved: the noise remover
 
