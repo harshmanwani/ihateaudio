@@ -153,25 +153,6 @@
   }
 }
 
-/* Reading progress. Tool pages are a tool followed by a long article, and
-   without this there is no signal for how much article is left. */
-.hdr__rail {
-  position: sticky;
-  top: 60px;
-  z-index: var(--z-sticky);
-  height: 2px;
-  margin-bottom: -2px;
-  pointer-events: none;
-}
-
-.hdr__rail-fill {
-  display: block;
-  height: 100%;
-  background: var(--brand);
-  transform-origin: 0 50%;
-  transform: scaleX(0);
-}
-
 /* ---------- All-tools mega menu ---------- */
 
 .meganav {
