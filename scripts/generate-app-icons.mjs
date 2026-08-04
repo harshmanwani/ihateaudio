@@ -2,8 +2,17 @@
  * Rasterizes the app icons and the iOS launch images from src/assets/logo.svg.
  *
  * One source of truth: the same file the header inlines and the favicon serves.
- * Runs as part of `npm run build`, so a change to the mark propagates to every
- * platform surface without anyone remembering to re-export anything.
+ *
+ * Run by hand, with `npm run appicons`, and its output committed — it is not part
+ * of the build. Rasterizing needs a real browser, and a Chromium launch on the
+ * critical path of every deploy buys nothing here: the mark changes about never,
+ * and every file below is a pure function of one SVG that is already in git.
+ *
+ * This comment used to claim the build ran it. It did not, and because the launch
+ * images were also gitignored, a deploy from a clean checkout shipped a PWA with
+ * no launch images and nothing anywhere said so. Both halves of that are fixed —
+ * they are committed now — and scripts/check-assets.mjs fails the build if any of
+ * them go missing again.
  *
  *   node scripts/generate-app-icons.mjs
  */

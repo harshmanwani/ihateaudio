@@ -21,8 +21,11 @@ public/lib/
 test-results/
 playwright-report/
 
-# Generated from src/assets/logo.svg by scripts/generate-app-icons.mjs at build.
-public/splash/
+# public/splash/ is deliberately NOT ignored. It is generated from logo.svg by
+# scripts/generate-app-icons.mjs, but so are favicon.svg and every icon-*.png
+# beside it, and those are committed. Ignoring only the launch images meant
+# src/assets/splash-links.html was in git while the files it points at were not,
+# so a deploy from a clean checkout shipped a PWA with no launch images.
 
 # Local overrides only. .env.production is committed on purpose: the ids in it
 # are public, and a build has to be reproducible from a clean clone.
