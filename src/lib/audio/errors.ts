@@ -17,6 +17,7 @@ export type AudioErrorCode =
   | 'no-audio-track'
   | 'encode-failed'
   | 'ffmpeg-load-failed'
+  | 'model-load-failed'
   | 'cancelled'
   | 'unknown-error';
 
@@ -74,6 +75,10 @@ const COPY: Record<AudioErrorCode, { message: string; fix: string }> = {
     message: "The converter couldn't load.",
     fix: 'Check your connection and reload the page. Nothing is uploaded — only the converter code is downloaded.',
   },
+  'model-load-failed': {
+    message: "The AI model couldn't load.",
+    fix: 'Check your connection and reload the page. Nothing is uploaded — only the model is downloaded.',
+  },
   cancelled: {
     message: 'Cancelled.',
     fix: 'Nothing was changed.',
@@ -102,6 +107,20 @@ export function toAudioError(err: unknown): AudioError {
   }
   if (/EncodingError|Unable to decode|decodeAudioData/i.test(text)) {
     return audioError('decode-failed');
+  }
+
+  // The AI tools fetch their runtime the first time they are used, and a failure
+  // there says nothing about the file. Left unrecognised it became
+  // 'unknown-error', whose copy tells the visitor to try a different file — advice
+  // that cannot work, because every file fails identically until the runtime
+  // loads. The three engine wordings for a failed dynamic import, transformers.js
+  // reporting a weight it could not find, and our own worker fallback.
+  if (
+    /dynamically imported module|Importing a module script failed|Could not locate file|failed to start/i.test(
+      text
+    )
+  ) {
+    return audioError('model-load-failed');
   }
 
   // Anything that reaches here is unrecognised, which in practice means one of

@@ -28,6 +28,7 @@ describe('audioError', () => {
       'no-audio-track',
       'encode-failed',
       'ffmpeg-load-failed',
+      'model-load-failed',
       'cancelled',
       'unknown-error',
     ] as const;
@@ -63,6 +64,33 @@ describe('toAudioError', () => {
       'decodeAudioData failed',
     ]) {
       expect(toAudioError(new Error(text)).code, text).toBe('decode-failed');
+    }
+  });
+
+  /**
+   * The AI tools fetch their runtime — the library, its WebAssembly, and the
+   * weights — from our own origin at the moment they are first used. When any of
+   * that 404s or the connection drops, what reaches here is a load failure, and
+   * it used to land in 'unknown-error': the tool told the visitor their file was
+   * the problem and suggested trying a different one, which never helped because
+   * every file failed the same way.
+   *
+   * That is not hypothetical. A deploy shipped without public/lib/, and the
+   * transcriber answered "Something went wrong processing that file" for every
+   * file until someone read the network tab.
+   */
+  it('recognises a runtime that failed to load, rather than blaming the file', () => {
+    for (const text of [
+      // Chrome, Firefox and Safari each word a failed dynamic import differently.
+      'Failed to fetch dynamically imported module: https://ihateaudio.com/lib/transformers/2.17.2/transformers.min.js',
+      'error loading dynamically imported module',
+      'Importing a module script failed.',
+      // transformers.js, when a weight file is not where it was told to look.
+      'Could not locate file: "https://ihateaudio.com/models/v1/whisper-tiny-en/config.json"',
+      // Our own fallback when the worker itself will not start.
+      'The transcriber failed to start.',
+    ]) {
+      expect(toAudioError(new Error(text)).code, text).toBe('model-load-failed');
     }
   });
 
