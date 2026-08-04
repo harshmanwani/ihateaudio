@@ -203,8 +203,26 @@ const faq = [
     border-radius: var(--r-md);
     font-size: var(--t-body);
     line-height: 1.7;
-    white-space: pre-wrap;
     text-wrap: pretty;
+  }
+
+  /* :global because these paragraphs are built in the script below, and scoped
+     rules compile to an attribute selector that only server-rendered markup
+     carries — the same reason the subtitle generator's .cue rules are global.
+     Styling them scoped silently does nothing, which is exactly what happened. */
+
+  /* The measure the comment above claimed and the CSS did not have. A transcript
+     spans the full width of the tool panel, which on a desktop is well past the
+     point where the eye loses its place coming back for the next line. */
+  :global(.transcript__p) {
+    max-width: 68ch;
+  }
+
+  /* Separated by space rather than by the blank line pre-wrap used to produce.
+     Same break points, but the gap is typographic, and the first and last no
+     longer pad the scroll area with an empty line. */
+  :global(.transcript__p + .transcript__p) {
+    margin-top: 0.9em;
   }
 
   .transcript__text:focus-visible {
@@ -287,7 +305,19 @@ const faq = [
       const panelEl = root.querySelector<HTMLElement>('[data-transcript]');
       const textEl = root.querySelector<HTMLElement>('[data-transcript-text]');
       const metaEl = root.querySelector<HTMLElement>('[data-transcript-meta]');
-      if (textEl) textEl.textContent = text;
+      if (textEl) {
+        // Real paragraphs rather than one blob leaning on white-space: pre-wrap.
+        // textContent per node, never innerHTML: this is transcribed speech, and
+        // a model that writes "<script>" when it hears it must stay text.
+        textEl.replaceChildren(
+          ...text.split(/\n{2,}/).map((paragraph) => {
+            const p = document.createElement('p');
+            p.className = 'transcript__p';
+            p.textContent = paragraph;
+            return p;
+          })
+        );
+      }
       if (metaEl) {
         const words = text.trim().split(/\s+/).length;
         metaEl.textContent = `${words.toLocaleString()} words, ${result.segments.length} segments`;
