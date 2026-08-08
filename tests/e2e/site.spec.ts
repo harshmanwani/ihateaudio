@@ -575,6 +575,50 @@ test.describe('analytics', () => {
     expect(scriptSrc.slice(0, scriptSrc.indexOf(';'))).not.toContain('unsafe-inline');
   });
 
+  test('every AI route is cross-origin isolated', async ({ request }) => {
+    /**
+     * The failure this guards against is silent. Without COOP and COEP the page
+     * still works — ONNX Runtime reads `crossOriginIsolated`, finds it false and
+     * sizes its thread pool to one, so separation just takes about 3.5× longer
+     * and nothing anywhere reports it. Driven off the registry rather than a
+     * hand-copied list because _headers has no wildcard that groups these paths:
+     * a seventh AI tool needs a seventh rule, and this is what says so.
+     */
+    const headers = await (await request.get('/_headers')).text();
+
+    /** The header lines belonging to one `/path` rule. */
+    const rule = (path: string): string => {
+      const lines = headers.split('\n');
+      const start = lines.findIndex((line) => line.trim() === path);
+      if (start === -1) return '';
+      const body: string[] = [];
+      for (const line of lines.slice(start + 1)) {
+        if (!/^\s/.test(line) || line.trim() === '') break;
+        body.push(line.trim());
+      }
+      return body.join('\n');
+    };
+
+    const ai = TOOLS.filter((tool) => tool.ai);
+    expect(ai.length, 'the registry should still have AI tools').toBeGreaterThan(0);
+
+    for (const tool of ai) {
+      const block = rule(`/${tool.slug}`);
+      expect(block, `/${tool.slug} needs its own rule in _headers`).toBeTruthy();
+      expect(block).toContain('Cross-Origin-Opener-Policy: same-origin');
+      expect(block).toContain('Cross-Origin-Embedder-Policy: require-corp');
+    }
+
+    /**
+     * And the part that is easy to miss: a require-corp document may only create
+     * a dedicated worker whose own response also says require-corp. Both bundled
+     * workers live under /_astro/ and Whisper's under /workers/, so if these two
+     * lose the header the AI tools do not get slower — they hang outright.
+     */
+    expect(rule('/_astro/*')).toContain('Cross-Origin-Embedder-Policy: require-corp');
+    expect(rule('/workers/*')).toContain('Cross-Origin-Embedder-Policy: require-corp');
+  });
+
   test('the privacy page describes what is actually collected', async ({ page }) => {
     // If the analytics config changes, this page has to change with it. A stale
     // "no cookies are set" would be the single most damaging sentence on the

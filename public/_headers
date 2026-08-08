@@ -13,9 +13,73 @@
   # privacy-minded audience's blockers do not eat every event.
   Content-Security-Policy: default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://www.googletagmanager.com https://a.tenmiracle.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.google-analytics.com https://*.googletagmanager.com; font-src 'self'; media-src 'self' blob:; connect-src 'self' blob: https://a.tenmiracle.com https://*.google-analytics.com https://*.analytics.google.com https://*.googletagmanager.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'none'; frame-ancestors 'none'
 
+# Cross-origin isolation, on the six model-backed tools and nowhere else.
+#
+# ONNX Runtime can only use threads through SharedArrayBuffer, and the browser
+# only hands out SharedArrayBuffer to an isolated document. runtime.ts in
+# src/lib/ai reads `crossOriginIsolated` to size its thread pool, so without
+# these headers it correctly sizes it to 1 and separation runs on one core.
+# Measured on the ten-second fixture, four threads took it 38.0s to 10.9s.
+#
+# Deliberately not on /*. `require-corp` blocks every cross-origin subresource
+# that has not opted in, and the two analytics scripts are cross-origin. Both
+# do opt in as it happens — googletagmanager.com sends
+# `Cross-Origin-Resource-Policy: cross-origin`, and the PostHog stub in
+# analytics.js sets `crossOrigin = 'anonymous'` on array.js, which makes it a
+# CORS request and exempt — but that is their arrangement to change, not ours,
+# and no other page on the site gets anything back for taking the risk.
+#
+# Six rules because these paths share no prefix and _headers cannot group them.
+# A seventh AI tool needs a seventh rule here, and will run single-threaded
+# until it gets one.
+/vocal-remover
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+
+/acapella-extractor
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+
+/stem-splitter
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+
+/audio-transcriber
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+
+/subtitle-generator
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+
+/noise-remover
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: require-corp
+
 # Content-hashed, so they can never go stale.
+#
+# The COEP here is not about caching and not optional. A require-corp document
+# may only create a dedicated worker whose *own* response also says
+# require-corp — same origin is not enough. Both bundled workers live under this
+# prefix (the separation worker, and ffmpeg's), so without this line the AI
+# tools load, accept a file, and then sit on "Starting the engine" forever while
+# the console reports ERR_BLOCKED_BY_RESPONSE on a script that is plainly there.
+#
+# It has to go on the whole prefix because these filenames are content-hashed
+# and _headers has no mid-path wildcard: `/_astro/*worker*` matches nothing.
+# That is harmless. COEP is only read when a response becomes a document or a
+# worker global; on the stylesheets and ordinary chunks here it is ignored, and
+# a worker started from a page that is not isolated is allowed to be
+# require-corp — it just holds its own subresources to the same rule, and every
+# one of them is same-origin.
 /_astro/*
   Cache-Control: public, max-age=31536000, immutable
+  Cross-Origin-Embedder-Policy: require-corp
+
+# Whisper's worker, for the same reason. Served from public/ rather than the
+# bundle because transformers.js has to resolve against real files.
+/workers/*
+  Cross-Origin-Embedder-Policy: require-corp
 
 /fonts/*
   Cache-Control: public, max-age=31536000, immutable
@@ -36,9 +100,9 @@
 
 # No rule for /ffmpeg/* on purpose. The core is over Cloudflare's 25 MiB asset
 # limit, so it is excluded from the upload by public/.assetsignore and served
-# from R2 by src/worker.ts, which sets its own headers. The path now carries the
-# core's version, so the Worker can mark it immutable for a year instead of the
-# one day a stable filename allowed.
+# from R2 by worker/index.ts, which sets its own headers. The path now carries
+# the core's version, so the Worker can mark it immutable for a year instead of
+# the one day a stable filename allowed.
 
 # Must never be cached, or a stale worker pins an old build for repeat visitors.
 /sw.js

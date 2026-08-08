@@ -345,6 +345,42 @@ test.describe('AI setup panel', () => {
       expect(Math.round(measured.titleHeight / measured.lineHeight)).toBe(1);
     });
   }
+
+  test('the stem splitter downloads only the stems still ticked', async ({ page }) => {
+    const requested: string[] = [];
+
+    // Never fetch the real weights: the question is which URLs are asked for,
+    // and a stub answers that in a few bytes instead of 56 MB. It fails the
+    // checksum, which is fine — by then the request has been counted.
+    await page.route('**/models/**', async (route) => {
+      requested.push(new URL(route.request().url()).pathname);
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/octet-stream',
+        body: 'not a model',
+      });
+    });
+
+    await page.goto('/stem-splitter');
+    await dropGeneratedAudio(page, { seconds: 3 });
+    await waitForWorkspace(page);
+    await expect(page.locator('[data-ai-offer]')).toBeVisible({ timeout: 15_000 });
+
+    // Vocals and drums are ticked to begin with. Move away from vocals, so the
+    // page's own figure is now a promise about drums alone.
+    await page.locator('[data-control="vocals"]').uncheck();
+    await expect(page.locator('[data-stem-cost]')).toContainText('1 stem');
+
+    await page.locator('[data-ai-start]').click();
+    await expect.poll(() => requested.length, { timeout: 20_000 }).toBeGreaterThan(0);
+    // Long enough for a listener left behind by the earlier selection to show
+    // itself, since it fetches in parallel rather than after.
+    await page.waitForTimeout(1500);
+
+    expect(requested.filter((path) => path.endsWith('.onnx'))).toEqual([
+      '/models/v1/kuielab-drums.onnx',
+    ]);
+  });
 });
 
 test.describe('accessibility', () => {

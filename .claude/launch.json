@@ -7,6 +7,16 @@
       "runtimeArgs": ["run", "dev"],
       "port": 4321,
       "autoPort": true
+    },
+    {
+      // Serves dist/ the way production does: through the Worker, with
+      // public/_headers actually applied. `astro dev` ignores _headers, so
+      // anything header-dependent (the CSP, cross-origin isolation on the AI
+      // routes) can only be checked here. Run `npm run build` first.
+      "name": "ihateaudio-worker",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["wrangler", "dev", "--port", "8787"],
+      "port": 8787
     }
   ]
 }

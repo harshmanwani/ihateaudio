@@ -173,8 +173,11 @@ const faq = [
    * ordering is the kind of thing that breaks the moment anything is refactored.
    *
    * Keyed by runtime rather than being a single value because onReady runs again
-   * after a reset, and a stale panel would be driving markup that is no longer on
-   * the page.
+   * for every file decoded, and only the newest panel should be the one this
+   * tool asks to fetch. Note that the markup itself survives — a reset hides the
+   * workspace rather than replacing it — so the setup button is the same button
+   * each time. Detaching the previous build's listener from it is createAiPanel's
+   * job, not this map's.
    */
   const panels = new WeakMap<ToolRuntime, ReturnType<typeof createAiPanel>>();
 

@@ -114,7 +114,9 @@ const PLAN = {
   '8d-audio-maker': { kind: 'download', nudge: true },
   // Peak and duration both stay put under EQ on a track already at the ceiling,
   // which the page's own FAQ predicts. So this one is proven the only way left:
-  // export twice, flat and boosted, and require the bytes to differ.
+  // export twice, flat and boosted, and require the bytes to differ. The nudge
+  // that boosts it is the fader bank rather than a slider — this page has no
+  // range input on it at all.
   equalizer: { kind: 'download', nudge: true, differsFromDefault: true },
   'stereo-widener': { kind: 'download', nudge: true },
 
@@ -288,6 +290,10 @@ for (const [slug, plan] of Object.entries(PLAN)) {
       continue;
     }
 
+    // What the nudge below actually moved, so the pass line can say. A tool
+    // whose only proof is "a control was moved" should name the control.
+    let nudged = null;
+
     // Baseline export at the untouched defaults, kept to compare against.
     let baseline = null;
     if (plan.differsFromDefault) {
@@ -321,22 +327,52 @@ for (const [slug, plan] of Object.entries(PLAN)) {
       await page.waitForTimeout(1500);
     }
 
-    // No specific value to set, but the tool's default does nothing: move its
-    // first slider so the effect is actually applied.
+    // No specific value to set, but the tool's default does nothing: move the
+    // control that applies the effect, three quarters of the way up its range.
     if (plan.nudge) {
-      const nudged = await page.evaluate(() => {
+      nudged = await page.evaluate(() => {
+        // Both events, everywhere: pages listen for `input` to repaint and
+        // `change` to recompute, and which one matters differs per tool.
+        const fire = (el) => {
+          el.dispatchEvent(new Event('input', { bubbles: true }));
+          el.dispatchEvent(new Event('change', { bubbles: true }));
+        };
+
         const slider = document.querySelector(
           'input[type="range"][data-control]:not([data-control$="-num"])'
         );
-        if (!slider) return null;
-        const min = Number(slider.min || 0);
-        const max = Number(slider.max || 100);
-        slider.value = String(min + (max - min) * 0.75);
-        slider.dispatchEvent(new Event('input', { bubbles: true }));
-        slider.dispatchEvent(new Event('change', { bubbles: true }));
-        return { control: slider.dataset.control, value: slider.value };
+        if (slider) {
+          const min = Number(slider.min || 0);
+          const max = Number(slider.max || 100);
+          slider.value = String(min + (max - min) * 0.75);
+          fire(slider);
+          return `${slider.dataset.control} to ${slider.value}`;
+        }
+
+        /**
+         * The equalizer has no range input on the page at all. Its control is a
+         * bespoke fader bank: one number input per band, with the slot, fill and
+         * cap painted from it. That input is the canonical store — typing into it
+         * is how the keyboard drives a fader — so setting it and firing the same
+         * two events is the real control path, rather than a synthetic drag over
+         * a slot whose geometry this script would have to guess at.
+         */
+        const bands = [...document.querySelectorAll('input[data-eq-val]')];
+        if (bands.length === 0) return null;
+
+        // Alternating, rather than the same boost everywhere: a band the source
+        // has no content in is a band where a boost changes nothing, and eight
+        // moves in opposite directions cannot all land in silence.
+        const gain = Number(bands[0].max || 12) * 0.75;
+        bands.forEach((band, index) => {
+          band.value = String(index % 2 === 0 ? gain : -gain);
+          fire(band);
+        });
+        return `${bands.length} equalizer bands to ±${gain} dB`;
       });
-      if (!nudged) throw new Error('no slider to move on a tool that needs one');
+      if (!nudged) {
+        throw new Error('no slider or fader bank to move on a tool that needs one');
+      }
       await page.waitForTimeout(1500);
     }
 
@@ -484,7 +520,8 @@ for (const [slug, plan] of Object.entries(PLAN)) {
           ? `${header.channels}ch ${(header.rate / 1000).toFixed(1)}kHz ` +
             `${header.bits}-bit (from the header)`
           : `${decoded.channels}ch, rate not readable without a decoder`) +
-        `, peak ${decoded.peak.toFixed(2)}`,
+        `, peak ${decoded.peak.toFixed(2)}` +
+        (nudged ? `, moved ${nudged}` : ''),
       ms: Date.now() - started,
       warnings: problems,
     });

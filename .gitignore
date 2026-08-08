@@ -37,6 +37,15 @@ playwright-report/
 # production, see worker/ and scripts/upload-models.mjs.
 public/models/
 
+# Miniflare's simulation of R2 and the cache for `wrangler dev`. Local state, not
+# a build input: `npm run ffmpeg:upload -- --local` and
+# `npm run models:upload -- --local` refill it from public/ffmpeg/ and
+# public/models/, and each put writes a new timestamped blob filename. This was
+# tracked once, which meant every local run of the Worker showed up as a 30 MB
+# delete-and-add of the core, plus churn in sqlite files that carry no
+# information a fresh checkout needs.
+.wrangler/
+
 # Verification fixtures for the AI tools: a controlled mix of a known
 # instrumental plus known speech, so separation quality can be measured rather
 # than eyeballed. Regenerate with scripts/make-ai-fixtures.sh if lost.

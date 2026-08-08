@@ -51,6 +51,27 @@ Trimming an MP3 and saving it back never touches ffmpeg. A tool page is **55 KB
 gzipped** on first visit and **19 KB** after, including the waveform renderer,
 transport and encoder plumbing.
 
+The AI studio is a fourth cost bracket, and the table above deliberately leaves
+it unnumbered: `ExportTier` is still `0 | 1 | 2`, because weights are an
+input-side cost no output format can trigger. This one is chosen per *tool*, and
+it is the only bracket that asks first — a page that needs weights loads inert
+and stays that way until the setup panel quotes the size and someone presses the
+button.
+
+| Model | Cost | Tools |
+|---|---|---|
+| MDX-Net Inst_HQ_3 | 64 MB, once, shared | Vocal remover and acapella extractor — one stem is the other's residual, so whichever runs first pays for both |
+| MDX-Net four-stem | 28 MB per stem ticked, 113 MB for all four | Song splitter |
+| Whisper `tiny.en` | 39 MB, two quantized graphs | Transcriber, subtitle generator |
+| RNNoise | 149 KB, bundled | Noise remover — nothing to fetch, so it stays `instant` |
+
+ONNX Runtime is imported as `onnxruntime-web/wasm`, which drops the WebGPU and
+WebGL providers and takes the loader from 390 KB to 70 KB; its 13 MB `.wasm`
+arrives with the first session rather than with the page. Weights land in Cache
+Storage under a versioned URL and are checked against a SHA-256 before the
+runtime is handed them, because a truncated model does not announce itself — it
+fails somewhere deep inside a protobuf parser, pointing nowhere near the cause.
+
 ## Layout
 
 ```
@@ -66,6 +87,13 @@ src/
       effects.ts       OfflineAudioContext graph effects
       analysis.ts      ITU-R BS.1770-4 loudness, true peak, tempo
       export.ts        The tier router
+    ai/
+      models.ts        Catalogue: sizes, checksums, measured STFT parameters
+      store.ts         Fetch once, cache, verify the SHA-256
+      runtime.ts       ONNX Runtime setup and session creation
+      separate.ts      MDX-Net separation, driven from a worker
+      transcribe.ts    Whisper via transformers.js, driven from a worker
+      denoise.ts       RNNoise, bundled rather than downloaded
   components/          ToolShell, ConversionPanel, Icon, Header, Footer
   layouts/             Base (SEO + schema), ToolPage (content + sidebar)
   pages/               One file per tool, plus the reference pages
@@ -77,14 +105,21 @@ else is shared, which is why they all behave identically.
 
 ## Deploying
 
-Static output — drop `dist/` anywhere. Built for Cloudflare Pages:
+The pages are static — `dist/` would serve from anywhere. Deployed to Cloudflare
+Workers with `npm run deploy` (`npm run build && wrangler deploy`):
 
 - Build command: `npm run build`
 - Output directory: `dist`
 - `public/_headers` carries the CSP and cache policy
+- `worker/index.ts` serves the two binary prefixes, `run_worker_first` in
+  `wrangler.jsonc` keeps it out of the path of everything else
 
-The ffmpeg core is served from our own origin rather than a CDN, so using the
-converter still involves no third-party request.
+The ffmpeg core and the AI weights are the exception to "static": both are far
+past Cloudflare's 25 MiB per-asset limit, so they live in R2 and are served by
+the Worker from our own origin. That is not only a size workaround. Left alone,
+transformers.js fetches Whisper from huggingface.co and ONNX Runtime fetches its
+wasm from jsDelivr; both are pointed at our origin instead, so using the
+converter or an AI tool still involves no third-party request.
 
 ## Tests
 
@@ -188,6 +223,27 @@ fixing something. The second file is what exercises the two joiners.
 
 ## Not here yet
 
-Vocal removal, stem separation and transcription need models measured in
-hundreds of megabytes. They will ship only if they can run locally like
-everything else does.
+The rule this section used to state — a model ships only if it can run locally
+like everything else does — held, and then turned out to be satisfiable. Vocal
+removal, separation, transcription, subtitles and denoising all ship, on weights
+served from our own R2 and run on the visitor's machine. What the rule still
+excludes:
+
+**Transcription in anything but English.** Whisper `tiny.en` is the largest
+variant that fits behind a one-time download without the download itself
+becoming the reason nobody uses the tool. The multilingual and larger models are
+several times the size, and past a certain point the honest comparison is not
+against a worse local result — it is against the upload this whole site exists
+to avoid.
+
+**Separation faster than real time.** ONNX Runtime does now get its four
+threads. The six AI routes send `Cross-Origin-Opener-Policy` and
+`Cross-Origin-Embedder-Policy`, so the page is cross-origin isolated and
+`SharedArrayBuffer` exists for the runtime to build a thread pool on. Measured
+on the ten-second fixture, that took a separation from 38.0s to 10.9s — about
+3.5×, which is the gain the four-thread cap was chosen to capture and roughly
+what a fourfold thread count can be expected to return on memory-bandwidth-bound
+convolutions. It is still not fast enough to call the tool real time, which is
+why this stays in this section. The WebGPU provider would beat it and cannot
+ship at all: it needs ONNX Runtime's `.jsep` build, 25.6 MB, over Cloudflare's
+25 MiB per-asset ceiling.

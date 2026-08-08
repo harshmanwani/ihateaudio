@@ -59,9 +59,13 @@ async function getPipeline(config, onProgress) {
     // script puts here — pointing this at a directory holding the plain build
     // instead just 404s on ort-wasm-simd-threaded.asyncify.mjs.
     wasm.wasmPaths = config.wasmDir;
-    // The binary is the threaded build, but threads need SharedArrayBuffer and that
-    // needs the page to be cross-origin isolated, which this site is not. Saying so
-    // explicitly beats letting the runtime discover it.
+    // The binary is the threaded build, and since the AI routes started sending
+    // COOP and COEP the two pages that load this worker are cross-origin isolated,
+    // so SharedArrayBuffer is available and this could be raised. It has not been:
+    // the separation path in src/lib/ai/runtime.ts is what the isolation was added
+    // for and what was measured, and whisper-tiny is a different enough shape —
+    // a sequential decoder, one token at a time — that a thread count for it wants
+    // measuring rather than assuming. Left explicit so the choice is visible.
     wasm.numThreads = 1;
     wasm.proxy = false;
 

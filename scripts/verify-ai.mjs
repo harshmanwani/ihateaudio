@@ -145,19 +145,28 @@ function rms(channels) {
 }
 
 /**
- * What each tool must achieve to count as working.
+ * What each tool must achieve to count as working, and where its answer is.
  *
  * `gain` is the improvement in SI-SDR against the ground-truth instrumental that
  * separation has to deliver over the untouched mix. The reference implementation
  * measures about +13 dB on this fixture, so 6 dB is a floor that a working
  * pipeline clears comfortably and a broken one cannot reach at all — returning the
  * input unchanged scores exactly 0.
+ *
+ * `take` is which button saves the file, and it has to be stated per tool because
+ * there is no longer one answer. Two of these three pages switched their export
+ * bar off: the mixer that appears under the controls already had a per-stem arrow
+ * and a mix button, and a fourth way to save one result was confusing people. The
+ * third kept the bar precisely because it mounts no mixer.
  */
 const PLAN = {
   'vocal-remover': {
     against: 'instrumental',
     gain: 6,
     budget: 420_000,
+    // The instrumental is the row people came here for, and its arrow is the
+    // download. Its buffer is the one measured against the ground truth.
+    take: { stem: 'instrumental' },
   },
   /**
    * The acapella extractor is measured against the speech, not the instrumental,
@@ -172,11 +181,15 @@ const PLAN = {
     against: 'vocals',
     gain: 3,
     budget: 420_000,
+    // The one separation page that still has an export bar, because mounting a
+    // mixer on it hangs the tab. So here the second press is the ordinary
+    // Download button, which the run panel has kept disabled until now.
+    take: { exportBar: true },
   },
   /**
-   * Drums only. One stem is enough to prove the four-stem path — the model
-   * selection, the per-stem transform sizes, the results list — without spending
-   * four passes on it, and drums is the stem with no ground truth in this fixture,
+   * Drums only. One stem is enough to prove the four-stem path — the tick boxes,
+   * the per-stem model and transform size, the mixer it all lands in — without
+   * spending four passes on it, and drums is the stem with no ground truth here,
    * so it is checked for being real audio that is clearly not the input rather
    * than for SDR against a reference that does not exist.
    */
@@ -184,8 +197,78 @@ const PLAN = {
     stems: { drums: true, vocals: false },
     differsFrom: 'mix',
     budget: 420_000,
+    take: { stem: 'drums' },
   },
 };
+
+/**
+ * How long the one-time model download may take before it counts as stuck.
+ *
+ * Separate from the per-tool budget on purpose: fetching 64 MB and separating a
+ * track are different failures with different causes, and a single number that
+ * covers both cannot tell you which one you are watching.
+ */
+const SETUP_BUDGET = 300_000;
+
+/**
+ * Throws if the page is showing its error card.
+ *
+ * The card, not `.note--error`: anything the tool fails at renders in the alert
+ * ToolShell keeps above the workspace, and that note class now lives on one
+ * unrelated page. A check that cannot fire is worse than no check, because it
+ * reads like coverage.
+ */
+async function failIfAlert(page, when) {
+  const alert = page.locator('[data-alert]:not([hidden])');
+  if ((await alert.count()) === 0) return;
+  const title = await page
+    .locator('[data-alert-title]')
+    .innerText()
+    .catch(() => '');
+  throw new Error(`${when}: ${(title || (await alert.innerText())).slice(0, 160)}`);
+}
+
+/**
+ * Prints whatever the page is currently saying about its progress.
+ *
+ * Two surfaces report and which one is live depends on the phase: the setup panel
+ * narrates the model download, and the run panel takes over once the button has
+ * been pressed. Reading both means one ticker covers the whole wait, which for
+ * these tools is minutes of otherwise silent stdout — and a hang is only
+ * distinguishable from slow arithmetic if something is counting.
+ */
+function narrate(page) {
+  // In-place updates only make sense on a terminal. Piped to a file they are a
+  // single enormous line of overwritten fragments, which is worse than silence —
+  // and a piped run has the log that say() keeps as it goes.
+  if (!process.stdout.isTTY) return { stop() {} };
+
+  const timer = setInterval(() => {
+    void page
+      .evaluate(() => {
+        const text = (sel) => document.querySelector(sel)?.textContent?.trim() ?? '';
+        const state = document.querySelector('[data-runner]')?.getAttribute('data-state');
+        const line =
+          state === 'busy'
+            ? `${text('[data-runner-phase]')} ${text('[data-runner-pct]')}`
+            : `${text('[data-ai-phase]')} ${text('[data-ai-count]')}`;
+        return line.trim();
+      })
+      .then((line) => {
+        if (line) process.stdout.write(`   … ${line.padEnd(64)}\r`);
+      })
+      // The page goes away at the end of every tool, and a ticker that outlives
+      // it by one interval must not be the thing that fails the run.
+      .catch(() => {});
+  }, 3000);
+
+  return {
+    stop() {
+      clearInterval(timer);
+      process.stdout.write(`${' '.repeat(72)}\r`);
+    },
+  };
+}
 
 const browser = await chromium.launch();
 const truth = readWav(TRUTH);
@@ -250,62 +333,129 @@ for (const [slug, plan] of Object.entries(PLAN)) {
     await page.goto(`${base}/${slug}`, { waitUntil: 'domcontentloaded' });
     await page.locator('[data-file-input]').setInputFiles(MIX);
     await page.waitForSelector('[data-workspace]:not([hidden])', { timeout: 60_000 });
+    await failIfAlert(page, 'decode failed');
 
-    const decodeError = page.locator('.note--error');
-    if (await decodeError.count()) {
-      throw new Error(`decode failed: ${(await decodeError.innerText()).slice(0, 160)}`);
-    }
-
-    // Stem selection, where the tool has it.
+    // Stem selection, where the tool has it. Before the setup panel is touched,
+    // because the splitter rebuilds its model list out of these ticks and a Set
+    // up pressed first would fetch the weights for the wrong selection.
     for (const [key, on] of Object.entries(plan.stems ?? {})) {
       const box = page.locator(`[data-control="${key}"]`);
       if (await box.count()) await box.setChecked(on);
     }
 
     // WAV out, so the measurement is of separation rather than of an MP3 encoder.
-    await page.selectOption('[data-format]', 'wav').catch(() => {});
+    // Only the page that kept its export bar has this picker; the mixer has its
+    // own, set further down once there is a mixer to set it on.
+    const exportFormat = page.locator('[data-format]');
+    if (await exportFormat.count()) await exportFormat.selectOption('wav');
 
     /**
-     * Multi-output tools do not download anything when the export button is
-     * pressed. They encode each part into a results list with its own button, so
-     * waiting for a download event here waits forever — which is precisely how the
-     * stem splitter appeared to hang for seven minutes while working correctly.
+     * The one-time model download, pressed on purpose and waited out here.
+     *
+     * The run would fetch the weights by itself — every one of these tools calls
+     * ensure() before it separates — but folding the two together produces a
+     * four-minute number that cannot be read, because a slow network and slow
+     * arithmetic look identical inside it. Pressing Set up first is also the path
+     * a visitor takes: the panel is the first thing on the page that asks for
+     * anything.
+     *
+     * Which state the panel settles into is decided asynchronously, from what is
+     * already in Cache Storage, so there is nothing to click until it has.
      */
-    const many = Boolean(plan.stems);
+    await page.waitForSelector(
+      '[data-ai-offer]:not([hidden]), [data-ai-ready]:not([hidden])',
+      { timeout: 60_000 }
+    );
 
-    const wait = many ? null : page.waitForEvent('download', { timeout: plan.budget });
-    await page.locator('[data-download]').first().click();
-
-    // The model download and the inference both happen after this click, so the
-    // progress panel is the only sign of life for minutes. Surface it, so a hang
-    // is distinguishable from slow arithmetic.
-    const ticker = setInterval(async () => {
-      const phase = await page
-        .locator('[data-ai-phase]')
-        .innerText()
-        .catch(() => '');
-      const count = await page
-        .locator('[data-ai-count]')
-        .innerText()
-        .catch(() => '');
-      if (phase) process.stdout.write(`   … ${phase} ${count}\r`);
-    }, 3000);
-
-    let download;
-    try {
-      if (many) {
-        // Each finished part becomes a row with its own button. Wait for the first
-        // to exist, then take it.
-        await page.waitForSelector('.result', { timeout: plan.budget });
-        const rowDownload = page.waitForEvent('download', { timeout: 60_000 });
-        await page.locator('.result button').first().click();
-        download = await rowDownload;
-      } else {
-        download = await wait;
+    let fetched = 0;
+    const setup = page.locator('[data-ai-start]');
+    if (await setup.isVisible()) {
+      const asked = Date.now();
+      await setup.click();
+      const ticker = narrate(page);
+      try {
+        await page.waitForSelector('[data-ai-ready]:not([hidden])', {
+          timeout: SETUP_BUDGET,
+        });
+      } finally {
+        ticker.stop();
       }
-    } finally {
-      clearInterval(ticker);
+      fetched = Date.now() - asked;
     }
+
+    /**
+     * First press: run the model, and save nothing.
+     *
+     * RunAction ships idle, stale and done as three separate buttons in one cell
+     * and shows one at a time, so `[data-analyze]` on its own matches all three
+     * and the first in the DOM is usually not the one on screen.
+     */
+    const pressed = Date.now();
+    await page.locator('[data-analyze]').filter({ visible: true }).first().click();
+
+    const ticker = narrate(page);
+    try {
+      /**
+       * Finished, or the error card — whichever arrives first.
+       *
+       * Waiting only for the finished state means a run that dies in ten seconds
+       * still costs the full seven-minute budget before the script admits it,
+       * while the reason has been on screen the whole time.
+       *
+       * There is deliberately no wait for the busy state in between. The runner
+       * is set busy synchronously by the click, but a run that fails on its first
+       * line — an empty stem selection, say — is back to idle before anything
+       * outside the page can observe it, and waiting to see busy first turns the
+       * quickest failure there is into a thirty-second timeout reported as the
+       * wrong problem.
+       *
+       * The card is only trusted while the runner is not busy, because a failure
+       * sets the runner back to idle *and then* raises the alert. Nothing else
+       * can be showing one: the decode check above throws on any card already up.
+       */
+      const outcome = await page.waitForFunction(
+        () => {
+          const state = document.querySelector('[data-runner]')?.getAttribute('data-state');
+          if (state === 'done') return { done: true };
+          const alert = document.querySelector('[data-alert]');
+          if (state !== 'busy' && alert && !alert.hasAttribute('hidden')) {
+            const said = (sel) => document.querySelector(sel)?.textContent?.trim() ?? '';
+            // Both lines. The title is the tool's friendly wording, which for an
+            // unrecognised failure is deliberately generic, and the fix line
+            // underneath is usually the only part that names anything.
+            return {
+              failed:
+                [said('[data-alert-title]'), said('[data-alert-fix]')]
+                  .filter(Boolean)
+                  .join(' — ') || 'no reason given',
+            };
+          }
+          return null;
+        },
+        undefined,
+        { timeout: plan.budget, polling: 500 }
+      );
+      const verdict = await outcome.jsonValue();
+      if (verdict.failed) throw new Error(`the run failed: ${verdict.failed}`);
+    } finally {
+      ticker.stop();
+    }
+    const ran = Date.now() - pressed;
+
+    /**
+     * Second press: save what is on screen. Which button that is depends on the
+     * page, which is what `take` is for.
+     */
+    const wait = page.waitForEvent('download', { timeout: 120_000 });
+    if (plan.take.exportBar) {
+      await page.locator('[data-download]').click();
+    } else {
+      const mixer = page.locator('[data-stem-panel="mixer"]');
+      // The mixer carries its own format picker, next to the buttons that use it.
+      await mixer.locator('[data-stem-format]').selectOption('wav');
+      await mixer.locator(`.stem[data-stem-id="${plan.take.stem}"] .stem__save`).click();
+    }
+    const download = await wait;
 
     const path = join(downloads, `${slug}-${download.suggestedFilename()}`);
     await download.saveAs(path);
@@ -360,7 +510,13 @@ for (const [slug, plan] of Object.entries(PLAN)) {
 
     const ms = Date.now() - started;
     results.push({ slug, ok: true, ms });
-    say(`ok  ${slug.padEnd(20)} ${note}, rms ${level.toFixed(4)}, ${(ms / 1000).toFixed(0)}s`);
+    // The two costs are reported apart because they are not the same thing to
+    // anyone reading this: the download is paid once per device, the separation
+    // every time, and only the second is a claim about the tool being fast.
+    const cost = fetched
+      ? `${(fetched / 1000).toFixed(0)}s to fetch the model, then ${(ran / 1000).toFixed(0)}s to separate`
+      : `${(ran / 1000).toFixed(0)}s to separate, model already stored`;
+    say(`ok  ${slug.padEnd(20)} ${note}, rms ${level.toFixed(4)}, ${cost}`);
   } catch (error) {
     results.push({ slug, ok: false, note: String(error.message ?? error) });
     say(`FAIL ${slug.padEnd(20)} ${String(error.message ?? error).slice(0, 300)}`);

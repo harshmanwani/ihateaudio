@@ -40,6 +40,20 @@ interface Elements {
   hint: HTMLElement | null;
 }
 
+/**
+ * Teardown for whichever panel currently owns a given setup button.
+ *
+ * The panel is built against a set of weights, but the button outlives it. The
+ * stem splitter rebuilds the panel on every checkbox change, and every AI tool
+ * rebuilds it in `onReady`, which runs again for each file decoded — the markup
+ * is hidden between files, never replaced. So a build has to take the previous
+ * build's listener off the button, or that listener stays live holding an asset
+ * list the user has moved away from, and one press fires all of them: weights
+ * fetched for stems nobody asked for, against a figure the page has just
+ * promised, on a connection that may well be metered.
+ */
+const boundStart = new WeakMap<HTMLElement, () => void>();
+
 function find(root: HTMLElement): Elements {
   const $ = <T extends HTMLElement>(sel: string) => root.querySelector<T>(sel);
   return {
@@ -144,7 +158,13 @@ export function createAiPanel(
   };
 
   if (el?.start) {
-    el.start.addEventListener('click', () => {
+    const start = el.start;
+
+    // Whatever was bound here before answers for a selection that is no longer
+    // on screen. Only the newest build may spend someone's bandwidth.
+    boundStart.get(start)?.();
+
+    const onClick = (): void => {
       if (started) return;
       started = fetchAll().then(
         () => {
@@ -161,7 +181,10 @@ export function createAiPanel(
       // A rejection here is reported by whoever awaits ensure(); swallow the
       // unhandled-rejection warning from this speculative call.
       void started.catch(() => {});
-    });
+    };
+
+    start.addEventListener('click', onClick);
+    boundStart.set(start, () => start.removeEventListener('click', onClick));
   }
 
   return {
