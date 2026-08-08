@@ -14,6 +14,33 @@ export default defineConfig({
   },
 
   vite: {
+    css: {
+      // Every colour token is authored in `oklch()`, and `oklch()` landed in
+      // Chrome 111. Without a target list nothing is down-levelled, so on an
+      // older browser each token holds text the parser cannot read, every
+      // `color: var(--ink)` is invalid at computed-value time, and the whole
+      // palette falls back to initial values — black text, transparent
+      // backgrounds, no buttons. Verified on a real Chromium 109: the layout
+      // was intact and every colour was gone.
+      //
+      // Naming the browsers makes Lightning CSS emit an sRGB fallback ahead of
+      // each modern declaration and wrap the wide-gamut custom properties in
+      // `@supports`, so current browsers still get the authored colour. The
+      // floor is set from what actually visits: Chrome 102 and 109 both appear
+      // in analytics, and Chrome 109 is the terminal version for Windows 7, 8
+      // and 8.1, so that tail does not age out on its own.
+      transformer: 'lightningcss',
+      lightningcss: {
+        // Lightning CSS encodes a version as major << 16 | minor << 8.
+        targets: {
+          chrome: 102 << 16,
+          edge: 102 << 16,
+          firefox: 102 << 16,
+          safari: (15 << 16) | (0 << 8),
+        },
+      },
+    },
+
     // @ffmpeg/ffmpeg must NOT be excluded from dep optimization. It creates its
     // worker with `new Worker(new URL('./worker.js', import.meta.url))`, and
     // Vite can only rewrite that to a real emitted chunk if it processes the
