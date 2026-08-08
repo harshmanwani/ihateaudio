@@ -102,7 +102,14 @@ export class StemPlayer {
 
   currentTime(): number {
     if (!this.playing) return Math.min(this.offset, this.duration);
-    return Math.min(this.duration, this.offset + (this.context.currentTime - this.startedAt));
+    // Sources are scheduled a moment ahead of the clock so they cannot drift
+    // apart, which leaves a window where the context has not reached the start
+    // yet and the raw difference is negative. Nothing has been heard in that
+    // window, so the position is still exactly where playback was asked to
+    // begin — clamping here rather than reporting a rewind is also what stops a
+    // stop() inside it storing a negative resume point.
+    const elapsed = Math.max(0, this.context.currentTime - this.startedAt);
+    return Math.min(this.duration, this.offset + elapsed);
   }
 
   /**
@@ -137,7 +144,10 @@ export class StemPlayer {
     if (this.context.state === 'suspended') await this.context.resume();
 
     const startAt = this.context.currentTime + 0.02;
-    const from = this.offset >= this.duration ? 0 : this.offset;
+    // A negative offset is a hard RangeError rather than a clamp, and because
+    // the offset survives the failed call it would poison every later attempt
+    // too: one bad value and the player never plays again.
+    const from = this.offset >= this.duration ? 0 : Math.max(0, this.offset);
     this.offset = from;
 
     for (const track of this.tracks) {
