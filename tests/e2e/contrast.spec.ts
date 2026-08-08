@@ -39,6 +39,14 @@ const AUDIT = `(() => {
   const fails = []; const seen = new Set(); let tested = 0;
   document.querySelectorAll('body *').forEach(el => {
     if (el.closest('[hidden]') || !el.offsetParent) return;
+    // WCAG 1.4.3 exempts text in an inactive user interface component, and a
+    // disabled control is dimmed precisely so it reads as unavailable — the
+    // segments drop to --ink-3 at 0.4 opacity, which no contrast rule could
+    // survive and none is meant to. Auditing them enforced a requirement the
+    // spec does not make, and it only surfaced now and then because the colour
+    // transitions: sample early and you catch the enabled colour and pass,
+    // sample once it has settled and you fail. A loaded machine samples late.
+    if (el.closest('[disabled], [aria-disabled="true"]')) return;
     const own = Array.from(el.childNodes).filter(n => n.nodeType === 3)
       .map(n => n.textContent).join('');
     if (!/\\S/.test(own)) return;
