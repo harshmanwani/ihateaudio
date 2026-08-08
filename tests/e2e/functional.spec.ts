@@ -20,6 +20,16 @@ test.describe('analysis tools', () => {
     await dropGeneratedAudio(page, { seconds: 8, amplitude: 0.5 });
     await waitForWorkspace(page);
 
+    // The workspace unhiding is not the measurement landing. The four figures
+    // are seeded with a placeholder and only filled a couple of frames later,
+    // once the BS.1770 scan has run over every sample — so reading the panel
+    // the instant it appears catches the placeholder on a loaded machine.
+    await expect
+      .poll(async () => page.locator('[data-stat="integrated"]').innerText(), {
+        timeout: 30_000,
+      })
+      .toMatch(/-?\d+\.\d+/);
+
     const text = await page.locator('[data-workspace]').innerText();
 
     // A -6 dBFS tone must produce a plausible negative LUFS figure, not a
@@ -68,6 +78,13 @@ test.describe('analysis tools', () => {
     });
 
     await waitForWorkspace(page);
+
+    // The same placeholder race as the loudness meter above: the workspace is
+    // unhidden before the detector has written a figure into it.
+    await expect
+      .poll(async () => page.locator('[data-bpm]').innerText(), { timeout: 30_000 })
+      .toMatch(/\d+\.\d/);
+
     const text = await page.locator('[data-workspace]').innerText();
 
     const bpm = (text.match(/1[12]\d(\.\d)?/g) ?? []).map(Number);
