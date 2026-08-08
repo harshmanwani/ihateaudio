@@ -215,6 +215,7 @@ const faq = [
 <script>
   import { createTool } from '../lib/tool';
   import { applyFade, curveValue, type FadeCurve } from '../lib/audio/dsp';
+  import { panelColors, panelContext } from '../lib/canvas';
 
   const CURVES: readonly string[] = ['linear', 'exponential', 'logarithmic', 'scurve'];
 
@@ -257,13 +258,11 @@ const faq = [
           fadeCanvas.height = height;
         }
 
-        const context = fadeCanvas.getContext('2d');
+        const context = panelContext(fadeCanvas);
         if (!context) return;
         context.clearRect(0, 0, width, height);
 
-        const styles = getComputedStyle(fadePanel);
-        const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
-        const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+        const { ink, hue } = panelColors(fadePanel);
 
         const padX = 10 * dpr;
         const padT = 12 * dpr;

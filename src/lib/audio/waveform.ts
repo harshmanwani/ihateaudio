@@ -22,6 +22,7 @@
  *    Below that threshold it switches to a polyline through the real samples
  *    with a dot on each, which is what makes a click or a DC offset visible.
  */
+import { colorToken } from '../canvas';
 import { computeWaveform, type WaveformData } from './analysis';
 
 export interface WaveformStyle {
@@ -148,10 +149,11 @@ export class Waveform {
     this.minimap = options.minimap ?? null;
     this.onViewChange = options.onViewChange;
 
-    // Read the palette from CSS so the canvas can never drift from the tokens.
+    // Read the palette from CSS so the canvas can never drift from the tokens,
+    // but only where a canvas can draw with what it reads — see colorToken.
     const computed = getComputedStyle(canvas);
     const token = (name: string, fallback: string): string =>
-      computed.getPropertyValue(name).trim() || fallback;
+      colorToken(computed, name, fallback);
 
     this.style = {
       wave: token('--wave', '#31d685'),

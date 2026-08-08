@@ -325,6 +325,7 @@ const faq = [
   import { createTool } from '../lib/tool';
   import { applyEq, type EqBand } from '../lib/audio/effects';
   import { clamp, db } from '../lib/format';
+  import { panelColors, panelContext } from '../lib/canvas';
 
   interface BandSpec {
     hz: number;
@@ -532,7 +533,7 @@ const faq = [
       canvas.height = height;
     }
 
-    const context = canvas.getContext('2d');
+    const context = panelContext(canvas);
     if (!context) return;
     context.clearRect(0, 0, width, height);
 
@@ -553,9 +554,7 @@ const faq = [
     const middle = (top + bottom) / 2;
     const halfSpan = (bottom - top) / 2;
 
-    const styles = getComputedStyle(panel);
-    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
-    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+    const { ink, hue } = panelColors(panel);
 
     // Rails at ±6 and ±12, and the zero detent stronger: the grid a hardware
     // fader bank prints on its faceplate.

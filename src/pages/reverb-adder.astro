@@ -310,6 +310,7 @@ const faq = [
   import { createTool } from '../lib/tool';
   import { applyReverb } from '../lib/audio/effects';
   import { clamp, pct } from '../lib/format';
+  import { panelColors, panelContext } from '../lib/canvas';
 
   interface Space {
     decay: number;
@@ -433,13 +434,11 @@ const faq = [
       canvas.height = height;
     }
 
-    const context = canvas.getContext('2d');
+    const context = panelContext(canvas);
     if (!context) return { rt60: decay, span };
     context.clearRect(0, 0, width, height);
 
-    const styles = getComputedStyle(panel);
-    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
-    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+    const { ink, hue } = panelColors(panel);
 
     const padL = 8 * dpr;
     const padR = 8 * dpr;

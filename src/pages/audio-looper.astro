@@ -227,6 +227,7 @@ const faq = [
   import { createTool } from '../lib/tool';
   import { loop, slice } from '../lib/audio/dsp';
   import { duration as fmtDuration, filesize } from '../lib/format';
+  import { panelColors, panelContext } from '../lib/canvas';
 
   /** How much of each side of the join to show. */
   const SEAM_WINDOW = 0.25;
@@ -289,13 +290,11 @@ const faq = [
       canvas.height = height;
     }
 
-    const context = canvas.getContext('2d');
+    const context = panelContext(canvas);
     if (!context) return;
     context.clearRect(0, 0, width, height);
 
-    const styles = getComputedStyle(panel);
-    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
-    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+    const { ink, hue } = panelColors(panel);
 
     const padL = 12 * dpr;
     const padR = 12 * dpr;

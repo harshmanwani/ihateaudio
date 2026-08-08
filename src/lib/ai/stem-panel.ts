@@ -6,6 +6,7 @@
  * state of its own — everything it renders it reads back from the player.
  */
 import { computeWaveform } from '../audio/analysis';
+import { drawableColor, panelContext } from '../canvas';
 import { exportAudio } from '../audio/export';
 import { saveBlob } from '../files';
 import { timecode } from '../format';
@@ -46,13 +47,17 @@ interface Row {
  * same coral fails at that — which is exactly how the first version looked. Lightness
  * and chroma are held constant so no track reads as more important than another;
  * only the hue moves. All four are chosen to sit legibly on the dark strip.
+ *
+ * Each carries the sRGB it resolves to, for canvases that cannot read `oklch()`.
+ * Holding the pair here rather than converting on the fly keeps the authored
+ * colour authoritative — the fallback is a transcription of it, not a guess.
  */
 const TRACK_HUES = [
-  'oklch(0.72 0.17 26)',
-  'oklch(0.78 0.16 95)',
-  'oklch(0.72 0.14 205)',
-  'oklch(0.72 0.16 300)',
-];
+  ['oklch(0.72 0.17 26)', '#fd736a'],
+  ['oklch(0.78 0.16 95)', '#d8b501'],
+  ['oklch(0.72 0.14 205)', '#00bdce'],
+  ['oklch(0.72 0.16 300)', '#b58bf9'],
+] as const;
 
 /**
  * Draws one stem's waveform into its strip.
@@ -78,7 +83,7 @@ function paintWave(canvas: HTMLCanvasElement, stem: Stem, colour: string): void 
     canvas.height = height;
   }
 
-  const context = canvas.getContext('2d');
+  const context = panelContext(canvas);
   if (!context) return;
   context.clearRect(0, 0, width, height);
 
@@ -471,7 +476,8 @@ export class StemPanel {
   private repaint(): void {
     for (let i = 0; i < this.rows.length; i += 1) {
       const row = this.rows[i]!;
-      paintWave(row.canvas, row.stem, TRACK_HUES[i % TRACK_HUES.length]!);
+      const [authored, srgb] = TRACK_HUES[i % TRACK_HUES.length]!;
+      paintWave(row.canvas, row.stem, drawableColor(authored, srgb));
     }
     // Same trigger as the waveforms, because anything that changes their width
     // changes where the playhead has to sit.

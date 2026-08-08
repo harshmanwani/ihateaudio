@@ -229,6 +229,7 @@ const faq = [
   import { createTool } from '../lib/tool';
   import { pitchShift } from '../lib/audio/stretch';
   import { clamp, pct } from '../lib/format';
+  import { panelColors, panelContext } from '../lib/canvas';
 
   /** Semitone offsets that are white keys, counting from a C. */
   const WHITE = new Set([0, 2, 4, 5, 7, 9, 11]);
@@ -261,13 +262,11 @@ const faq = [
       canvas.height = height;
     }
 
-    const context = canvas.getContext('2d');
+    const context = panelContext(canvas);
     if (!context) return;
     context.clearRect(0, 0, width, height);
 
-    const styles = getComputedStyle(panel);
-    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
-    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+    const { ink, hue } = panelColors(panel);
 
     const padL = 10 * dpr;
     const padR = 10 * dpr;

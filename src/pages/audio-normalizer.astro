@@ -281,6 +281,7 @@ const faq = [
   } from '../lib/audio/analysis';
   import { applyGain } from '../lib/audio/dsp';
   import { db } from '../lib/format';
+  import { panelColors, panelContext } from '../lib/canvas';
 
   /**
    * Where the well-known delivery targets sit, so the file's own loudness has
@@ -366,14 +367,11 @@ const faq = [
       canvas.height = height;
     }
 
-    const context = canvas.getContext('2d');
+    const context = panelContext(canvas);
     if (!context) return;
     context.clearRect(0, 0, width, height);
 
-    const styles = getComputedStyle(panel);
-    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
-    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
-    const raw = styles.getPropertyValue('--danger').trim() || '#c0392b';
+    const { ink, hue, danger: raw } = panelColors(panel);
     const alarm = `color-mix(in oklch, ${raw} 62%, white)`;
 
     const padL = 78 * dpr;

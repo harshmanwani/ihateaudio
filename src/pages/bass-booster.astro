@@ -218,6 +218,7 @@ const faq = [
   import { bassBoost, applyEq } from '../lib/audio/effects';
   import { normalizePeak } from '../lib/audio/dsp';
   import { db } from '../lib/format';
+  import { panelColors, panelContext } from '../lib/canvas';
 
   /**
    * The shelf response, measured rather than sketched.
@@ -259,13 +260,11 @@ const faq = [
       canvas.height = height;
     }
 
-    const context = canvas.getContext('2d');
+    const context = panelContext(canvas);
     if (!context) return;
     context.clearRect(0, 0, width, height);
 
-    const styles = getComputedStyle(panel);
-    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
-    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+    const { ink, hue } = panelColors(panel);
 
     const filter = shelfContext.createBiquadFilter();
     filter.type = 'lowshelf';

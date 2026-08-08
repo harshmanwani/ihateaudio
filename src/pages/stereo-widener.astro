@@ -342,6 +342,7 @@ const faq = [
   import { createTool } from '../lib/tool';
   import { setStereoWidth } from '../lib/audio/effects';
   import { clamp, db, pct } from '../lib/format';
+  import { panelColors, panelContext } from '../lib/canvas';
 
   interface Measurement {
     /** RMS of the mid signal — the part that survives a mono fold. */
@@ -440,13 +441,11 @@ const faq = [
       canvas.height = size;
     }
 
-    const context = canvas.getContext('2d');
+    const context = panelContext(canvas);
     if (!context) return;
     context.clearRect(0, 0, size, size);
 
-    const styles = getComputedStyle(panel);
-    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
-    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+    const { ink, hue } = panelColors(panel);
 
     const mid = size / 2;
     // sqrt(2)/2 so a hard-panned signal at full scale still lands inside.

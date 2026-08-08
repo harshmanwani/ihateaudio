@@ -317,6 +317,7 @@ const stats = [
 <script>
   import { createTool } from '../lib/tool';
   import { measureLoudness } from '../lib/audio/analysis';
+  import { panelColors, panelContext } from '../lib/canvas';
 
   interface Target {
     id: string;
@@ -376,13 +377,11 @@ const stats = [
       canvas.height = height;
     }
 
-    const context = canvas.getContext('2d');
+    const context = panelContext(canvas);
     if (!context) return;
     context.clearRect(0, 0, width, height);
 
-    const styles = getComputedStyle(panel);
-    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
-    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+    const { ink, hue } = panelColors(panel);
 
     const padL = 42 * dpr;
     const padR = 96 * dpr;

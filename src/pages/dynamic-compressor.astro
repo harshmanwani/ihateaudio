@@ -411,6 +411,7 @@ const faq = [
   import { createTool } from '../lib/tool';
   import { applyCompressor } from '../lib/audio/effects';
   import { db } from '../lib/format';
+  import { panelColors, panelContext } from '../lib/canvas';
 
   interface Params {
     threshold: number;
@@ -481,13 +482,11 @@ const faq = [
       canvas.height = size;
     }
 
-    const context = canvas.getContext('2d');
+    const context = panelContext(canvas);
     if (!context) return;
     context.clearRect(0, 0, size, size);
 
-    const styles = getComputedStyle(canvas.closest('[data-curve-panel]') ?? canvas);
-    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
-    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+    const { ink, hue } = panelColors(canvas.closest('[data-curve-panel]') ?? canvas);
 
     const pad = 26 * dpr;
     const plot = size - pad * 2;

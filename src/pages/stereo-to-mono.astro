@@ -188,6 +188,7 @@ const faq = [
   import { fft } from '../lib/audio/fft';
   import { hannPeriodic } from '../lib/audio/stft';
   import type { NamedOutput } from '../lib/tool';
+  import { panelColors, panelContext } from '../lib/canvas';
 
   type Mode = 'mono' | 'stereo' | 'split';
 
@@ -355,14 +356,11 @@ const faq = [
       canvas.height = height;
     }
 
-    const context = canvas.getContext('2d');
+    const context = panelContext(canvas);
     if (!context) return;
     context.clearRect(0, 0, width, height);
 
-    const styles = getComputedStyle(panel);
-    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
-    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
-    const raw = styles.getPropertyValue('--danger').trim() || '#c0392b';
+    const { ink, hue, danger: raw } = panelColors(panel);
     const alarm = `color-mix(in oklch, ${raw} 62%, white)`;
 
     const padL = 40 * dpr;

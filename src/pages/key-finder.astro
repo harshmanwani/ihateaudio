@@ -282,6 +282,7 @@ const faq = [
   import { createTool } from '../lib/tool';
   import type { KeyCandidate } from '../lib/audio/key';
   import { camelot, detectKey, NOTE_NAMES, rankKeys } from '../lib/audio/key';
+  import { panelColors, panelContext } from '../lib/canvas';
 
   /** Semitone offsets of the notes in a major and a natural minor scale. */
   const MAJOR_SCALE = [0, 2, 4, 5, 7, 9, 11];
@@ -339,13 +340,11 @@ const faq = [
       canvas.height = height;
     }
 
-    const context = canvas.getContext('2d');
+    const context = panelContext(canvas);
     if (!context) return;
     context.clearRect(0, 0, width, height);
 
-    const styles = getComputedStyle(panel);
-    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
-    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+    const { ink, hue } = panelColors(panel);
 
     const cx = width / 2;
     const cy = height / 2;

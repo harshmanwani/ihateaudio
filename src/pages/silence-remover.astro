@@ -244,6 +244,7 @@ const faq = [
   import { createTool } from '../lib/tool';
   import { findSilence, removeSilence } from '../lib/audio/dsp';
   import { duration as fmtDuration } from '../lib/format';
+  import { panelColors, panelContext } from '../lib/canvas';
 
   /**
    * The file's level over time, in the same windows the detector uses.
@@ -303,13 +304,11 @@ const faq = [
       canvas.height = height;
     }
 
-    const context = canvas.getContext('2d');
+    const context = panelContext(canvas);
     if (!context) return;
     context.clearRect(0, 0, width, height);
 
-    const styles = getComputedStyle(panel);
-    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
-    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+    const { ink, hue } = panelColors(panel);
 
     const padL = 34 * dpr;
     const padR = 12 * dpr;

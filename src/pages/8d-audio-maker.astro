@@ -305,6 +305,7 @@ const faq = [
   import { apply8D } from '../lib/audio/effects';
   import { setChannels } from '../lib/audio/dsp';
   import { clamp, pct } from '../lib/format';
+  import { panelColors, panelContext } from '../lib/canvas';
 
   interface Pair {
     get(): number;
@@ -414,13 +415,11 @@ const faq = [
       canvas.height = size;
     }
 
-    const context = canvas.getContext('2d');
+    const context = panelContext(canvas);
     if (!context) return;
     context.clearRect(0, 0, size, size);
 
-    const styles = getComputedStyle(panel);
-    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
-    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
+    const { ink, hue } = panelColors(panel);
 
     const mid = size / 2;
     const maxR = mid * 0.82;

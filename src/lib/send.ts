@@ -27,6 +27,7 @@ import { findSilence, setChannels, slice } from './audio/dsp';
 import { exportAudio } from './audio/export';
 import { getAudioContext } from './audio/decode';
 import { baseName, duration as fmtDuration, extensionOf, filesize } from './format';
+import { panelColors, panelContext } from './canvas';
 
 const AUDITION_SECONDS = 15;
 
@@ -204,14 +205,11 @@ export function createSendTool(destinationId: string): ToolRuntime | null {
           canvas.height = height;
         }
 
-        const context = canvas.getContext('2d');
+        const context = panelContext(canvas);
         if (!context) return;
         context.clearRect(0, 0, width, height);
 
-        const styles = getComputedStyle(panel);
-        const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
-        const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
-        const danger = styles.getPropertyValue('--danger').trim() || '#c0392b';
+        const { ink, hue, danger } = panelColors(panel);
 
         const route = selectedRoute();
         const budget = plan.budget;

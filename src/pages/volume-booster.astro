@@ -240,6 +240,7 @@ const faq = [
   import { applyGain, normalizePeak, rmsOf, toDecibels } from '../lib/audio/dsp';
   import { peakDb } from '../lib/audio/analysis';
   import { db } from '../lib/format';
+  import { panelColors, panelContext } from '../lib/canvas';
 
   type Mode = 'boost' | 'normalize';
 
@@ -279,14 +280,11 @@ const faq = [
       canvas.height = height;
     }
 
-    const context = canvas.getContext('2d');
+    const context = panelContext(canvas);
     if (!context) return;
     context.clearRect(0, 0, width, height);
 
-    const styles = getComputedStyle(panel);
-    const ink = styles.getPropertyValue('--stage-ink').trim() || '#fff';
-    const hue = styles.getPropertyValue('--cat-vivid').trim() || '#3aa76d';
-    const raw = styles.getPropertyValue('--danger').trim() || '#c0392b';
+    const { ink, hue, danger: raw } = panelColors(panel);
     // The danger token is tuned for light backgrounds; on the dark stage it needs
     // lifting or it reads as brown.
     const alarm = `color-mix(in oklch, ${raw} 62%, white)`;
