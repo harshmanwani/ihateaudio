@@ -2,14 +2,16 @@
  * A deliberately small boundary around the WebMCP browser API.
  *
  * Two hosts exist in the wild: the W3C proposal puts the API on
- * `navigator.modelContext`, and ChatGPT's browser puts it on
- * `document.modelContext`. The rest of the app should not care which, or
- * whether either is present. A normal browser gets an ordinary editor; a
- * compatible agent sees the tools the current page registers.
+ * `navigator.modelContext`, and ChatGPT's browser bridge puts it on
+ * `document.modelContext`. A page may see either, or both at once — Chrome with
+ * the WebMCP flag plus the ChatGPT extension — so tools register on every
+ * distinct host found. The rest of the app never needs to know which.
  */
 
 export interface SiteTool {
   name: string;
+  /** Human-readable name a host may show beside `name`. */
+  title?: string;
   description: string;
   inputSchema: {
     type: 'object';
@@ -28,7 +30,8 @@ export interface ModelContextHost {
   registerTool(tool: SiteTool): Promise<void> | void;
 }
 
-export type HostResolver = () => ModelContextHost | null | undefined;
+/** Every host on the page. Duplicates are fine; they are registered once. */
+export type HostResolver = () => ModelContextHost[];
 
 export interface SiteToolRegistration {
   supported: boolean;
@@ -41,25 +44,28 @@ const hostOf = (owner: unknown): ModelContextHost | null => {
   return typeof candidate?.registerTool === 'function' ? candidate : null;
 };
 
-/** The standard host first, then ChatGPT's. */
-const defaultHost: HostResolver = () =>
-  hostOf(globalThis.navigator) ?? hostOf(globalThis.document);
+const defaultHosts: HostResolver = () =>
+  [hostOf(globalThis.navigator), hostOf(globalThis.document)].filter(
+    (host): host is ModelContextHost => host !== null
+  );
 
 /**
- * Registers tools only when the current browser implements WebMCP.
+ * Registers tools on every WebMCP host the current browser exposes.
  *
  * A registration failure must never take the editor down with it: WebMCP is an
  * enhancement, not a dependency of the user-facing product.
  */
 export async function registerSiteTools(
   tools: SiteTool[],
-  resolve: HostResolver = defaultHost
+  resolve: HostResolver = defaultHosts
 ): Promise<SiteToolRegistration> {
-  const host = resolve();
-  if (!host) return { supported: false, registered: 0 };
+  const hosts = [...new Set(resolve())];
+  if (hosts.length === 0) return { supported: false, registered: 0 };
 
   try {
-    for (const tool of tools) await host.registerTool(tool);
+    for (const host of hosts) {
+      for (const tool of tools) await host.registerTool(tool);
+    }
     return { supported: true, registered: tools.length };
   } catch (error) {
     return {

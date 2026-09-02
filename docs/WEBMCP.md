@@ -88,19 +88,33 @@ tab. An agent cannot fetch the audio, and the page never sends it anywhere.
 
 ## Testing it
 
-**ChatGPT desktop app**
+**ChatGPT desktop app (macOS or Windows)**
 
-1. Update to the latest version.
-2. Settings → Browser → Permissions → enable **Site tools**.
-3. Open `https://ihateaudio.com/audio-trimmer` in the in-app browser.
-4. The address bar shows **Site tools**. Open it to see the registered tools.
+Site tools live only in the desktop app's *built-in browser*. The Codex Chrome
+extension ("Chrome integration") drives Chrome by clicks and does not see site
+tools, so a page can report "6 agent tools ready" there and ChatGPT will still
+say none are callable.
+
+1. Update to the latest version. Site tools also need an account and model that
+   support them.
+2. Open a chat in **Work** or **Codex**, then open the built-in browser from the
+   toolbar, or press ⌘⇧B (macOS) / Ctrl+Shift+B (Windows).
+3. Settings → Browser → Permissions → **Enable site tools** must be on.
+4. Open `https://ihateaudio.com/audio-trimmer`. A grey arrow appears in the
+   address bar; select it to see the registered tools. It turns blue while
+   ChatGPT uses one.
 5. Choose a file, then ask for an outcome: "Keep 0:05 to 0:20 and fade the
    edges."
 
 **Google Chrome 149 or later**
 
-1. Enable `chrome://flags/#enable-webmcp-testing`.
-2. Open any tool page. The same tools register on `navigator.modelContext`.
+1. Enable `chrome://flags/#enable-webmcp-testing` and relaunch.
+2. Open any tool page over HTTPS. The page registers on the browser's host:
+   `navigator.modelContext` in the proposal, `document.modelContext` in current
+   Chrome builds (152 at the time of writing). Both are handled.
+3. DevTools → Application → **WebMCP** lists every registered tool with its
+   schema, and can invoke any of them with JSON input. In the console,
+   `await document.modelContext.getTools()` shows the same list.
 
 **Locally**
 

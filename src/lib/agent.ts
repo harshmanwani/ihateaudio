@@ -125,3 +125,9 @@ export function textResult(data: Record<string, unknown>): {
 } {
   return { content: [{ type: 'text', text: JSON.stringify(data) }] };
 }
+
+/** `set_loudness_target` → "Set loudness target": the title hosts display beside the name. */
+export function titleFor(name: string): string {
+  const [first = '', ...rest] = name.split('_').filter(Boolean);
+  return [first.charAt(0).toUpperCase() + first.slice(1), ...rest].join(' ');
+}

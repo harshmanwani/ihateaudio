@@ -36,6 +36,7 @@ import {
   coerceParams,
   schemaFor,
   textResult,
+  titleFor,
   type AgentManifest,
   type ParamValue,
 } from './agent';
@@ -1522,7 +1523,8 @@ export class ToolRuntime {
       });
     }
 
-    return tools;
+    // Hosts such as Chrome DevTools show a title beside the name; give every tool one.
+    return tools.map((registered) => ({ title: titleFor(registered.name), ...registered }));
   }
 
   /**
