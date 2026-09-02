@@ -779,9 +779,13 @@ const faq = [
 
   // Hand the recording to the next tool without a save-and-reopen round trip.
   root?.querySelectorAll<HTMLAnchorElement>('[data-hand-off]').forEach((link) => {
-    link.addEventListener('click', () => {
+    link.addEventListener('click', (event) => {
       if (!recordedBlob) return;
-      stashForNextTool(recordedBlob, `${baseName}.${extensionFor(recordedBlob.type)}`);
+      // Wait for the stash to be durable, then follow the link ourselves.
+      event.preventDefault();
+      void stashForNextTool(recordedBlob, `${baseName}.${extensionFor(recordedBlob.type)}`).then(() => {
+        window.location.assign(link.href);
+      });
     });
   });
 </script>

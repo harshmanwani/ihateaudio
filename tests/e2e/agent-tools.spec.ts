@@ -60,11 +60,15 @@ test.describe('agent tools on the shared runtime', () => {
     await shimHost(page, 'navigator');
     await page.goto('/audio-trimmer');
 
-    await expect(page.locator('[data-agent-status]')).toHaveText('6 agent tools ready');
+    await expect(page.locator('[data-agent-status]')).toHaveText('10 agent tools ready');
     expect(await names(page)).toEqual([
       'export_download',
       'inspect_audio',
+      'list_tools',
+      'load_audio_from_url',
+      'open_tool',
       'render_preview',
+      'send_to_tool',
       'set_output_format',
       'set_selection',
       'set_trim',
@@ -107,11 +111,15 @@ test.describe('agent tools on the shared runtime', () => {
     await shimHost(page, 'document');
     await page.goto('/silence-remover');
 
-    await expect(page.locator('[data-agent-status]')).toHaveText('5 agent tools ready');
+    await expect(page.locator('[data-agent-status]')).toHaveText('9 agent tools ready');
     expect(await names(page)).toEqual([
       'export_download',
       'inspect_audio',
+      'list_tools',
+      'load_audio_from_url',
+      'open_tool',
       'render_preview',
+      'send_to_tool',
       'set_output_format',
       'set_silence_removal',
     ]);
@@ -134,11 +142,15 @@ test.describe('agent tools on the shared runtime', () => {
     await shimHost(page, 'document');
     await page.goto('/audio-converter');
 
-    await expect(page.locator('[data-agent-status]')).toHaveText('4 agent tools ready');
+    await expect(page.locator('[data-agent-status]')).toHaveText('8 agent tools ready');
     expect(await names(page)).toEqual([
       'export_download',
       'inspect_audio',
+      'list_tools',
+      'load_audio_from_url',
+      'open_tool',
       'render_preview',
+      'send_to_tool',
       'set_output_format',
     ]);
 

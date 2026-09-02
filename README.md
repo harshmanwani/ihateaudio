@@ -105,16 +105,19 @@ else is shared, which is why they all behave identically.
 
 ## Agents (WebMCP)
 
-Every tool page registers a small set of WebMCP site tools when the browser
-hosts the API — ChatGPT's in-app browser (`document.modelContext`) or Chrome
-with WebMCP enabled (`navigator.modelContext`). An agent can inspect the loaded
-audio, move the selection, set the format, render a preview and, on request,
-export. Thirty-three pages also declare one named action for their own controls, so
-"tighten the pauses at −45 dB" lands on the same sliders a person drags. The
-audio never leaves the tab; an agent receives numbers and settings, not samples.
+The whole site is agent-operable. In a browser that hosts WebMCP — ChatGPT's
+built-in browser (`document.modelContext`) or Chrome with the flag
+(`navigator.modelContext`) — the homepage and every tool page register site
+tools. From the homepage an agent can `list_tools` and `open_tool`; on a tool
+page it can inspect the loaded audio, set the page's own controls through one
+named action (33 pages have one), render a preview, `send_to_tool` to hand the
+result to the next tool with no re-upload, and `export_download` on request.
+The person chooses a file once; the audio never leaves the tab. An agent
+receives numbers and settings, not samples.
 
 The layer is `src/lib/webmcp.ts` (the host boundary), `src/lib/agent.ts` (the
-manifest, schema and clamping) and the agent section of `src/lib/tool.ts`.
+manifest, schema and clamping), `src/lib/site-tools.ts` (catalog and
+navigation) and the agent section of `src/lib/tool.ts`.
 [docs/WEBMCP.md](docs/WEBMCP.md) lists every tool, how to test it in ChatGPT
 and Chrome, and which files are new for the WebMCP Challenge.
 

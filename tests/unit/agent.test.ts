@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { coerceParams, schemaFor, textResult, titleFor, type AgentManifest } from '../../src/lib/agent';
+import { coerceParams, nearestOption, schemaFor, textResult, titleFor, type AgentManifest } from '../../src/lib/agent';
 
 /** A manifest shaped like the silence remover's, plus one enum and one flag. */
 const manifest: AgentManifest = {
@@ -87,5 +87,16 @@ describe('titleFor', () => {
   it('turns a snake_case tool name into the title Chrome DevTools shows', () => {
     expect(titleFor('inspect_audio')).toBe('Inspect audio');
     expect(titleFor('set_loudness_target')).toBe('Set loudness target');
+  });
+});
+
+describe('nearestOption', () => {
+  it('snaps a number onto the closest numeric option of a select', () => {
+    expect(nearestOption(['64', '96', '128', '192', '320'], 100)).toBe('96');
+    expect(nearestOption(['64', '96', '128', '192', '320'], 1000)).toBe('320');
+  });
+
+  it('returns null when no option is numeric', () => {
+    expect(nearestOption(['keep', 'mono'], 2)).toBeNull();
   });
 });

@@ -40,21 +40,21 @@ interface Case {
 const CASES: Case[] = [
   {
     path: '/noise-remover',
-    count: 5,
+    count: 9,
     action: 'set_noise_reduction',
     input: { strength: 60 },
     settings: { amount: '60' },
   },
   {
     path: '/pitch-shifter',
-    count: 5,
+    count: 9,
     action: 'set_pitch_shift',
     input: { semitones: 7, cents: -10 },
     settings: { semitones: '7', cents: '-10' },
   },
   {
     path: '/reverb-adder',
-    count: 5,
+    count: 9,
     action: 'set_reverb',
     // Moving any of the three numbers switches the room select to custom.
     input: { decaySec: 3.5, mix: 20, preDelayMs: 40 },
@@ -62,28 +62,28 @@ const CASES: Case[] = [
   },
   {
     path: '/sample-rate-converter',
-    count: 5,
+    count: 9,
     action: 'set_sample_rate',
     input: { sampleRateHz: '16000' },
     settings: { rate: '16000' },
   },
   {
     path: '/slowed-reverb',
-    count: 5,
+    count: 9,
     action: 'set_slowed_reverb',
     input: { speed: 0.8, mix: 30, decaySec: 3 },
     settings: { speed: '0.8', mix: '30', decay: '3' },
   },
   {
     path: '/stem-splitter',
-    count: 5,
+    count: 9,
     action: 'set_stems',
     input: { vocals: true, drums: false, bass: true, other: false },
     settings: { vocals: 'true', drums: 'false', bass: 'true', other: 'false' },
   },
   {
     path: '/stereo-to-mono',
-    count: 5,
+    count: 9,
     action: 'set_channel_mode',
     input: { mode: 'split' },
     settings: {},

@@ -136,6 +136,8 @@ const schema = [
           {TOOLS.length} tools that run right here in your browser. Drop a file
           in, get it back fixed. No uploads, no signup, everything free.
         </p>
+        {/* Filled in by the script below only in a browser that hosts WebMCP. */}
+        <p class="hero__agent" data-agent-status role="status" hidden></p>
       </div>
       <div class="toolsearch">
         <Icon name="magnifying-glass" size={18} />
@@ -387,6 +389,13 @@ const schema = [
      long edges regardless of aspect ratio, which is what a wide pill needs. The
      static hairline underneath means the border never disappears between
      passes. */
+  .hero__agent {
+    margin: var(--s2) 0 0;
+    color: var(--accent-ink, var(--ink-2));
+    font-size: var(--t-small);
+    font-weight: 650;
+  }
+
   .crosspromo + .hero {
     padding-block-start: var(--s5);
   }
@@ -489,6 +498,19 @@ const schema = [
 
 <script>
   import { track } from '../lib/track';
+  import { registerSiteTools } from '../lib/webmcp';
+  import { siteTools } from '../lib/site-tools';
+
+  // An agent arriving on the homepage can list every tool and open one; the
+  // tool pages then register their own actions. Ordinary browsers see nothing.
+  void registerSiteTools(siteTools()).then((result) => {
+    const status = document.querySelector<HTMLElement>('[data-agent-status]');
+    if (!status || !result.supported) return;
+    status.textContent = result.error
+      ? 'Agent tools could not register'
+      : `${result.registered} agent tools ready`;
+    status.hidden = false;
+  });
 
   /*
     The click, counted on this side too.

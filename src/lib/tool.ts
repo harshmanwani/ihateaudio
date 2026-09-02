@@ -34,12 +34,14 @@ import { mountStemPanel } from './ai/stem-panel';
 import { registerSiteTools, type SiteTool } from './webmcp';
 import {
   coerceParams,
+  nearestOption,
   schemaFor,
   textResult,
   titleFor,
   type AgentManifest,
   type ParamValue,
 } from './agent';
+import { navigateSoon, resolveTool, siteTools } from './site-tools';
 
 export interface Selection {
   start: number;
@@ -311,8 +313,9 @@ export class ToolRuntime {
     void this.registerAgentTools();
 
     // A file handed over by the previous tool loads with no upload step.
-    const handed = claimHandoff();
-    if (handed) void this.load([handed]);
+    void claimHandoff().then((handed) => {
+      if (handed) void this.load([handed]);
+    });
   }
 
   private buildFormatOptions(): void {
@@ -1295,23 +1298,34 @@ export class ToolRuntime {
    */
   async renderPreview(): Promise<boolean> {
     if (this.buffers.length === 0) return false;
+    const buffer = await this.produceBuffer();
+    if (!buffer) return false;
+    this.showResult(buffer, this.config.previewLabel ?? 'Preview');
+    return true;
+  }
+
+  /**
+   * The audio this page would export with its current settings, or null when
+   * the tool's result is not audio (an image, a subtitle file) or it failed.
+   * Pages without a `preview` fall back to `process`, the exact output.
+   */
+  private async produceBuffer(): Promise<AudioBuffer | null> {
+    if (this.buffers.length === 0) return null;
     const produce = this.config.preview ?? this.config.process;
     try {
       const result = await Promise.resolve(produce(this.context()));
-      const buffer =
-        result instanceof AudioBuffer
-          ? result
-          : result &&
-              typeof result === 'object' &&
-              'buffer' in result &&
-              (result as { buffer?: unknown }).buffer instanceof AudioBuffer
-            ? (result as { buffer: AudioBuffer }).buffer
-            : null;
-      if (!buffer) return false;
-      this.showResult(buffer, this.config.previewLabel ?? 'Preview');
-      return true;
+      if (result instanceof AudioBuffer) return result;
+      if (
+        result &&
+        typeof result === 'object' &&
+        'buffer' in result &&
+        (result as { buffer?: unknown }).buffer instanceof AudioBuffer
+      ) {
+        return (result as { buffer: AudioBuffer }).buffer;
+      }
+      return null;
     } catch {
-      return false;
+      return null;
     }
   }
 
@@ -1473,6 +1487,92 @@ export class ToolRuntime {
       },
     ];
 
+    tools.push(...siteTools());
+
+    tools.push({
+      name: 'send_to_tool',
+      description:
+        'Hand the audio on this page to another tool on this site and open it there, with no re-upload. Sends the result of the current settings, rendered losslessly; take "original" sends the file as it was loaded. Slugs come from list_tools. The page navigates after replying; call inspect_audio on the new page.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          slug: { type: 'string', description: 'The tool to open next, e.g. "silence-remover".' },
+          take: {
+            type: 'string',
+            enum: ['result', 'original'],
+            description: 'What to send. Default: result.',
+          },
+        },
+        required: ['slug'],
+        additionalProperties: false,
+      },
+      execute: async (input) => {
+        const missing = needTrack();
+        if (missing) return textResult(missing);
+        const slug = typeof input.slug === 'string' ? input.slug.trim() : '';
+        const target = await resolveTool(slug);
+        if (!target) {
+          return textResult({ error: `"${slug}" is not a tool on this site. Call list_tools for the slugs.` });
+        }
+        const original = input.take === 'original';
+        const buffer = original ? this.buffers[0] : await this.produceBuffer();
+        if (!buffer) {
+          return textResult({
+            error: "This tool's result is not audio, so it cannot be sent on. Use export_download instead.",
+          });
+        }
+        const source = this.files[0]?.name ?? 'audio';
+        const name = original ? source : outputName(source, this.config.suffix, 'wav');
+        const blob = await exportAudio(buffer, 'wav', { bitDepth: this.bitDepth() });
+        await stashForNextTool(blob, name);
+        navigateSoon(target.url);
+        return textResult({
+          sentTo: target.slug,
+          opening: target.url,
+          file: { name, bytes: blob.size },
+          durationSec: round(buffer.duration),
+          note: 'Rendered losslessly and handed to the next tool. The page is opening it now; call inspect_audio there.',
+        });
+      },
+    });
+
+    tools.push({
+      name: 'load_audio_from_url',
+      description:
+        'Open an audio file from a public https:// URL or a data: URL on this page, as if the person had chosen it. The browser fetches it and it stays in the tab. Fails when the server does not allow cross-origin reads. For a file on the person\'s device, ask them to choose it instead.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          url: { type: 'string', description: 'https:// or data: URL of an audio file.' },
+        },
+        required: ['url'],
+        additionalProperties: false,
+      },
+      execute: async (input) => {
+        const url = typeof input.url === 'string' ? input.url.trim() : '';
+        if (!/^(https?:|data:)/i.test(url)) return textResult({ error: 'Give an https:// or data: URL.' });
+        let file: File;
+        try {
+          const response = await fetch(url);
+          if (!response.ok) return textResult({ error: `The server answered ${response.status} for that URL.` });
+          const blob = await response.blob();
+          const name = url.startsWith('data:')
+            ? 'audio'
+            : decodeURIComponent(new URL(url).pathname.split('/').pop() || 'audio');
+          file = new File([blob], name, { type: blob.type || 'audio/*' });
+        } catch (error) {
+          return textResult({
+            error: `Could not fetch that URL: ${error instanceof Error ? error.message : 'network error'}. The server may not allow cross-origin reads.`,
+          });
+        }
+        await this.load([file]);
+        if (this.files[0] !== file || this.buffers.length === 0) {
+          return textResult({ error: 'The file was fetched but could not be decoded as audio.' });
+        }
+        return textResult({ loaded: true, ...this.inspect() });
+      },
+    });
+
     if (this.config.selection) {
       tools.push({
         name: 'set_selection',
@@ -1544,8 +1644,21 @@ export class ToolRuntime {
         `[data-control="${param.control ?? key}"]`
       );
       if (!control) continue;
-      if (control.type === 'checkbox') control.checked = Boolean(value);
-      else control.value = String(value);
+      if (control instanceof HTMLSelectElement) {
+        const options = [...control.options].map((option) => option.value);
+        const wanted = String(value);
+        const chosen = options.includes(wanted)
+          ? wanted
+          : typeof value === 'number'
+            ? nearestOption(options, value)
+            : null;
+        if (chosen === null) continue;
+        control.value = chosen;
+      } else if (control.type === 'checkbox') {
+        control.checked = Boolean(value);
+      } else {
+        control.value = String(value);
+      }
       control.dispatchEvent(new Event('input', { bubbles: true }));
       control.dispatchEvent(new Event('change', { bubbles: true }));
     }
@@ -1887,10 +2000,15 @@ export class ToolRuntime {
     if (!chain || !this.lastOutput) return;
     chain.removeAttribute('hidden');
     chain.querySelectorAll<HTMLAnchorElement>('[data-chain-link]').forEach((link) => {
-      link.onclick = () => {
-        if (this.lastOutput) {
-          stashForNextTool(this.lastOutput.blob, this.lastOutput.name);
-        }
+      link.onclick = (event) => {
+        const output = this.lastOutput;
+        if (!output) return;
+        // The stash must be durable before the page unloads, so the click waits
+        // for it and then follows the link itself.
+        event.preventDefault();
+        void stashForNextTool(output.blob, output.name).then(() => {
+          window.location.assign(link.href);
+        });
       };
     });
   }

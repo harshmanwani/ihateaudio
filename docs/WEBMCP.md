@@ -23,13 +23,24 @@ transport, selection and export path, and the local DSP under
 | `src/lib/agent.ts` | The pure half: a tool's `agent` manifest, the JSON schema built from it, and the clamping that keeps agent values inside what the interface can represent. |
 | `src/lib/tool.ts` (additions) | The base agent tools every page gets, the manifest → WebMCP tool compiler, and the applier that lands values on the page's own controls and fires their events. |
 | `src/components/ToolShell.astro` | A status line, visible only in an agent browser, that says how many tools registered. |
+| `src/lib/site-tools.ts` | The site-level tools, on the homepage and every page: `list_tools` (the catalog) and `open_tool` (navigate). Replies before navigating so the host never loses a result. |
+| `src/lib/agent-catalog.ts`, `src/pages/agent-tools.json.ts` | The catalog an agent routes by, built at deploy time by reading each page's manifest, so action names cannot drift. |
+| `src/lib/files.ts` (hand-off) | The between-tools hand-off moved from memory to IndexedDB so it survives a page load. `send_to_tool` and the human "Keep going?" links both use it. |
+| `src/pages/index.astro` | The homepage registers the site-level tools and shows the agent status line. |
 | 33 page files | An `agent` manifest each, one named action per tool, from the trimmer to the stem splitter. |
-| `tests/unit/agent.test.ts`, `tests/unit/webmcp.test.ts`, `tests/e2e/agent-tools.spec.ts`, `tests/e2e/agent-manifests.spec.ts` | Unit tests for the schema and clamping, and browser tests that shim a WebMCP host, call the tools, and assert the visible controls moved. |
+| `tests/unit/agent*.test.ts`, `tests/unit/webmcp.test.ts`, `tests/e2e/agent-*.spec.ts` | Unit tests for the schema, clamping, select snapping and catalog extraction; browser tests that shim a WebMCP host on `document` and on `navigator`, call every action, assert the visible controls moved, and prove the hand-off between tools and loading from a URL. |
 
 `git log --since=2026-08-26 -- src/lib/webmcp.ts src/lib/agent.ts` shows the
 dated history.
 
 ## What an agent can do
+
+**On every page, including the homepage:**
+
+| Tool | Does |
+| --- | --- |
+| `list_tools` | Read-only. The whole catalog: each tool's slug, URL, summary, and the agent action it exposes. The agent picks the page for a request itself. |
+| `open_tool` | Navigate to a tool by slug. Replies first, then navigates; the new page registers its own tools. |
 
 **On every tool page**, with no per-page work:
 
@@ -40,6 +51,17 @@ dated history.
 | `set_output_format` | Choose the download format and, for lossy formats, the bitrate. |
 | `render_preview` | Render the result of the current settings into a listenable player under the controls. Nothing is saved. |
 | `export_download` | Render and start a browser download. Described as a side effect, for use only when the person has asked. |
+| `send_to_tool` | Render the result losslessly and hand it to another tool page, which loads it on arrival. No re-upload. `take: "original"` sends the file as loaded. |
+| `load_audio_from_url` | Open a public `https://` or `data:` URL as if the person had chosen it. The browser fetches it; it stays in the tab. |
+
+**A whole job from the homepage.** "Make this voice note podcast-ready" runs as:
+`list_tools` → `open_tool("audio-trimmer")` → the person chooses the file, once →
+`set_trim` → `send_to_tool("silence-remover")` → `set_silence_removal` →
+`send_to_tool("audio-normalizer")` → `set_loudness_target({ platform: "podcast" })` →
+`render_preview` → `export_download`. The person made one click and the
+judgment calls; the agent ran the pipeline across four pages. The only thing an
+agent cannot do is read a file off the person's disk, which is a browser rule
+and the privacy guarantee at once.
 
 **Per page**, one named action from the page's manifest (33 pages; the rest have no settable control and run on the base tools):
 

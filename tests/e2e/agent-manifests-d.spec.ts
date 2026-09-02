@@ -39,28 +39,28 @@ interface Case {
 const CASES: Case[] = [
   {
     path: '/stereo-widener',
-    count: 5,
+    count: 9,
     action: 'set_stereo_width',
     input: { width: 1.6 },
     settings: { width: '1.6' },
   },
   {
     path: '/tempo-changer',
-    count: 5,
+    count: 9,
     action: 'set_tempo',
     input: { tempoPercent: 75, bpm: 120 },
     settings: { tempo: '75', bpm: '120' },
   },
   {
     path: '/voice-changer',
-    count: 5,
+    count: 9,
     action: 'set_voice',
     input: { preset: 'telephone', semitones: -3 },
     settings: { preset: 'telephone', pitch: '-3' },
   },
   {
     path: '/waveform-generator',
-    count: 5,
+    count: 9,
     action: 'set_waveform_image',
     input: {
       style: 'line',
@@ -82,7 +82,7 @@ const CASES: Case[] = [
   },
   {
     path: '/wav-converter',
-    count: 5,
+    count: 9,
     action: 'set_wav_bit_depth',
     input: { bitDepth: '24' },
     settings: { bitdepth: '24' },
@@ -90,7 +90,7 @@ const CASES: Case[] = [
   },
   {
     path: '/audio-transcriber',
-    count: 5,
+    count: 9,
     action: 'set_transcript_layout',
     input: { paragraphs: false },
     settings: { paragraphs: 'false' },

@@ -131,3 +131,25 @@ export function titleFor(name: string): string {
   const [first = '', ...rest] = name.split('_').filter(Boolean);
   return [first.charAt(0).toUpperCase() + first.slice(1), ...rest].join(' ');
 }
+
+/**
+ * The option a select would land on for a number it has no exact match for.
+ *
+ * A `<select>` given a value it does not contain goes blank, which is worse
+ * than either refusing or rounding. Rounding to the nearest numeric option is
+ * what a person does when the bitrate they wanted is not in the list.
+ */
+export function nearestOption(options: string[], wanted: number): string | null {
+  let best: string | null = null;
+  let distance = Number.POSITIVE_INFINITY;
+  for (const option of options) {
+    const value = Number(option);
+    if (option.trim() === '' || !Number.isFinite(value)) continue;
+    const gap = Math.abs(value - wanted);
+    if (gap < distance) {
+      distance = gap;
+      best = option;
+    }
+  }
+  return best;
+}

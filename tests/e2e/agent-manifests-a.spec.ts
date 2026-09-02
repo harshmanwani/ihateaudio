@@ -38,7 +38,7 @@ interface Case {
 const CASES: Case[] = [
   {
     path: '/8d-audio-maker',
-    count: 5,
+    count: 9,
     action: 'set_8d_effect',
     input: { secondsPerTurn: 8, distance: 2 },
     settings: { speed: '8', radius: '2' },
@@ -46,14 +46,14 @@ const CASES: Case[] = [
   {
     // `selection` on ToolShell registers set_selection too, so one more tool.
     path: '/android-ringtone-maker',
-    count: 6,
+    count: 10,
     action: 'set_ringtone',
     input: { startSec: 0.5, endSec: 3, fadeOut: true, fadeSec: 1 },
     settings: { start: '0:00.50', end: '0:03.00', fadeout: 'true', fade: '1' },
   },
   {
     path: '/ringtone-maker',
-    count: 6,
+    count: 10,
     action: 'set_ringtone',
     input: { startSec: 1, endSec: 3.5, fadeOut: true, fadeSec: 2.5 },
     settings: { start: '0:01.00', end: '0:03.50', fadeout: 'true', fade: '2.5' },
@@ -61,7 +61,7 @@ const CASES: Case[] = [
   {
     // 100 kbps is not an MP3 choice; the page snaps it to the nearest one, 96.
     path: '/audio-compressor',
-    count: 5,
+    count: 9,
     action: 'set_compression',
     input: { bitrateKbps: 100, sampleRateHz: 16000, channels: 'mono' },
     settings: { bitrate: '96', rate: '16000' },
@@ -69,14 +69,14 @@ const CASES: Case[] = [
   },
   {
     path: '/audio-looper',
-    count: 5,
+    count: 9,
     action: 'set_loop',
     input: { repeats: 5, gapSec: 1.5 },
     settings: { times: '5', gap: '1.5' },
   },
   {
     path: '/audio-splitter',
-    count: 5,
+    count: 9,
     action: 'set_split',
     input: { method: 'silence', silenceThresholdDbfs: -40, minimumGapSec: 0.5 },
     settings: { threshold: '-40', gap: '0.5' },
@@ -84,7 +84,7 @@ const CASES: Case[] = [
   },
   {
     path: '/bass-booster',
-    count: 5,
+    count: 9,
     action: 'set_bass_boost',
     input: { amountDb: 9, cornerHz: 120, keepLevel: false },
     settings: { amount: '9', corner: '120', fit: 'false' },

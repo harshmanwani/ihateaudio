@@ -161,29 +161,76 @@ export function attachDropzone(
 /**
  * Hands a result to the next tool without a re-upload.
  *
- * sessionStorage only holds strings, so the blob lives in a module-level map
- * keyed by a token; same-tab navigation keeps the page context alive long
- * enough for the next tool to claim it.
+ * The blob goes into IndexedDB under a token, and the token into sessionStorage.
+ * Both survive a full page load on this origin, which is what following a link
+ * is. A module-level map keeps the same-document fast path. Nothing here leaves
+ * the browser: the next page claims the entry and deletes it.
  */
 const handoff = new Map<string, { blob: Blob; name: string }>();
 const HANDOFF_KEY = 'iha:handoff';
+const HANDOFF_DB = 'iha-handoff';
+const HANDOFF_STORE = 'files';
 
-export function stashForNextTool(blob: Blob, name: string): void {
+function openHandoffDb(): Promise<IDBDatabase> {
+  return new Promise((resolve, reject) => {
+    if (typeof indexedDB === 'undefined') {
+      reject(new Error('IndexedDB is unavailable'));
+      return;
+    }
+    const request = indexedDB.open(HANDOFF_DB, 1);
+    request.onupgradeneeded = () => {
+      if (!request.result.objectStoreNames.contains(HANDOFF_STORE)) {
+        request.result.createObjectStore(HANDOFF_STORE);
+      }
+    };
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error ?? new Error('IndexedDB failed to open'));
+  });
+}
+
+function withStore<T>(
+  mode: IDBTransactionMode,
+  run: (store: IDBObjectStore) => IDBRequest<T>
+): Promise<T> {
+  return openHandoffDb().then(
+    (db) =>
+      new Promise<T>((resolve, reject) => {
+        const tx = db.transaction(HANDOFF_STORE, mode);
+        const request = run(tx.objectStore(HANDOFF_STORE));
+        tx.oncomplete = () => {
+          db.close();
+          resolve(request.result);
+        };
+        tx.onerror = () => {
+          db.close();
+          reject(tx.error ?? new Error('IndexedDB transaction failed'));
+        };
+      })
+  );
+}
+
+/** Resolves once the entry is durable; navigate only after it does. */
+export async function stashForNextTool(blob: Blob, name: string): Promise<void> {
   const token = `h${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
   handoff.set(token, { blob, name });
+  (window as unknown as { __ihaHandoff?: typeof handoff }).__ihaHandoff = handoff;
   try {
     sessionStorage.setItem(HANDOFF_KEY, token);
   } catch {
     /* Private mode can block sessionStorage; chaining degrades to re-upload. */
   }
-  // Survives a same-document navigation within the tab.
-  (window as unknown as { __ihaHandoff?: typeof handoff }).__ihaHandoff = handoff;
+  try {
+    await withStore('readwrite', (store) => store.put({ blob, name, at: Date.now() }, token));
+  } catch {
+    /* Without IndexedDB the in-memory copy still serves a same-document navigation. */
+  }
 }
 
-export function claimHandoff(): File | null {
+export async function claimHandoff(): Promise<File | null> {
   let token: string | null = null;
   try {
     token = sessionStorage.getItem(HANDOFF_KEY);
+    if (token) sessionStorage.removeItem(HANDOFF_KEY);
   } catch {
     return null;
   }
@@ -191,15 +238,20 @@ export function claimHandoff(): File | null {
 
   const store =
     (window as unknown as { __ihaHandoff?: typeof handoff }).__ihaHandoff ?? handoff;
-  const entry = store.get(token);
+  let entry = store.get(token) ?? null;
+  store.delete(token);
 
-  try {
-    sessionStorage.removeItem(HANDOFF_KEY);
-  } catch {
-    /* Removal failing is harmless — the token is single-use by convention. */
+  if (!entry) {
+    try {
+      entry =
+        (await withStore<{ blob: Blob; name: string } | undefined>('readonly', (s) => s.get(token!))) ??
+        null;
+      if (entry) await withStore('readwrite', (s) => s.delete(token!));
+    } catch {
+      entry = null;
+    }
   }
   if (!entry) return null;
-  store.delete(token);
 
   return new File([entry.blob], entry.name, { type: entry.blob.type });
 }

@@ -43,14 +43,14 @@ const CASES: Case[] = [
   {
     path: '/bpm-detector',
     // Base tools, set_selection (the page passes `selection`), and the action.
-    count: 6,
+    count: 10,
     action: 'set_analysis_range',
     input: { selectionOnly: true },
     settings: { selected: 'true' },
   },
   {
     path: '/crossfade-joiner',
-    count: 5,
+    count: 9,
     action: 'set_crossfade',
     // Two 4-second files cap the slider at 2 s, so 1.5 lands as sent.
     input: { fadeSec: 1.5 },
@@ -59,7 +59,7 @@ const CASES: Case[] = [
   },
   {
     path: '/audio-joiner',
-    count: 5,
+    count: 9,
     action: 'set_join_gap',
     input: { gapSec: 1.5 },
     settings: { gap: '1.5' },
@@ -67,7 +67,7 @@ const CASES: Case[] = [
   },
   {
     path: '/dynamic-compressor',
-    count: 5,
+    count: 9,
     action: 'set_compressor',
     input: { thresholdDb: -24, ratio: 3.5, attackMs: 20, releaseMs: 250 },
     // Moving a slider by hand detaches the preset.
@@ -75,7 +75,7 @@ const CASES: Case[] = [
   },
   {
     path: '/echo-adder',
-    count: 5,
+    count: 9,
     action: 'set_echo',
     // The preset lands first and sets all three; the mix then overrides one.
     input: { preset: 'dub', mixPercent: 30 },
@@ -83,7 +83,7 @@ const CASES: Case[] = [
   },
   {
     path: '/equalizer',
-    count: 5,
+    count: 9,
     action: 'set_equalizer',
     // The bass preset lifts 60 Hz to +9; the band then moves 1 kHz and turns the
     // preset to custom, as a typed value would.
@@ -93,7 +93,7 @@ const CASES: Case[] = [
   },
   {
     path: '/nightcore-maker',
-    count: 5,
+    count: 9,
     action: 'set_nightcore',
     input: { preset: 'hyper' },
     settings: { rate: '1.4' },

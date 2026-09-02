@@ -35,21 +35,21 @@ interface Case {
 const CASES: Case[] = [
   {
     path: '/fade-in-out',
-    count: 5,
+    count: 9,
     action: 'set_fade',
     input: { fadeInSec: 1.5, fadeOutSec: 2, curve: 'linear' },
     settings: { in: '1.5', out: '2', curve: 'linear' },
   },
   {
     path: '/speed-changer',
-    count: 5,
+    count: 9,
     action: 'set_speed',
     input: { speed: 1.5, keepPitch: true },
     settings: { speed: '1.5', 'keep-pitch': 'true' },
   },
   {
     path: '/volume-booster',
-    count: 5,
+    count: 9,
     action: 'set_volume',
     input: { method: 'normalize', targetPeakDbfs: -3 },
     settings: { target: '-3' },
@@ -57,7 +57,7 @@ const CASES: Case[] = [
   },
   {
     path: '/audio-normalizer',
-    count: 5,
+    count: 9,
     action: 'set_loudness_target',
     input: { platform: 'custom', targetLufs: -16, ceilingDbtp: -2 },
     settings: { preset: 'custom', target: '-16', ceiling: '-2' },
