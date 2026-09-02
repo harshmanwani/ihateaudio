@@ -147,6 +147,24 @@ test.describe('site-level agent tools', () => {
     expect((inspection.audio as { durationSec: number }).durationSec).toBeCloseTo(3, 1);
   });
 
+  test('load_audio_from_url accepts a localhost URL, so an agent with a shell can serve a file', async ({
+    page,
+  }) => {
+    await shimHost(page);
+    await page.route('http://localhost:9977/attached.wav', (route) =>
+      route.fulfill({
+        body: wavBytes(2),
+        contentType: 'audio/wav',
+        headers: { 'access-control-allow-origin': '*' },
+      })
+    );
+    await page.goto('/audio-trimmer');
+    const loaded = await call(page, 'load_audio_from_url', { url: 'http://localhost:9977/attached.wav' });
+    expect(loaded.loaded).toBe(true);
+    await waitForWorkspace(page);
+    expect(((await call(page, 'inspect_audio')).file as { name: string }).name).toBe('attached.wav');
+  });
+
   test('load_audio_from_url reports a fetch failure instead of hanging', async ({ page }) => {
     await shimHost(page);
     await page.route('https://media.example/missing.wav', (route) => route.fulfill({ status: 404 }));

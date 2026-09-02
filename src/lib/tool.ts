@@ -1539,7 +1539,7 @@ export class ToolRuntime {
     tools.push({
       name: 'load_audio_from_url',
       description:
-        'Open an audio file from a public https:// URL or a data: URL on this page, as if the person had chosen it. The browser fetches it and it stays in the tab. Fails when the server does not allow cross-origin reads. For a file on the person\'s device, ask them to choose it instead.',
+        'Open an audio file by URL on this page, as if the person had chosen it: a public https:// URL, a data: URL, or an http://localhost URL served on this machine (an agent with a shell can serve a file the person attached and load it here). The browser fetches it and it stays in the tab. The server must allow cross-origin reads. Otherwise ask the person to choose the file.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -1550,7 +1550,11 @@ export class ToolRuntime {
       },
       execute: async (input) => {
         const url = typeof input.url === 'string' ? input.url.trim() : '';
-        if (!/^(https?:|data:)/i.test(url)) return textResult({ error: 'Give an https:// or data: URL.' });
+        // https for the open web, data: for inline bytes, and plain http only on
+        // this machine: an agent with a shell can serve a file the person handed
+        // it and point the page at it, which keeps the audio on the device.
+        const allowed = /^(https:|data:)/i.test(url) || /^http:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?\//i.test(url);
+        if (!allowed) return textResult({ error: 'Give an https:// URL, a data: URL, or an http://localhost URL.' });
         let file: File;
         try {
           const response = await fetch(url);

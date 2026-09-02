@@ -52,7 +52,7 @@ dated history.
 | `render_preview` | Render the result of the current settings into a listenable player under the controls. Nothing is saved. |
 | `export_download` | Render and start a browser download. Described as a side effect, for use only when the person has asked. |
 | `send_to_tool` | Render the result losslessly and hand it to another tool page, which loads it on arrival. No re-upload. `take: "original"` sends the file as loaded. |
-| `load_audio_from_url` | Open a public `https://` or `data:` URL as if the person had chosen it. The browser fetches it; it stays in the tab. |
+| `load_audio_from_url` | Open a public `https://` URL, a `data:` URL, or an `http://localhost` URL as if the person had chosen it. The browser fetches it; it stays in the tab. An agent with a shell can serve an attached file locally and load it, which makes the whole job hands-free. |
 
 **A whole job from the homepage.** "Make this voice note podcast-ready" runs as:
 `list_tools` → `open_tool("audio-trimmer")` → the person chooses the file, once →
