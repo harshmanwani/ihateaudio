@@ -408,6 +408,37 @@ const faq = [
     suffix: 'tightened',
     defaultFormat: 'mp3',
 
+    agent: {
+      name: 'set_silence_removal',
+      description:
+        'Set how quiet gaps are detected and removed: the silence threshold in dBFS, the shortest gap that counts, and the padding kept on each side of a cut. The report under the sliders and the highlights on the waveform update at once; nothing is saved.',
+      params: [
+        {
+          key: 'threshold',
+          description: 'Audio below this level, in dBFS, counts as silence. -70 to -20.',
+          type: 'number',
+          min: -70,
+          max: -20,
+        },
+        {
+          key: 'minimumGapSec',
+          control: 'min',
+          description: 'Ignore gaps shorter than this many seconds. 0.1 to 3.',
+          type: 'number',
+          min: 0.1,
+          max: 3,
+        },
+        {
+          key: 'paddingSec',
+          control: 'pad',
+          description: 'Seconds of quiet kept on each side of a cut. 0 to 0.5.',
+          type: 'number',
+          min: 0,
+          max: 0.5,
+        },
+      ],
+    },
+
     onReady(ctx, runtime) {
       const root = runtime.root;
       const report = root.querySelector<HTMLElement>('[data-report]');

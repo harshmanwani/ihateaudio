@@ -31,6 +31,14 @@ import {
 import { timecode, filesize, outputName, baseName, duration as fmtDuration } from './format';
 import { track, durationBucket } from './track';
 import { mountStemPanel } from './ai/stem-panel';
+import { registerSiteTools, type SiteTool } from './webmcp';
+import {
+  coerceParams,
+  schemaFor,
+  textResult,
+  type AgentManifest,
+  type ParamValue,
+} from './agent';
 
 export interface Selection {
   start: number;
@@ -87,10 +95,21 @@ export interface ToolConfig {
   preview?: (ctx: ToolContext) => Promise<AudioBuffer> | AudioBuffer;
   /** Name on the result strip's row, e.g. "Equalised". Defaults to "Preview". */
   previewLabel?: string;
+  /**
+   * Describes this tool's own controls to an agent.
+   *
+   * The base tools — inspect, selection, format, preview, export — register on
+   * every page without this. The manifest adds the one action that is specific
+   * to the tool, named for what it does rather than for the control it moves.
+   */
+  agent?: AgentManifest;
 }
 
 const $ = <T extends HTMLElement>(root: ParentNode, selector: string): T | null =>
   root.querySelector<T>(selector);
+
+/** Three decimals is a millisecond, which is as fine as any control here goes. */
+const round = (value: number): number => Math.round(value * 1000) / 1000;
 
 export class ToolRuntime {
   readonly root: HTMLElement;
@@ -288,6 +307,7 @@ export class ToolRuntime {
     this.setupKeyboard();
     this.setupMarkers();
     this.setupFloatingExport();
+    void this.registerAgentTools();
 
     // A file handed over by the previous tool loads with no upload step.
     const handed = claimHandoff();
@@ -1263,6 +1283,270 @@ export class ToolRuntime {
       .catch(() => {
         /* Preview is a convenience; export remains the source of truth. */
       });
+  }
+
+  /**
+   * Renders what the tool would export into the result strip, without saving.
+   *
+   * Resolves once the player is actually mounted, so an agent never claims a
+   * preview exists before it does. Pages without a `preview` fall back to
+   * `process`, which is the honest preview: the exact output.
+   */
+  async renderPreview(): Promise<boolean> {
+    if (this.buffers.length === 0) return false;
+    const produce = this.config.preview ?? this.config.process;
+    try {
+      const result = await Promise.resolve(produce(this.context()));
+      const buffer =
+        result instanceof AudioBuffer
+          ? result
+          : result &&
+              typeof result === 'object' &&
+              'buffer' in result &&
+              (result as { buffer?: unknown }).buffer instanceof AudioBuffer
+            ? (result as { buffer: AudioBuffer }).buffer
+            : null;
+      if (!buffer) return false;
+      this.showResult(buffer, this.config.previewLabel ?? 'Preview');
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Sets the export format through the same path a person uses in the select,
+   * so the UI stays the single source of truth rather than an agent holding a
+   * hidden second setting.
+   */
+  setFormat(id: string): boolean {
+    const select = this.el.format;
+    if (!select) return false;
+
+    try {
+      const spec = formatById(id);
+      if (this.config.formats && !this.config.formats.includes(spec.id)) return false;
+      select.value = spec.id;
+      if (select.value !== spec.id) return false;
+      this.onFormatChange();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  // ---------- agent tools ----------
+
+  /**
+   * What an agent sees of this page: narrow WebMCP tools that move the same
+   * controls a person does. Registered only where a host exists, so an ordinary
+   * browser never knows this ran.
+   */
+  private async registerAgentTools(): Promise<void> {
+    const result = await registerSiteTools(this.agentTools());
+    const status = this.root.querySelector<HTMLElement>('[data-agent-status]');
+    if (!status || !result.supported) return;
+    status.textContent = result.error
+      ? 'Agent tools could not register'
+      : `${result.registered} agent tools ready`;
+    status.hidden = false;
+  }
+
+  /** Derived facts only. Never the samples, never the file contents. */
+  private inspect(): Record<string, unknown> {
+    const buffer = this.buffers[0];
+    const file = this.files[0];
+    return {
+      ready: Boolean(buffer),
+      tool: {
+        slug: this.root.dataset.slug ?? '',
+        name: document.querySelector('h1')?.textContent?.trim() ?? '',
+      },
+      file: file ? { name: file.name, bytes: file.size, type: file.type || 'unknown' } : null,
+      audio: buffer
+        ? {
+            durationSec: round(buffer.duration),
+            sampleRateHz: buffer.sampleRate,
+            channels: buffer.numberOfChannels,
+          }
+        : null,
+      selection:
+        this.config.selection && buffer
+          ? { startSec: round(this.selection.start), endSec: round(this.selection.end) }
+          : null,
+      settings: this.values(),
+      format: { id: this.getFormat(), bitrateKbps: this.bitrate() },
+    };
+  }
+
+  private agentTools(): SiteTool[] {
+    const noInput = { type: 'object', properties: {}, additionalProperties: false } as const;
+    const formatIds = FORMATS.map((format) => format.id);
+    const needTrack = (): Record<string, unknown> | null =>
+      this.buffers.length > 0
+        ? null
+        : { error: 'No audio is loaded. Ask the person to choose a file on this page first.' };
+
+    const tools: SiteTool[] = [
+      {
+        name: 'inspect_audio',
+        description:
+          'Read derived facts about the audio loaded on this page: duration, channels, sample rate, the current selection, every visible setting and the export format. Never returns audio samples or file contents.',
+        inputSchema: noInput,
+        annotations: { readOnlyHint: true },
+        execute: () => textResult(this.inspect()),
+      },
+      {
+        name: 'set_output_format',
+        description:
+          'Choose the download format shown in the export bar, and optionally the bitrate for lossy formats. Changes a visible control only; nothing is rendered or saved.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            format: { type: 'string', enum: formatIds, description: 'Output format id.' },
+            bitrateKbps: { type: 'number', description: 'Bitrate for lossy formats, in kbps.' },
+          },
+          additionalProperties: false,
+        },
+        execute: (input) => {
+          if (typeof input.format === 'string' && !this.setFormat(input.format)) {
+            return textResult({
+              error: `"${input.format}" is not an available format on this page.`,
+              format: this.inspect().format,
+            });
+          }
+          if (typeof input.bitrateKbps === 'number' && this.el.quality) {
+            this.el.quality.value = String(input.bitrateKbps);
+            this.el.quality.dispatchEvent(new Event('change', { bubbles: true }));
+          }
+          return textResult({ updated: true, format: this.inspect().format });
+        },
+      },
+      {
+        name: 'render_preview',
+        description:
+          'Render the result of the current settings locally and show it as a listenable player below the controls. Does not download, upload or replace the original.',
+        inputSchema: noInput,
+        execute: async () => {
+          const missing = needTrack();
+          if (missing) return textResult(missing);
+          const ok = await this.renderPreview();
+          return textResult(
+            ok
+              ? {
+                  previewReady: true,
+                  note: 'A local preview is visible below the controls. The original is unchanged.',
+                }
+              : { error: 'This tool cannot render a preview of its output.' }
+          );
+        },
+      },
+      {
+        name: 'export_download',
+        description:
+          'Render the result with the current settings and start a browser download. This saves a file on the device: use it only after the person has asked for the export.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            format: {
+              type: 'string',
+              enum: formatIds,
+              description: 'Download format. Default: the format shown in the export bar.',
+            },
+          },
+          additionalProperties: false,
+        },
+        execute: async (input) => {
+          const missing = needTrack();
+          if (missing) return textResult(missing);
+          if (typeof input.format === 'string' && !this.setFormat(input.format)) {
+            return textResult({ error: `"${input.format}" is not an available format on this page.` });
+          }
+          await this.run();
+          return textResult({
+            exportStarted: true,
+            format: this.inspect().format,
+            note: 'Rendered locally and handed to the browser download. The original is unchanged.',
+          });
+        },
+      },
+    ];
+
+    if (this.config.selection) {
+      tools.push({
+        name: 'set_selection',
+        description:
+          'Move the selection handles on the waveform, in seconds from the start of the file. The page clamps the values to the file.',
+        inputSchema: {
+          type: 'object',
+          properties: {
+            startSec: { type: 'number', minimum: 0, description: 'Selection start.' },
+            endSec: { type: 'number', minimum: 0, description: 'Selection end.' },
+          },
+          additionalProperties: false,
+        },
+        execute: (input) => {
+          const missing = needTrack();
+          if (missing) return textResult(missing);
+          const current = this.getSelection();
+          const num = (value: unknown, fallback: number): number =>
+            typeof value === 'number' && Number.isFinite(value) ? value : fallback;
+          this.setSelection({
+            start: num(input.startSec, current.start),
+            end: num(input.endSec, current.end),
+          });
+          return textResult({ updated: true, selection: this.inspect().selection });
+        },
+      });
+    }
+
+    const manifest = this.config.agent;
+    if (manifest) {
+      tools.push({
+        name: manifest.name,
+        description: manifest.description,
+        inputSchema: schemaFor(manifest),
+        execute: (input) => {
+          const missing = needTrack();
+          if (missing) return textResult(missing);
+          const { values, ignored } = coerceParams(manifest, input);
+          this.applyAgentValues(manifest, values);
+          const view = this.inspect();
+          return textResult({
+            applied: values,
+            ignored,
+            settings: view.settings,
+            selection: view.selection,
+          });
+        },
+      });
+    }
+
+    return tools;
+  }
+
+  /**
+   * Lands each value on the control a person would have used, and fires the
+   * same events, so the page's own listeners — live reports, mirrored number
+   * fields, previews — run exactly as they do for a drag.
+   */
+  private applyAgentValues(manifest: AgentManifest, values: Record<string, ParamValue>): void {
+    for (const [key, value] of Object.entries(values)) {
+      const param = manifest.params.find((candidate) => candidate.key === key);
+      if (!param) continue;
+      if (param.apply) {
+        param.apply(value, this);
+        continue;
+      }
+      const control = this.root.querySelector<HTMLInputElement>(
+        `[data-control="${param.control ?? key}"]`
+      );
+      if (!control) continue;
+      if (control.type === 'checkbox') control.checked = Boolean(value);
+      else control.value = String(value);
+      control.dispatchEvent(new Event('input', { bubbles: true }));
+      control.dispatchEvent(new Event('change', { bubbles: true }));
+    }
   }
 
   // ---------- export ----------

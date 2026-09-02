@@ -94,6 +94,8 @@ const formats = video
         <Icon name="shield-check" size={14} />
         {PRIVACY_LINE}
       </span>
+      {/* Filled in by the runtime only in a browser that hosts WebMCP. */}
+      <span class="drop__agent" data-agent-status role="status" hidden></span>
     </div>
     <input type="file" data-file-input tabindex="-1" aria-hidden="true" />
   </div>

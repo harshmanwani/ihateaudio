@@ -162,6 +162,43 @@ const faq = [
     selection: true,
     defaultFormat: 'mp3',
 
+    agent: {
+      name: 'set_trim',
+      description:
+        'Set what the trimmer does: the start and end of the selection in seconds, whether to keep that selection or cut it out and join the rest, and whether to fade the new edges. Moves the visible controls only; nothing is saved.',
+      params: [
+        {
+          key: 'startSec',
+          description: 'Selection start, in seconds from the start of the file.',
+          type: 'number',
+          min: 0,
+          apply: (value, runtime) =>
+            runtime.setSelection({ start: Number(value), end: runtime.getSelection().end }),
+        },
+        {
+          key: 'endSec',
+          description: 'Selection end, in seconds from the start of the file.',
+          type: 'number',
+          min: 0,
+          apply: (value, runtime) =>
+            runtime.setSelection({ start: runtime.getSelection().start, end: Number(value) }),
+        },
+        {
+          key: 'mode',
+          description: '"keep" exports only the selection; "cut" removes it and joins the rest.',
+          type: 'string',
+          enum: ['keep', 'cut'],
+          apply: (value, runtime) =>
+            runtime.root.querySelector<HTMLButtonElement>(`[data-mode="${value}"]`)?.click(),
+        },
+        {
+          key: 'fade',
+          description: 'Fade the new edges for 20 ms so a cut never clicks.',
+          type: 'boolean',
+        },
+      ],
+    },
+
     onReady(ctx, runtime) {
       const root = runtime.root;
       const startInput = root.querySelector<HTMLInputElement>('[data-control="start"]');
