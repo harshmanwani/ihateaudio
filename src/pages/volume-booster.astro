@@ -393,6 +393,39 @@ const faq = [
     suffix: 'louder',
     defaultFormat: 'mp3',
 
+    agent: {
+      name: 'set_volume',
+      description:
+        'Set how the level changes: boost by a fixed number of decibels, or normalize the loudest peak to a target. The headroom meter, the clipping warning and the preview update at once; nothing is saved.',
+      params: [
+        {
+          key: 'method',
+          description:
+            '"boost" adds a fixed gain to everything; "normalize" measures the loudest sample and moves it exactly to the target peak, so it can never clip.',
+          type: 'string',
+          enum: ['boost', 'normalize'],
+          apply: (value, runtime) =>
+            runtime.root.querySelector<HTMLButtonElement>(`[data-mode="${value}"]`)?.click(),
+        },
+        {
+          key: 'gainDb',
+          control: 'gain',
+          description: 'Boost in decibels for the boost method. -20 to 30; +6 doubles the waveform, +20 multiplies it by ten.',
+          type: 'number',
+          min: -20,
+          max: 30,
+        },
+        {
+          key: 'targetPeakDbfs',
+          control: 'target',
+          description: 'Target peak in dBFS for the normalize method. -12 to 0; -1 leaves room for the encoder.',
+          type: 'number',
+          min: -12,
+          max: 0,
+        },
+      ],
+    },
+
     onReady(ctx, runtime) {
       const root = runtime.root;
       sourcePeak = peakDb(ctx.buffer);

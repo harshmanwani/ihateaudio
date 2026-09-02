@@ -551,6 +551,38 @@ const faq = [
     suffix: 'normalized',
     defaultFormat: 'mp3',
 
+    agent: {
+      name: 'set_loudness_target',
+      description:
+        'Set the delivery target: pick a platform preset, or set the integrated loudness target in LUFS and the true-peak ceiling in dBTP by hand. The travel drawing, the plan text and the preview update at once; nothing is saved.',
+      params: [
+        {
+          key: 'platform',
+          control: 'preset',
+          description:
+            'A published delivery preset that sets both target and ceiling: spotify, apple, youtube, amazon or tidal (-14 LUFS); podcast or aes (-16); ebu broadcast (-23); or custom to set the numbers by hand.',
+          type: 'string',
+          enum: ['spotify', 'apple', 'youtube', 'amazon', 'tidal', 'podcast', 'aes', 'ebu', 'custom'],
+        },
+        {
+          key: 'targetLufs',
+          control: 'target',
+          description: 'Integrated loudness target in LUFS, -30 to -6. Setting this switches the platform to custom.',
+          type: 'number',
+          min: -30,
+          max: -6,
+        },
+        {
+          key: 'ceilingDbtp',
+          control: 'ceiling',
+          description: 'True-peak ceiling in dBTP, -6 to 0. Gain stops here even if the target is not reached.',
+          type: 'number',
+          min: -6,
+          max: 0,
+        },
+      ],
+    },
+
     onReady(ctx, runtime) {
       const root = runtime.root;
       measured = measureLoudness(ctx.buffer);

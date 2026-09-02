@@ -424,6 +424,28 @@ const faq = [
     suffix: 'speed',
     defaultFormat: 'mp3',
 
+    agent: {
+      name: 'set_speed',
+      description:
+        'Set the playback speed multiplier and whether the pitch is held. 1 is the original. The new-length and pitch readouts and the preview update at once; nothing is saved.',
+      params: [
+        {
+          key: 'speed',
+          description: 'Speed multiplier, 0.25 to 4. Below 1 is slower, above 1 is faster; 2 is double speed.',
+          type: 'number',
+          min: 0.25,
+          max: 4,
+        },
+        {
+          key: 'keepPitch',
+          control: 'keep-pitch',
+          description:
+            'Hold the original pitch by time-stretching, instead of letting it rise and fall with the speed like a record. Rendered on download, not previewed.',
+          type: 'boolean',
+        },
+      ],
+    },
+
     onReady(ctx, runtime) {
       sourceDuration = ctx.buffer.duration;
       const root = runtime.root;

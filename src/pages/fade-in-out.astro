@@ -228,6 +228,37 @@ const faq = [
     suffix: 'faded',
     defaultFormat: 'mp3',
 
+    agent: {
+      name: 'set_fade',
+      description:
+        'Set the fade-in and fade-out lengths in seconds and the shape of the ramp. The envelope drawing and the faded preview under the controls update at once; nothing is saved.',
+      params: [
+        {
+          key: 'fadeInSec',
+          control: 'in',
+          description: 'Fade-in length in seconds from the first sample. 0 to 30, capped at the file length.',
+          type: 'number',
+          min: 0,
+          max: 30,
+        },
+        {
+          key: 'fadeOutSec',
+          control: 'out',
+          description: 'Fade-out length in seconds to the last sample. 0 to 30, capped at the file length.',
+          type: 'number',
+          min: 0,
+          max: 30,
+        },
+        {
+          key: 'curve',
+          description:
+            'Shape of the ramp: linear; scurve (flat at both ends, the safe default over a second); exponential (sinks away, leaves a tail); logarithmic (moves early, for fade-ins).',
+          type: 'string',
+          enum: ['linear', 'scurve', 'exponential', 'logarithmic'],
+        },
+      ],
+    },
+
     onReady(ctx, runtime) {
       const root = runtime.root;
 
