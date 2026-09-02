@@ -165,7 +165,7 @@ const faq = [
     agent: {
       name: 'set_trim',
       description:
-        'Set what the trimmer does: the start and end of the selection in seconds, whether to keep that selection or cut it out and join the rest, and whether to fade the new edges. Moves the visible controls only; nothing is saved.',
+        'Trim, cut or clip the loaded audio: set the start and end of the selection in seconds, whether to keep that selection or cut it out and join the rest, and whether to fade the new edges. Example: the first 30 seconds is startSec 0, endSec 30, mode keep. Moves the visible controls only; nothing is saved until export_download is called.',
       params: [
         {
           key: 'startSec',

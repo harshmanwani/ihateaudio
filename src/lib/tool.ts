@@ -1392,7 +1392,7 @@ export class ToolRuntime {
       {
         name: 'inspect_audio',
         description:
-          'Read derived facts about the audio loaded on this page: duration, channels, sample rate, the current selection, every visible setting and the export format. Never returns audio samples or file contents.',
+          'Call this first. Read derived facts about the audio loaded on this page: whether a file is loaded, its duration, channels and sample rate, the current selection, every visible setting and the export format. Never returns audio samples or file contents.',
         inputSchema: noInput,
         annotations: { readOnlyHint: true },
         execute: () => textResult(this.inspect()),
@@ -1445,7 +1445,7 @@ export class ToolRuntime {
       {
         name: 'export_download',
         description:
-          'Render the result with the current settings and start a browser download. This saves a file on the device: use it only after the person has asked for the export.',
+          'Finish the job: render the result with the current settings and start a browser download of the edited audio. This saves a file on the device, so call it only after the person has asked for the export or the trimmed file.',
         inputSchema: {
           type: 'object',
           properties: {
