@@ -192,6 +192,35 @@ const faq = [
     suffix: 'nightcore',
     defaultFormat: 'mp3',
 
+    agent: {
+      name: 'set_nightcore',
+      description:
+        'Set the nightcore rate, 1.15 to 1.45, where speed and pitch rise together; 1.25 is the classic sound. Or pick a preset: subtle (1.15), classic (1.25) or hyper (1.4). The rate, pitch-rise and new-length readouts and the preview update at once; nothing is saved.',
+      params: [
+        {
+          key: 'rate',
+          control: 'rate',
+          description:
+            'Playback rate multiplier, 1.15 to 1.45 in steps of 0.01. 1.25 raises the pitch about 3.9 semitones; 1.4 about 5.8.',
+          type: 'number',
+          min: 1.15,
+          max: 1.45,
+        },
+        {
+          key: 'preset',
+          description: 'A named rate: subtle is 1.15, classic is 1.25, hyper is 1.4.',
+          type: 'string',
+          enum: ['subtle', 'classic', 'hyper'],
+          apply: (value, runtime) => {
+            const rates: Record<string, string> = { subtle: '1.15', classic: '1.25', hyper: '1.4' };
+            runtime.root
+              .querySelector<HTMLButtonElement>(`[data-preset="${rates[String(value)]}"]`)
+              ?.click();
+          },
+        },
+      ],
+    },
+
     onReady(ctx, runtime) {
       sourceDuration = ctx.buffer.duration;
       const root = runtime.root;

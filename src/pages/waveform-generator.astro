@@ -239,6 +239,64 @@ const presets = [
     suffix: 'waveform',
     stage: false,
 
+    agent: {
+      name: 'set_waveform_image',
+      description:
+        'Set the PNG drawn from the loaded audio: a size preset or an exact width and height in pixels, the bars, filled or line style, the waveform and background colours as hex, and whether the background is transparent. The preview image, which is the exact file the Download PNG button saves, redraws at once; nothing is saved. Setting widthPx or heightPx switches the preset to custom, so send a preset on its own.',
+      params: [
+        {
+          key: 'preset',
+          description:
+            'A size preset that fills in the width and height: 1600x400 banner, 1080x1080 square post, 1920x1080 video frame, 1200x630 link preview, 800x200 small strip, or custom.',
+          type: 'string',
+          enum: ['1600x400', '1080x1080', '1920x1080', '1200x630', '800x200', 'custom'],
+        },
+        {
+          key: 'widthPx',
+          control: 'width',
+          description: 'Image width in pixels, 200 to 4000 in steps of 10.',
+          type: 'number',
+          min: 200,
+          max: 4000,
+        },
+        {
+          key: 'heightPx',
+          control: 'height',
+          description: 'Image height in pixels, 80 to 4000 in steps of 10.',
+          type: 'number',
+          min: 80,
+          max: 4000,
+        },
+        {
+          key: 'style',
+          description:
+            'bars draws one rounded column per slice and reads best small; filled draws one solid shape and suits large sizes; line traces only the upper envelope and suits overlays.',
+          type: 'string',
+          enum: ['bars', 'filled', 'line'],
+          apply: (value, runtime) =>
+            runtime.root.querySelector<HTMLButtonElement>(`[data-style="${value}"]`)?.click(),
+        },
+        {
+          key: 'waveColor',
+          control: 'wave',
+          description: 'Waveform colour as a six-digit hex string, for example #5bbf94.',
+          type: 'string',
+        },
+        {
+          key: 'backgroundColor',
+          control: 'background',
+          description:
+            'Background colour as a six-digit hex string, for example #0e1512. Ignored while transparent is on.',
+          type: 'string',
+        },
+        {
+          key: 'transparent',
+          description: 'Leave the background unpainted so the PNG composites over video or a design.',
+          type: 'boolean',
+        },
+      ],
+    },
+
     onReady(ctx, runtime) {
       const root = runtime.root;
       buffer = ctx.buffer;

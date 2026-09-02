@@ -392,6 +392,23 @@ const faq = [
     multiple: true,
     defaultFormat: 'mp3',
 
+    agent: {
+      name: 'set_crossfade',
+      description:
+        'Set the crossfade length in seconds for every join between the loaded files, 0.1 to 12. The page caps it at half the length of the shortest file, so the value that lands may be lower. The join diagram and the running total update at once; nothing is saved until export_download is called.',
+      params: [
+        {
+          key: 'fadeSec',
+          control: 'fade',
+          description:
+            'Overlap at each join, in seconds, 0.1 to 12. Four to twelve suits beat-matched music, 0.3 to 1 suits speech.',
+          type: 'number',
+          min: 0.1,
+          max: 12,
+        },
+      ],
+    },
+
     onReady(ctx, runtime) {
       const root = runtime.root;
       const list = root.querySelector<HTMLElement>('[data-list]');

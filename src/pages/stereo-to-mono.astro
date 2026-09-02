@@ -476,6 +476,23 @@ const faq = [
     suffix: 'mono',
     defaultFormat: 'mp3',
 
+    agent: {
+      name: 'set_channel_mode',
+      description:
+        'Choose the channel conversion: fold stereo down to mono, duplicate mono into a stereo pair, or split a stereo file into two separate single-channel files. Modes that do not fit the loaded file are disabled and the choice is ignored, so read channels from inspect_audio first: mono needs 2 or more channels, stereo needs exactly 1, split needs 2 or more. The downmix report and the preview update at once; nothing is saved.',
+      params: [
+        {
+          key: 'mode',
+          description:
+            '"mono" folds every channel down to one; "stereo" writes a mono file into two identical channels; "split" exports the left and right channels as two files.',
+          type: 'string',
+          enum: ['mono', 'stereo', 'split'],
+          apply: (value, runtime) =>
+            runtime.root.querySelector<HTMLButtonElement>(`[data-mode="${value}"]`)?.click(),
+        },
+      ],
+    },
+
     onReady(ctx, runtime) {
       const root = runtime.root;
       const channels = ctx.buffer.numberOfChannels;

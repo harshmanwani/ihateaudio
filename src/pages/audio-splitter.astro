@@ -297,6 +297,54 @@ const faq = [
     suffix: 'part',
     defaultFormat: 'mp3',
     markers: true,
+    agent: {
+      name: 'set_split',
+      description:
+        'Choose where the cuts go: a fixed number of equal parts, a fixed length for every part, or one cut in the middle of each silent gap. Each method reads only its own knobs. The cut markers on the waveform and the plan text update at once; nothing is saved until export_download is called, which downloads one file per part.',
+      params: [
+        {
+          key: 'method',
+          description:
+            '"equal" splits into a fixed number of parts; "length" makes every part a fixed length with a shorter remainder at the end; "silence" cuts at every gap quieter than the threshold.',
+          type: 'string',
+          enum: ['equal', 'length', 'silence'],
+          apply: (value, runtime) =>
+            runtime.root.querySelector<HTMLButtonElement>(`[data-mode="${value}"]`)?.click(),
+        },
+        {
+          key: 'parts',
+          description: 'Number of equal parts for the equal method, 2 to 40.',
+          type: 'number',
+          min: 2,
+          max: 40,
+        },
+        {
+          key: 'partLengthSec',
+          control: 'length',
+          description: 'Length of each part in seconds for the length method, 5 to 900 in steps of 5.',
+          type: 'number',
+          min: 5,
+          max: 900,
+        },
+        {
+          key: 'silenceThresholdDbfs',
+          control: 'threshold',
+          description:
+            'Audio below this level in dBFS counts as silence for the silence method, -70 to -20. Room tone sits near -50, so -45 catches it.',
+          type: 'number',
+          min: -70,
+          max: -20,
+        },
+        {
+          key: 'minimumGapSec',
+          control: 'gap',
+          description: 'A gap must last at least this many seconds to earn a cut, 0.3 to 5.',
+          type: 'number',
+          min: 0.3,
+          max: 5,
+        },
+      ],
+    },
 
     onReady(ctx, runtime) {
       const root = runtime.root;

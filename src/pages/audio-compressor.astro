@@ -432,10 +432,61 @@ const faq = [
     return STEPS.find((step) => step >= raw) ?? STEPS[STEPS.length - 1]!;
   }
 
+  /**
+   * Lands a number on the nearest option of a select, then fires its change
+   * listener, so an agent asking for 100 kbps gets 96 rather than an empty box.
+   */
+  function snapSelect(root: HTMLElement, name: string, wanted: number): void {
+    const select = root.querySelector<HTMLSelectElement>(`[data-control="${name}"]`);
+    if (!select || select.options.length === 0) return;
+    let best = select.options[0]!.value;
+    for (const option of Array.from(select.options)) {
+      if (Math.abs(Number(option.value) - wanted) < Math.abs(Number(best) - wanted)) {
+        best = option.value;
+      }
+    }
+    select.value = best;
+    select.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+
   const tool = createTool({
     suffix: 'smaller',
     defaultFormat: 'mp3',
     formats: ['mp3', 'm4a', 'ogg', 'opus'],
+    agent: {
+      name: 'set_compression',
+      description:
+        'Shrink the file: set the target bitrate in kbps, which is the one control that changes the byte count, and optionally lower the sample rate or fold the audio to mono so the encoder has less to describe at that bitrate. The size plot, the projected output size and the export bar update at once; nothing is saved.',
+      params: [
+        {
+          key: 'bitrateKbps',
+          description:
+            'Target bitrate in kbps, snapped to the nearest choice the export format offers: 64 to 320 for MP3, 32 to 192 for Opus. 64 mono is fine for speech; 128 is where most people stop noticing on music.',
+          type: 'number',
+          min: 32,
+          max: 320,
+          apply: (value, runtime) => snapSelect(runtime.root, 'bitrate', Number(value)),
+        },
+        {
+          key: 'sampleRateHz',
+          description:
+            'Output sample rate in Hz, snapped to the nearest choice: 8000, 11025, 16000, 22050, 32000, 44100 or 48000. 0 keeps the original. Does not change the byte count; it buys quality at the same bitrate.',
+          type: 'number',
+          min: 0,
+          max: 48000,
+          apply: (value, runtime) => snapSelect(runtime.root, 'rate', Number(value)),
+        },
+        {
+          key: 'channels',
+          description:
+            '"keep" leaves the channel count alone; "mono" folds stereo down so the encoder spends every bit on one channel. Use mono for speech, not music.',
+          type: 'string',
+          enum: ['keep', 'mono'],
+          apply: (value, runtime) =>
+            runtime.root.querySelector<HTMLButtonElement>(`[data-channels="${value}"]`)?.click(),
+        },
+      ],
+    },
 
     onReady(ctx) {
       source = { buffer: ctx.buffer, bytes: ctx.files[0]?.size ?? 0 };

@@ -109,7 +109,7 @@ Every tool page registers a small set of WebMCP site tools when the browser
 hosts the API — ChatGPT's in-app browser (`document.modelContext`) or Chrome
 with WebMCP enabled (`navigator.modelContext`). An agent can inspect the loaded
 audio, move the selection, set the format, render a preview and, on request,
-export. Six pages also declare one named action for their own controls, so
+export. Thirty-three pages also declare one named action for their own controls, so
 "tighten the pauses at −45 dB" lands on the same sliders a person drags. The
 audio never leaves the tab; an agent receives numbers and settings, not samples.
 

@@ -23,7 +23,7 @@ transport, selection and export path, and the local DSP under
 | `src/lib/agent.ts` | The pure half: a tool's `agent` manifest, the JSON schema built from it, and the clamping that keeps agent values inside what the interface can represent. |
 | `src/lib/tool.ts` (additions) | The base agent tools every page gets, the manifest → WebMCP tool compiler, and the applier that lands values on the page's own controls and fires their events. |
 | `src/components/ToolShell.astro` | A status line, visible only in an agent browser, that says how many tools registered. |
-| Six page files | An `agent` manifest each: trimmer, silence remover, fade, speed changer, volume booster, loudness normalizer. |
+| 33 page files | An `agent` manifest each, one named action per tool, from the trimmer to the stem splitter. |
 | `tests/unit/agent.test.ts`, `tests/unit/webmcp.test.ts`, `tests/e2e/agent-tools.spec.ts`, `tests/e2e/agent-manifests.spec.ts` | Unit tests for the schema and clamping, and browser tests that shim a WebMCP host, call the tools, and assert the visible controls moved. |
 
 `git log --since=2026-08-26 -- src/lib/webmcp.ts src/lib/agent.ts` shows the
@@ -41,16 +41,43 @@ dated history.
 | `render_preview` | Render the result of the current settings into a listenable player under the controls. Nothing is saved. |
 | `export_download` | Render and start a browser download. Described as a side effect, for use only when the person has asked. |
 
-**Per page**, one named action from the page's manifest:
+**Per page**, one named action from the page's manifest (33 pages; the rest have no settable control and run on the base tools):
 
 | Page | Action | Parameters |
 | --- | --- | --- |
-| `/audio-trimmer` | `set_trim` | `startSec`, `endSec`, `mode` (keep, cut), `fade` |
-| `/silence-remover` | `set_silence_removal` | `threshold` dBFS, `minimumGapSec`, `paddingSec` |
+| `/8d-audio-maker` | `set_8d_effect` | `secondsPerTurn`, `distance` |
+| `/android-ringtone-maker` | `set_ringtone` | `startSec`, `endSec`, `fadeOut`, `fadeSec` |
+| `/audio-compressor` | `set_compression` | `bitrateKbps`, `sampleRateHz`, `channels` |
+| `/audio-joiner` | `set_join_gap` | `gapSec` |
+| `/audio-looper` | `set_loop` | `repeats`, `gapSec` |
+| `/audio-normalizer` | `set_loudness_target` | `platform`, `targetLufs`, `ceilingDbtp` |
+| `/audio-splitter` | `set_split` | `method`, `parts`, `partLengthSec`, `silenceThresholdDbfs`, `minimumGapSec` |
+| `/audio-transcriber` | `set_transcript_layout` | `paragraphs` |
+| `/audio-trimmer` | `set_trim` | `startSec`, `endSec`, `mode`, `fade` |
+| `/bass-booster` | `set_bass_boost` | `amountDb`, `cornerHz`, `keepLevel` |
+| `/bpm-detector` | `set_analysis_range` | `selectionOnly` |
+| `/crossfade-joiner` | `set_crossfade` | `fadeSec` |
+| `/dynamic-compressor` | `set_compressor` | `preset`, `thresholdDb`, `ratio`, `attackMs`, `releaseMs`, `kneeDb`, `makeupDb` |
+| `/echo-adder` | `set_echo` | `preset`, `delayMs`, `feedbackPercent`, `mixPercent` |
+| `/equalizer` | `set_equalizer` | `preset` |
 | `/fade-in-out` | `set_fade` | `fadeInSec`, `fadeOutSec`, `curve` |
+| `/nightcore-maker` | `set_nightcore` | `rate`, `preset` |
+| `/noise-remover` | `set_noise_reduction` | `strength` |
+| `/pitch-shifter` | `set_pitch_shift` | `semitones`, `cents` |
+| `/reverb-adder` | `set_reverb` | `space`, `decaySec`, `mix`, `preDelayMs` |
+| `/ringtone-maker` | `set_ringtone` | `startSec`, `endSec`, `fadeOut`, `fadeSec` |
+| `/sample-rate-converter` | `set_sample_rate` | `sampleRateHz` |
+| `/silence-remover` | `set_silence_removal` | `threshold`, `minimumGapSec`, `paddingSec` |
+| `/slowed-reverb` | `set_slowed_reverb` | `intensity`, `speed`, `mix`, `decaySec` |
 | `/speed-changer` | `set_speed` | `speed`, `keepPitch` |
-| `/volume-booster` | `set_volume` | `method` (boost, normalize), `gainDb`, `targetPeakDbfs` |
-| `/audio-normalizer` | `set_loudness_target` | `platform` preset, `targetLufs`, `ceilingDbtp` |
+| `/stem-splitter` | `set_stems` | `vocals`, `drums`, `bass`, `other` |
+| `/stereo-to-mono` | `set_channel_mode` | `mode` |
+| `/stereo-widener` | `set_stereo_width` | `width` |
+| `/tempo-changer` | `set_tempo` | `tempoPercent`, `bpm` |
+| `/voice-changer` | `set_voice` | `preset`, `semitones` |
+| `/volume-booster` | `set_volume` | `method`, `gainDb`, `targetPeakDbfs` |
+| `/wav-converter` | `set_wav_bit_depth` | `bitDepth` |
+| `/waveform-generator` | `set_waveform_image` | `preset`, `widthPx`, `heightPx`, `style`, `waveColor`, `backgroundColor`, `transparent` |
 
 Every reply is `{ content: [{ type: 'text', text }] }`, where `text` is JSON
 that echoes the settings after the change, so the agent can confirm what it

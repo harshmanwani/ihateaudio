@@ -481,6 +481,22 @@ const faq = [
     defaultFormat: 'wav',
     formats: ['wav', 'flac', 'mp3', 'm4a', 'ogg'],
 
+    agent: {
+      name: 'set_sample_rate',
+      description:
+        'Choose the sample rate the file is converted to, in hertz, from the fixed list the page offers. The spectrum drawing, the Nyquist ceiling note and the upsampling and MP3 warnings update at once. Converting up cannot add detail that was never recorded. Nothing is rendered or saved until the person downloads or export_download is called.',
+      params: [
+        {
+          key: 'sampleRateHz',
+          control: 'rate',
+          description:
+            'Target sample rate in hertz: 8000 (telephone), 16000 (speech models), 22050 (embedded audio), 32000 (broadcast), 44100 (CD and music), 48000 (video and pro audio) or 96000 (high-resolution production). Check inspect_audio for the rate the file has now.',
+          type: 'string',
+          enum: ['8000', '16000', '22050', '32000', '44100', '48000', '96000'],
+        },
+      ],
+    },
+
     onReady(ctx, runtime) {
       sourceRate = ctx.buffer.sampleRate;
       spectrum = averageSpectrum(ctx.buffer);

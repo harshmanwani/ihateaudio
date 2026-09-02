@@ -466,6 +466,30 @@ const faq = [
     defaultFormat: 'mp3',
     previewLabel: 'Shifted',
 
+    agent: {
+      name: 'set_pitch_shift',
+      description:
+        'Set how far the pitch moves without changing the running time: whole semitones from -12 to 12 (12 is one octave) and a fine tune in cents from -50 to 50 (100 cents is one semitone). The keyboard drawing and the interval name update at once. The shifted result is rendered when the person presses Preview the shift or when render_preview is called; nothing is saved.',
+      params: [
+        {
+          key: 'semitones',
+          description:
+            'Shift in semitones, -12 to 12, in whole steps. +12 is one octave up, +7 a perfect fifth, -12 one octave down. Voices still sound human within about 5 either way.',
+          type: 'number',
+          min: -12,
+          max: 12,
+        },
+        {
+          key: 'cents',
+          description:
+            'Fine tune in cents, -50 to 50. One hundred cents makes a semitone; most people stop hearing a difference below about 5.',
+          type: 'number',
+          min: -50,
+          max: 50,
+        },
+      ],
+    },
+
     onReady(_ctx, runtime) {
       const root = runtime.root;
       const steps = root.querySelector<HTMLInputElement>('[data-control="semitones"]');

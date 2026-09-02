@@ -423,6 +423,30 @@ const faq = [
   const tool = createTool({
     suffix: 'looped',
     defaultFormat: 'mp3',
+    agent: {
+      name: 'set_loop',
+      description:
+        'Set how many times the clip repeats and the silence between repeats in seconds. The gap sits between repeats only, so the file still ends on audio. The seam drawing, the total length next to the heading and the memory warning update at once; nothing is saved.',
+      params: [
+        {
+          key: 'repeats',
+          control: 'times',
+          description:
+            'Number of repeats, 2 to 50. Total length is repeats times the clip length, plus one gap fewer than that.',
+          type: 'number',
+          min: 2,
+          max: 50,
+        },
+        {
+          key: 'gapSec',
+          control: 'gap',
+          description: 'Silence between repeats in seconds, 0 to 5. 0 joins the copies back to back.',
+          type: 'number',
+          min: 0,
+          max: 5,
+        },
+      ],
+    },
 
     onReady(ctx, runtime) {
       const root = runtime.root;

@@ -486,6 +486,31 @@ const faq = [
   createTool({
     suffix: '8d',
     defaultFormat: 'mp3',
+    agent: {
+      name: 'set_8d_effect',
+      description:
+        'Set the orbit that makes the sound circle the listener: how many seconds one full turn takes, and how far from the head it circles. Twelve seconds a turn is the value most 8D uploads use. The orbit drawing, the turns-a-minute readout and the preview update at once; nothing is saved.',
+      params: [
+        {
+          key: 'secondsPerTurn',
+          control: 'speed',
+          description:
+            'Seconds for one full orbit around the head. 6 to 20; slower feels like drifting, faster starts to sound seasick.',
+          type: 'number',
+          min: 6,
+          max: 20,
+        },
+        {
+          key: 'distance',
+          control: 'radius',
+          description:
+            'How far from the head the sound circles. 1 to 8; 1 brushes the ears, 3 is about arm length, 8 is far off. Lower keeps more level and body.',
+          type: 'number',
+          min: 1,
+          max: 8,
+        },
+      ],
+    },
 
     onReady(_ctx, runtime) {
       if (wired) return;

@@ -577,6 +577,76 @@ const faq = [
     suffix: 'compressed',
     defaultFormat: 'mp3',
 
+    agent: {
+      name: 'set_compressor',
+      description:
+        'Set the compressor: pick a preset, or set the threshold in dB, the ratio, attack and release in ms, the knee width in dB and the makeup gain in dB by hand. Moving any slider switches the preset to custom. The transfer curve, the gain-reduction readout and the preview update at once; nothing is saved.',
+      params: [
+        {
+          key: 'preset',
+          control: 'preset',
+          description:
+            'A starting point that sets every slider: voice (speech and podcasts), music, gentle (least destructive) or heavy (limiter-like). custom leaves the sliders as they are.',
+          type: 'string',
+          enum: ['voice', 'music', 'gentle', 'heavy', 'custom'],
+        },
+        {
+          key: 'thresholdDb',
+          control: 'threshold',
+          description:
+            'Level in dB where compression starts, -60 to 0. Louder than this is turned down; quieter passes through untouched.',
+          type: 'number',
+          min: -60,
+          max: 0,
+        },
+        {
+          key: 'ratio',
+          control: 'ratio',
+          description:
+            'How firmly the excess is held, 1 to 20 in steps of 0.5. At 4, four decibels over the threshold come out as one; past 10 it acts as a limiter.',
+          type: 'number',
+          min: 1,
+          max: 20,
+        },
+        {
+          key: 'attackMs',
+          control: 'attack',
+          description:
+            'How long it waits before clamping down, in ms, 0 to 200. 15 to 30 keeps the punch of consonants and drum hits.',
+          type: 'number',
+          min: 0,
+          max: 200,
+        },
+        {
+          key: 'releaseMs',
+          control: 'release',
+          description:
+            'How long it takes to let go again, in ms, 10 to 1000 in steps of 10. Too short breathes between words; too long ducks everything after one loud moment.',
+          type: 'number',
+          min: 10,
+          max: 1000,
+        },
+        {
+          key: 'kneeDb',
+          control: 'knee',
+          description:
+            'How gradually the ratio comes in around the threshold, in dB, 0 to 40. 0 switches abruptly; 10 and up eases in and suits voices.',
+          type: 'number',
+          min: 0,
+          max: 40,
+        },
+        {
+          key: 'makeupDb',
+          control: 'makeup',
+          description:
+            'Gain added after compression to put the level back, in dB, 0 to 24 in steps of 0.5. Roughly match the gain reduction.',
+          type: 'number',
+          min: 0,
+          max: 24,
+        },
+      ],
+    },
+
     onReady(ctx, runtime) {
       const root = runtime.root;
       const preset = root.querySelector<HTMLSelectElement>('[data-control="preset"]');

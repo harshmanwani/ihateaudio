@@ -500,6 +500,22 @@ const faq = [
     suffix: 'wide',
     defaultFormat: 'mp3',
 
+    agent: {
+      name: 'set_stereo_width',
+      description:
+        'Set the stereo width as a multiplier on the side signal: 1 is the original, 0 collapses the mix to the centre, 3 triples the side. The goniometer, the correlation bar, the mono-loss readout, the clipping warning and the preview update at once; nothing is saved. A mono or dual-mono file has no side signal, so the page switches the control off and the width has no effect.',
+      params: [
+        {
+          key: 'width',
+          description:
+            'Stereo width multiplier, 0 to 3 in steps of 0.05. Music usually sits between 1.1 and 1.5; 0.7 to 0.8 tightens speech; 0 is mono.',
+          type: 'number',
+          min: 0,
+          max: 3,
+        },
+      ],
+    },
+
     onReady(ctx, runtime) {
       source = ctx.buffer;
 

@@ -348,6 +348,37 @@ const faq = [
   const tool = createTool({
     suffix: 'bass',
     defaultFormat: 'mp3',
+    agent: {
+      name: 'set_bass_boost',
+      description:
+        'Set the low shelf: how many decibels to lift everything below the corner frequency, where that corner sits in hertz, and whether to pull the whole file back to -1 dBFS afterwards so the boost cannot clip. The shelf drawing, the small-speaker warning and the preview update at once; nothing is saved.',
+      params: [
+        {
+          key: 'amountDb',
+          control: 'amount',
+          description: 'Boost in decibels below the corner, 0 to 15. 3 to 6 is an adjustment; 12 is an effect.',
+          type: 'number',
+          min: 0,
+          max: 15,
+        },
+        {
+          key: 'cornerHz',
+          control: 'corner',
+          description:
+            'Corner frequency in hertz, 60 to 250. 60 to 80 for sub only, 100 for general weight, 150 to 250 for body.',
+          type: 'number',
+          min: 60,
+          max: 250,
+        },
+        {
+          key: 'keepLevel',
+          control: 'fit',
+          description:
+            'Scale the file back so the loudest sample lands at -1 dBFS after the shelf. Leave on unless the level is managed elsewhere.',
+          type: 'boolean',
+        },
+      ],
+    },
 
     onReady(_ctx, runtime) {
       const root = runtime.root;

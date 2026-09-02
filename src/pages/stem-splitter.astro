@@ -182,6 +182,36 @@ const faq = [
     suffix: 'stem',
     defaultFormat: 'wav',
 
+    agent: {
+      name: 'set_stems',
+      description:
+        'Tick or untick the stems to separate: vocals, drums, bass and other. Each ticked stem is a separate 28 MB AI model download (saved after the first time) and a separate pass over the audio of roughly the length of the track, so the cost line under the checkboxes updates at once. The stems are produced only when the person presses Split; nothing is downloaded or saved by this call.',
+      params: [
+        {
+          key: 'vocals',
+          description: 'Separate the vocals stem.',
+          type: 'boolean',
+        },
+        {
+          key: 'drums',
+          description: 'Separate the drums stem, the most reliable of the four.',
+          type: 'boolean',
+        },
+        {
+          key: 'bass',
+          description:
+            'Separate the bass stem. Its model is the largest and the most likely to run out of memory on a long track.',
+          type: 'boolean',
+        },
+        {
+          key: 'other',
+          description:
+            'Separate the "other" stem: everything that is not vocals, drums or bass, such as guitars, keys and synths. The weakest of the four.',
+          type: 'boolean',
+        },
+      ],
+    },
+
     onReady(ctx, runtime) {
       const root = runtime.root;
       const cost = root.querySelector<HTMLElement>('[data-stem-cost]');

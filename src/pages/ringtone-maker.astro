@@ -282,6 +282,43 @@ const faq = [
     selection: true,
     formats: ['m4r'],
     defaultFormat: 'm4r',
+    agent: {
+      name: 'set_ringtone',
+      description:
+        'Choose the part of the track that becomes the iPhone ringtone: the start and end of the selection in seconds, and whether to fade out at the end and for how long. The selection is capped at 30 seconds because iOS will not list a longer tone; a longer span keeps its start and is trimmed at the end. The handles, the length readout and the fade field update at once; nothing is saved until export_download is called.',
+      params: [
+        {
+          key: 'startSec',
+          description: 'Selection start, in seconds from the start of the file.',
+          type: 'number',
+          min: 0,
+          apply: (value, runtime) =>
+            runtime.setSelection({ start: Number(value), end: runtime.getSelection().end }),
+        },
+        {
+          key: 'endSec',
+          description: 'Selection end, in seconds from the start of the file.',
+          type: 'number',
+          min: 0,
+          apply: (value, runtime) =>
+            runtime.setSelection({ start: runtime.getSelection().start, end: Number(value) }),
+        },
+        {
+          key: 'fadeOut',
+          control: 'fadeout',
+          description: 'Fade out at the end of the clip, so an arbitrary cut point sounds deliberate.',
+          type: 'boolean',
+        },
+        {
+          key: 'fadeSec',
+          control: 'fade',
+          description: 'Fade-out length in seconds, used when fadeOut is on. 0.2 to 10; 2 is enough for most clips.',
+          type: 'number',
+          min: 0.2,
+          max: 10,
+        },
+      ],
+    },
 
     onReady(_ctx, runtime) {
       const root = runtime.root;

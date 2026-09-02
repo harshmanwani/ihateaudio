@@ -484,6 +484,30 @@ const faq = [
     defaultFormat: 'mp3',
     previewLabel: 'Changed',
 
+    agent: {
+      name: 'set_voice',
+      description:
+        'Choose the voice preset and an extra manual pitch shift in semitones that runs after it. The frequency drawing, its caption and the preset note update at once. The chain is heavy, so the changed voice renders only when the person clicks Preview the voice or render_preview is called; nothing is saved.',
+      params: [
+        {
+          key: 'preset',
+          description:
+            'deeper or higher move the pitch 4 semitones with the length unchanged; chipmunk (1.5x) and giant (0.7x) change speed and length together; robot adds a metallic comb; telephone band-limits to 300 Hz to 3.4 kHz; radio narrows, lifts 2 kHz and compresses; none applies only the manual pitch.',
+          type: 'string',
+          enum: ['deeper', 'higher', 'chipmunk', 'giant', 'robot', 'telephone', 'radio', 'none'],
+        },
+        {
+          key: 'semitones',
+          control: 'pitch',
+          description:
+            'Manual pitch shift in semitones, -12 to 12 in whole numbers, applied after the preset. 0 is none; beyond about 7 either way stops sounding like a person.',
+          type: 'number',
+          min: -12,
+          max: 12,
+        },
+      ],
+    },
+
     onReady(_ctx, runtime) {
 
       const root = runtime.root;

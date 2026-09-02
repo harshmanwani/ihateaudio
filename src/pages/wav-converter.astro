@@ -158,6 +158,22 @@ const faq = [
     formats: ['wav'],
     defaultFormat: 'wav',
 
+    agent: {
+      name: 'set_wav_bit_depth',
+      description:
+        'Choose the bit depth of the WAV that is written: 16 is CD quality and the safe default, 24 is the studio hand-off standard, 32 is IEEE float that stores the engine values exactly. The pressed button, the dynamic-range note and the projected file size in the export bar update at once; nothing is saved until export_download is called.',
+      params: [
+        {
+          key: 'bitDepth',
+          description: 'Bits per sample: "16", "24" or "32" (32 is IEEE float).',
+          type: 'string',
+          enum: ['16', '24', '32'],
+          apply: (value, runtime) =>
+            runtime.root.querySelector<HTMLButtonElement>(`[data-depth="${value}"]`)?.click(),
+        },
+      ],
+    },
+
     // The runtime reads data-control="bitdepth" and writes the WAV itself, so
     // the decoded samples pass straight through.
     process(ctx) {

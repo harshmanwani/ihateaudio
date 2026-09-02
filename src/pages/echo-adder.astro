@@ -514,6 +514,50 @@ const faq = [
     suffix: 'echo',
     defaultFormat: 'mp3',
 
+    agent: {
+      name: 'set_echo',
+      description:
+        'Set the echo: pick a preset, or set the delay time in ms, the feedback and the mix in percent by hand. Moving any slider clears the preset highlight. The tap drawing, the audible-repeat count and the preview update at once; nothing is saved.',
+      params: [
+        {
+          key: 'preset',
+          description:
+            'A starting point that sets all three sliders: slapback (80 ms, one tight repeat), classic (350 ms, a few repeats) or dub (600 ms, repeats that dissolve slowly).',
+          type: 'string',
+          enum: ['slapback', 'classic', 'dub'],
+          apply: (value, runtime) =>
+            runtime.root.querySelector<HTMLButtonElement>(`[data-preset="${value}"]`)?.click(),
+        },
+        {
+          key: 'delayMs',
+          control: 'delay',
+          description:
+            'Gap between one repeat and the next, in ms, 50 to 1500 in steps of 5. One beat is 60000 divided by the BPM; 60 to 120 is slapback.',
+          type: 'number',
+          min: 50,
+          max: 1500,
+        },
+        {
+          key: 'feedbackPercent',
+          control: 'feedback',
+          description:
+            'How much of each repeat feeds the next, in percent, 0 to 85. 40 gives three or four repeats; 75 and up is the dub sound.',
+          type: 'number',
+          min: 0,
+          max: 85,
+        },
+        {
+          key: 'mixPercent',
+          control: 'mix',
+          description:
+            'Level of the repeats against the original, in percent, 0 to 100. 20 to 35 keeps them clearly behind the source.',
+          type: 'number',
+          min: 0,
+          max: 100,
+        },
+      ],
+    },
+
     onReady(_ctx, runtime) {
       if (wired) return;
       wired = true;

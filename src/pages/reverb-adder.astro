@@ -530,6 +530,47 @@ const faq = [
     suffix: 'reverb',
     defaultFormat: 'mp3',
 
+    agent: {
+      name: 'set_reverb',
+      description:
+        'Set the space the audio is placed in: pick a room preset, or set the decay in seconds, the wet mix in percent and the pre-delay in milliseconds by hand. Setting any of the three numbers switches the room to custom. The tail drawing, the RT60 readout and the preview update at once; nothing is saved.',
+      params: [
+        {
+          key: 'space',
+          description:
+            'A room preset that sets decay, mix and pre-delay together: room (0.6 s, close and dry), studio (1.2 s), hall (2.5 s, concert stage), cathedral (5 s), canyon (8 s), or custom to keep the numbers as they are.',
+          type: 'string',
+          enum: ['room', 'studio', 'hall', 'cathedral', 'canyon', 'custom'],
+        },
+        {
+          key: 'decaySec',
+          control: 'decay',
+          description:
+            'How long the tail takes to fall away, in seconds, 0.2 to 8 in steps of 0.1. A treated studio is under 1; a concert hall about 2; a stone cathedral 5 or more.',
+          type: 'number',
+          min: 0.2,
+          max: 8,
+        },
+        {
+          key: 'mix',
+          description:
+            'Wet mix in percent, 0 to 100. Speech usually wants 15 to 25; past about 40 the dry sound stops leading and the result reads as an effect.',
+          type: 'number',
+          min: 0,
+          max: 100,
+        },
+        {
+          key: 'preDelayMs',
+          control: 'predelay',
+          description:
+            'Gap before the first reflection, in milliseconds, 0 to 150. 20 to 40 lets a spoken word finish before the room answers, which keeps a voice intelligible in a big space.',
+          type: 'number',
+          min: 0,
+          max: 150,
+        },
+      ],
+    },
+
     onReady(_ctx, runtime) {
       if (wired) return;
       wired = true;

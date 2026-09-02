@@ -253,6 +253,19 @@ const faq = [
     suffix: 'transcript',
     video: true,
 
+    agent: {
+      name: 'set_transcript_layout',
+      description:
+        'Choose whether the transcript is broken into paragraphs where the speaker pauses, or delivered as one continuous block that is easier to paste into something that reflows it. Changes the visible checkbox only. The transcript is produced on the device when the person clicks Transcribe or render_preview is called; nothing is saved until the text is copied or downloaded.',
+      params: [
+        {
+          key: 'paragraphs',
+          description: 'true breaks the text into paragraphs at pauses; false gives one block.',
+          type: 'boolean',
+        },
+      ],
+    },
+
     onReady(_ctx, runtime) {
       panels.set(
         runtime,

@@ -156,6 +156,23 @@ const faq = [
     suffix: 'cleaned',
     defaultFormat: 'wav',
 
+    agent: {
+      name: 'set_noise_reduction',
+      description:
+        'Set the cleanup strength for the AI denoiser, as a percentage from 0 to 100 in steps of 5. Full strength removes the most steady background noise; backing off blends the original back in, which sounds more natural when the room is part of the recording. Moves the visible slider only: the cleaned result is produced when the person presses Clean or when render_preview is called, and nothing is saved.',
+      params: [
+        {
+          key: 'strength',
+          control: 'amount',
+          description:
+            'Cleanup strength in percent, 0 to 100 in steps of 5. 100 removes the most noise; 70 to 80 keeps some body in a voice that sounds thin at full strength.',
+          type: 'number',
+          min: 0,
+          max: 100,
+        },
+      ],
+    },
+
     onReady(_ctx, runtime) {
       const root = runtime.root;
       const slider = root.querySelector<HTMLInputElement>('[data-control="amount"]');

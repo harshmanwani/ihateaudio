@@ -319,6 +319,23 @@ const faq = [
     multiple: true,
     defaultFormat: 'mp3',
 
+    agent: {
+      name: 'set_join_gap',
+      description:
+        'Set the silent gap in seconds inserted between each pair of files, 0 to 5. Zero joins them with no space at all. The run bar and the total length update at once; nothing is saved until export_download is called.',
+      params: [
+        {
+          key: 'gapSec',
+          control: 'gap',
+          description:
+            'Digital silence between tracks, in seconds, 0 to 5. About 2 reads as an album gap; 0 suits segments of one continuous recording.',
+          type: 'number',
+          min: 0,
+          max: 5,
+        },
+      ],
+    },
+
     onReady(ctx, runtime) {
       const root = runtime.root;
       const list = root.querySelector<HTMLElement>('[data-list]');

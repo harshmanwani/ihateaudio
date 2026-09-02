@@ -379,6 +379,31 @@ const faq = [
     defaultFormat: 'mp3',
     previewLabel: 'Stretched',
 
+    agent: {
+      name: 'set_tempo',
+      description:
+        'Set the tempo as a percentage of the original with the pitch held, and optionally the source BPM so the page can say what BPM the result plays at. The stretch drawing, the new length and the BPM readout update at once. Time-stretching is heavy, so the stretched audio renders only when the person clicks Preview the tempo or render_preview is called; nothing is saved.',
+      params: [
+        {
+          key: 'tempoPercent',
+          control: 'tempo',
+          description:
+            'Tempo as a percentage of the original, 50 to 200 in whole numbers. 100 is unchanged, 75 is three quarters speed, 120 is a fifth faster. 75 to 140 stays clean on dense music.',
+          type: 'number',
+          min: 50,
+          max: 200,
+        },
+        {
+          key: 'bpm',
+          description:
+            'Original tempo of the recording in beats per minute, 20 to 300. Optional; it only feeds the readout that reports the BPM the result plays at.',
+          type: 'number',
+          min: 20,
+          max: 300,
+        },
+      ],
+    },
+
     onReady(ctx, runtime) {
       source = ctx.buffer;
 

@@ -315,6 +315,47 @@ const faq = [
     defaultFormat: 'mp3',
     previewLabel: 'Slowed + reverb',
 
+    agent: {
+      name: 'set_slowed_reverb',
+      description:
+        'Set how slowed and reverberated the song becomes. Intensity (0 to 100) is the one knob that rewrites speed, reverb mix and tail length together; the presets are intensity 18 (subtle), 59 (classic) and 88 (deep). Send speed, mix or decaySec on their own to override one of the three. The length and pitch-drop readouts update at once. The result is rendered when the person presses Preview or when render_preview is called; nothing is saved.',
+      params: [
+        {
+          key: 'intensity',
+          description:
+            'How slowed, 0 to 100. Rewrites speed, mix and tail length together: 18 is the subtle preset (0.92x, light reverb), 59 classic (0.85x, medium), 88 deep (0.80x, heavy). Send it without the other three, or they are applied after it in the order given.',
+          type: 'number',
+          min: 0,
+          max: 100,
+        },
+        {
+          key: 'speed',
+          description:
+            'Playback speed multiplier, 0.7 to 1 in steps of 0.01. The pitch drops with the speed: 0.85 is about 2.8 semitones down, 0.8 about 3.9. 1 means no slowdown.',
+          type: 'number',
+          min: 0.7,
+          max: 1,
+        },
+        {
+          key: 'mix',
+          description:
+            'Reverb mix in percent, 0 to 80. 20 is a suggestion of space, 45 is cavernous; 0 gives a plain slowdown.',
+          type: 'number',
+          min: 0,
+          max: 80,
+        },
+        {
+          key: 'decaySec',
+          control: 'decay',
+          description:
+            'Reverb tail length in seconds, 0.5 to 6 in steps of 0.1. Long tails suit slow, sparse songs; busy tracks need a short one.',
+          type: 'number',
+          min: 0.5,
+          max: 6,
+        },
+      ],
+    },
+
     onReady(ctx, runtime) {
       source = ctx.buffer;
 

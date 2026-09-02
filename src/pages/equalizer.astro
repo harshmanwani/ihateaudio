@@ -323,6 +323,7 @@ const faq = [
 
 <script>
   import { createTool } from '../lib/tool';
+  import type { AgentParam } from '../lib/agent';
   import { applyEq, type EqBand } from '../lib/audio/effects';
   import { clamp, db } from '../lib/format';
   import { panelColors, panelContext } from '../lib/canvas';
@@ -603,6 +604,45 @@ const faq = [
     suffix: 'eq',
     defaultFormat: 'mp3',
     previewLabel: 'Equalised',
+
+    agent: {
+      name: 'set_equalizer',
+      description:
+        'Set the eight-band equalizer: pick a preset, or set the gain of any band in dB from -12 to 12. The bands sit at 60, 150, 400, 1000, 2400, 6000, 12000 and 16000 Hz; the two ends are shelves, the rest are peaks. Setting a band switches the preset to custom. The faders, the response curve and the equalised preview update at once; nothing is saved.',
+      params: [
+        {
+          key: 'preset',
+          control: 'preset',
+          description:
+            'A curve that sets every band: flat (no change), voice, music, bass, treble, podcast or radio. custom leaves the faders as they are.',
+          type: 'string',
+          enum: ['flat', 'voice', 'music', 'bass', 'treble', 'podcast', 'radio', 'custom'],
+        },
+        ...BANDS.map((band): AgentParam => {
+          const label = band.hz >= 1000 ? `${band.hz / 1000} kHz` : `${band.hz} Hz`;
+          const shape = band.type === 'peaking' ? 'peak' : 'shelf';
+          return {
+            key: `band${band.hz}Hz`,
+            description: `Gain of the ${label} ${shape}, in dB, -12 to 12, snapped to 0.5.`,
+            type: 'number',
+            min: -RANGE,
+            max: RANGE,
+            // The number input above the fader is the canonical store, so this
+            // is the keyboard path a person uses: input snaps the preset to
+            // custom and repaints, change rounds to 0.5 dB and re-renders.
+            apply: (value, runtime) => {
+              const input = runtime.root.querySelector<HTMLInputElement>(
+                `[data-eq-val="${band.hz}"]`
+              );
+              if (!input) return;
+              input.value = String(value);
+              input.dispatchEvent(new Event('input', { bubbles: true }));
+              input.dispatchEvent(new Event('change', { bubbles: true }));
+            },
+          };
+        }),
+      ],
+    },
 
     onReady(_ctx, runtime) {
       if (wired) return;

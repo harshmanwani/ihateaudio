@@ -237,6 +237,21 @@ const readings = [
     selection: true,
     stage: true,
 
+    agent: {
+      name: 'set_analysis_range',
+      description:
+        'Choose where the tempo is measured: the whole file, or only the current selection on the waveform. Move the selection with set_selection first; it must be longer than 2 seconds to count. The BPM figure, the confidence line and the beat grid re-measure at once; nothing is saved.',
+      params: [
+        {
+          key: 'selectionOnly',
+          control: 'selected',
+          description:
+            'true measures only the selected section, which helps when an intro, an outro or a breakdown drags the result off; false measures the whole file.',
+          type: 'boolean',
+        },
+      ],
+    },
+
     onReady(ctx, runtime) {
       const root = runtime.root;
       const bpmOut = root.querySelector<HTMLElement>('[data-bpm]');
