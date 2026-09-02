@@ -103,6 +103,25 @@ src/
 Adding a tool is an entry in `src/data/tools.ts` plus one page file. Everything
 else is shared, which is why they all behave identically.
 
+## Agents (WebMCP)
+
+Every tool page registers a small set of WebMCP site tools when the browser
+hosts the API — ChatGPT's in-app browser (`document.modelContext`) or Chrome
+with WebMCP enabled (`navigator.modelContext`). An agent can inspect the loaded
+audio, move the selection, set the format, render a preview and, on request,
+export. Six pages also declare one named action for their own controls, so
+"tighten the pauses at −45 dB" lands on the same sliders a person drags. The
+audio never leaves the tab; an agent receives numbers and settings, not samples.
+
+The layer is `src/lib/webmcp.ts` (the host boundary), `src/lib/agent.ts` (the
+manifest, schema and clamping) and the agent section of `src/lib/tool.ts`.
+[docs/WEBMCP.md](docs/WEBMCP.md) lists every tool, how to test it in ChatGPT
+and Chrome, and which files are new for the WebMCP Challenge.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
 ## Deploying
 
 The pages are static — `dist/` would serve from anywhere. Deployed to Cloudflare

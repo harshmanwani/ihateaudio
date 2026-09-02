@@ -50,3 +50,6 @@ public/models/
 # instrumental plus known speech, so separation quality can be measured rather
 # than eyeballed. Regenerate with scripts/make-ai-fixtures.sh if lost.
 tests/fixtures/
+
+# Local working notes, never published.
+notes/
