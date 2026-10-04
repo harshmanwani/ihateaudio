@@ -2,7 +2,6 @@ import { launch } from '@cloudflare/playwright';
 import { McpServer } from '@modelcontextprotocol/server';
 import { createMcpHandler } from 'agents/mcp/server';
 import { z } from 'zod';
-import { Readable } from 'node:stream';
 
 export interface McpEnv {
   BROWSER: Parameters<typeof launch>[0];
@@ -37,8 +36,7 @@ async function stage(env:McpEnv,f:z.infer<typeof FILE>){
 async function saveDownload(env:McpEnv,d:any){
   const name=String(d.suggestedFilename?.()||'ihateaudio-output').replace(/[\r\n]/g,'_').slice(0,180), id=crypto.randomUUID().replace(/-/g,'');
   let body:any=await d.createReadStream(); if(!body) throw new Error('The browser returned an empty download.');
-  if(typeof body.pipe==='function') body=Readable.toWeb(body);
-  const mt=mime(name), key=OUTPUT+id;
+    const mt=mime(name), key=OUTPUT+id;
   await env.MODELS.put(key,body,{httpMetadata:{contentType:mt,contentDisposition:'attachment; filename="'+name.replace(/"/g,'_')+'"',cacheControl:'private, max-age=60'},customMetadata:{expiresAt:String(Date.now()+TTL),fileName:name}});
   return {name,mime:mt,url:ORIGIN+'/mcp-files/output/'+id+'/'+encodeURIComponent(name)};
 }
@@ -61,7 +59,7 @@ async function run(env:McpEnv,slug:string,files:z.infer<typeof FILE>[],settings:
   if(!MULTI.has(slug)&&files.length!==1)throw new Error(title(slug)+' accepts one input file.');
   const browser=await launch(env.BROWSER),page=await browser.newPage(); page.setDefaultTimeout(120_000); const keys:string[]=[];
   try{await bridge(page);await page.goto(ORIGIN+'/'+slug,{waitUntil:'domcontentloaded',timeout:120_000});await waitTools(page);
-    if(MULTI.has(slug)){for(const f of files){const x=await stage(env,f);keys.push(x.key);const rr=await siteTool(page,'load_audio_from_url',{url:x.url}); if(!rr)throw new Error('Could not load input file.')}await waitLoaded(page)}
+    if(MULTI.has(slug)){const staged=await Promise.all(files.map(f=>stage(env,f)));keys.push(...staged.map(x=>x.key));const payloads=await Promise.all(staged.map(async x=>{const r=await fetch(x.url);if(!r.ok)throw new Error('Could not read staged input file.');return {name:x.name,mimeType:x.mime,buffer:new Uint8Array(await r.arrayBuffer())}}));await page.locator('[data-file-input]').setInputFiles(payloads as any);await waitLoaded(page)}
     else{const x=await stage(env,files[0]);keys.push(x.key);await siteTool(page,'load_audio_from_url',{url:x.url});await waitLoaded(page)}
     const a=ACTIONS[slug];if(a)await siteTool(page,a.name,settings||{});
     if(outputFormat||bitrateKbps!==undefined)await siteTool(page,'set_output_format',{...(outputFormat?{format:outputFormat}:{}),...(bitrateKbps!==undefined?{bitrateKbps}:{} )});
