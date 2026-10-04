@@ -11,7 +11,7 @@ export interface McpEnv {
   MODELS: R2Bucket;
 }
 
-const ORIGIN='https://ihateaudio.com', INPUT='mcp-input/', OUTPUT='mcp-output/', TTL=3600_000, MAX=250*1024*1024, TIMEOUT=10*60_000;
+const ORIGIN='https://ihateaudio.com', INPUT='mcp-input/', OUTPUT='mcp-output/', TTL=3600_000, MAX=250*1024*1024;
 const FILE=z.object({download_url:z.string().url(),file_id:z.string().min(1),mime_type:z.string().optional(),file_name:z.string().optional()}).strict();
 const FILES=z.array(FILE).min(1).max(12);
 const MULTI=new Set(['audio-joiner','crossfade-joiner']);
@@ -36,17 +36,44 @@ async function stage(env:McpEnv,f:z.infer<typeof FILE>){
   return {key,url:ORIGIN+'/mcp-files/input/'+id+'/'+encodeURIComponent(name),name,mime:mt};
 }
 
-async function saveDownload(env:McpEnv,d:any){
-  const name=String(d.suggestedFilename?.()||'ihateaudio-output').replace(/[\r\n]/g,'_').slice(0,180), id=crypto.randomUUID().replace(/-/g,'');
-  let body:any=await d.createReadStream(); if(!body) throw new Error('The browser returned an empty download.');
-    const mt=mime(name), key=OUTPUT+id;
-  await env.MODELS.put(key,body,{httpMetadata:{contentType:mt,contentDisposition:'attachment; filename="'+name.replace(/"/g,'_')+'"',cacheControl:'private, max-age=60'},customMetadata:{expiresAt:String(Date.now()+TTL),fileName:name}});
+// Downloads never reach the Worker: Browser Rendering's browser runs on another
+// machine, so Playwright's download stream comes back empty. Every save on the
+// site goes through saveBlob (an object URL on a clicked <a download>), so the
+// bridge keeps those blobs in the page instead and they are read back from there.
+const CHUNK=512*1024;
+const savedCount=(page:any):Promise<number>=>page.evaluate(()=>(globalThis as any).__ihaSaved.length);
+async function readSaved(page:any,i:number):Promise<{name:string;body:Uint8Array}>{
+  const {name,size}=await page.evaluate((i:number)=>{const x=(globalThis as any).__ihaSaved[i];return {name:String(x.name),size:x.blob.size as number}},i);
+  if(!size) throw new Error('The browser returned an empty download.');
+  if(size>MAX) throw new Error('The result is larger than the 250 MB plugin limit.');
+  const body=new Uint8Array(size);
+  for(let at=0;at<size;at+=CHUNK){
+    const b64:string=await page.evaluate(({i,at,end}:{i:number;at:number;end:number})=>new Promise((ok,fail)=>{const r=new (globalThis as any).FileReader();r.onload=()=>ok(String(r.result).slice(String(r.result).indexOf(',')+1));r.onerror=()=>fail(r.error);r.readAsDataURL((globalThis as any).__ihaSaved[i].blob.slice(at,end))}),{i,at,end:Math.min(size,at+CHUNK)});
+    const bin=atob(b64); for(let k=0;k<bin.length;k++) body[at+k]=bin.charCodeAt(k);
+  }
+  return {name,body};
+}
+async function saveOutput(env:McpEnv,file:{name:string;body:Uint8Array}){
+  const name=(file.name||'ihateaudio-output').replace(/[\r\n]/g,'_').slice(0,180), id=crypto.randomUUID().replace(/-/g,'');
+  const mt=mime(name), key=OUTPUT+id;
+  await env.MODELS.put(key,file.body,{httpMetadata:{contentType:mt,contentDisposition:'attachment; filename="'+name.replace(/"/g,'_')+'"',cacheControl:'private, max-age=60'},customMetadata:{expiresAt:String(Date.now()+TTL),fileName:name}});
   return {name,mime:mt,url:ORIGIN+'/mcp-files/output/'+id+'/'+encodeURIComponent(name)};
+}
+/** Waits until the page has saved more than `from` files, then stores every new one. */
+async function collect(page:any,env:McpEnv,from:number,waitMs:number){
+  for(let t=0;t<waitMs&&(await savedCount(page))<=from;t+=250) await sleep(250);
+  const n=await savedCount(page), out:any[]=[];
+  for(let i=from;i<n;i++) out.push(await saveOutput(env,await readSaved(page,i)));
+  return out;
 }
 
 async function bridge(page:any){await page.addInitScript(()=>{
   const reg:any[]=[]; const host={registerTool:(t:any)=>reg.push(t)};
   Object.defineProperty(globalThis,'__ihaAgentTools',{configurable:true,value:reg});
+  const saved:any[]=[], blobs=new Map<string,Blob>(), make=URL.createObjectURL, A=(globalThis as any).HTMLAnchorElement.prototype, click=A.click;
+  Object.defineProperty(globalThis,'__ihaSaved',{configurable:true,value:saved});
+  URL.createObjectURL=function(o:any){const u=make.call(URL,o);if(o instanceof Blob)blobs.set(u,o);return u};
+  A.click=function(this:any){const b=this.download&&blobs.get(this.href);if(b){saved.push({name:this.download,blob:b});return}return click.call(this)};
   try{Object.defineProperty(document,'modelContext',{configurable:true,value:host})}catch{try{(document as any).modelContext=host}catch{}}
   try{Object.defineProperty(navigator,'modelContext',{configurable:true,value:host})}catch{try{(navigator as any).modelContext=host}catch{}}
 })}
@@ -54,8 +81,8 @@ async function siteTool(page:any,name:string,input:any={}){return page.evaluate(
 async function waitTools(page:any){for(let i=0;i<100;i++){if(await page.evaluate(()=>Array.isArray((globalThis as any).__ihaAgentTools)&&((globalThis as any).__ihaAgentTools||[]).some((t:any)=>t?.name==='inspect_audio')))return;await sleep(200)}throw new Error('iHateAudio did not expose its WebMCP tools.')}
 async function waitLoaded(page:any){for(let i=0;i<360;i++){const x=await page.evaluate(()=>{const w=document.querySelector('[data-workspace]'),d=document.querySelector('[data-drop]');return !!(w&&!w.hasAttribute('hidden'))||!!(d?.hasAttribute('hidden'))});if(x)return;await sleep(250)}throw new Error('The audio file did not finish loading.')}
 async function analysis(page:any,slug:string){for(let i=0;i<360;i++){const x=await page.evaluate((s:string)=>{const t=(q:string)=>document.querySelector(q)?.textContent?.trim()||null;if(s==='bpm-detector'){const bpm=t('[data-bpm]');return {ready:!!bpm&&bpm!=='···',bpm,confidence:t('[data-confidence]'),explanation:t('[data-confidence-text]'),halfTime:t('[data-reading="half"]'),main:t('[data-reading="main"]'),doubleTime:t('[data-reading="double"]')}}if(s==='key-finder'){const k=t('[data-key-name]');return {ready:!!k,key:k,camelot:t('[data-key-camelot]'),confidence:t('[data-key-confidence]'),secondChoice:t('[data-key-second]')}}const i=t('[data-stat="integrated"]');return {ready:!!i&&i!=='···',integrated:i,range:t('[data-stat="range"]'),truePeak:t('[data-stat="truepeak"]'),peak:t('[data-stat="peak"]')};},slug);if((x as any).ready)return x;await sleep(250)}throw new Error(title(slug)+' analysis timed out.')}
-async function exportPage(page:any,env:McpEnv,format?:string){const p=page.waitForEvent('download',{timeout:TIMEOUT}).catch(()=>null);await siteTool(page,'export_download',format?{format}:{});const first=await Promise.race([p,sleep(1500).then(()=>null)]);const out:any[]=[];if(first)out.push(await saveDownload(env,first));const n=await page.locator('[data-results] .result button').count();for(let i=0;i<n;i++){const q=page.waitForEvent('download',{timeout:TIMEOUT}).catch(()=>null);await page.locator('[data-results] .result button').nth(i).click();const d=await q;if(d)out.push(await saveDownload(env,d))}if(!out.length)throw new Error('iHateAudio finished without producing a downloadable file.');return out}
-async function waveform(page:any,env:McpEnv){const b=page.locator('[data-png-download]');await b.waitFor({state:'visible',timeout:20_000});const q=page.waitForEvent('download',{timeout:TIMEOUT});await b.click();return [await saveDownload(env,await q)]}
+async function exportPage(page:any,env:McpEnv,format?:string){const before=await savedCount(page);await siteTool(page,'export_download',format?{format}:{});const buttons=page.locator('[data-results] .result button'),n=await buttons.count();for(let i=0;i<n;i++)await buttons.nth(i).click();const out=await collect(page,env,before,1500);if(!out.length)throw new Error('iHateAudio finished without producing a downloadable file.');return out}
+async function waveform(page:any,env:McpEnv){const b=page.locator('[data-png-download]');await b.waitFor({state:'visible',timeout:20_000});const before=await savedCount(page);await b.click();const out=await collect(page,env,before,20_000);if(!out.length)throw new Error('The waveform image was not produced.');return out}
 
 async function run(env:McpEnv,slug:string,files:z.infer<typeof FILE>[],settings:any,outputFormat?:string,bitrateKbps?:number){
   if(slug==='voice-recorder')return {tool:title(slug),available:false,url:ORIGIN+'/voice-recorder',reason:'Live microphone capture requires an interactive browser permission prompt and cannot be delegated to a remote MCP worker. Use the iHateAudio recorder page directly, then upload the recording for processing.'};
