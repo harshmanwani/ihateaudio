@@ -73,7 +73,7 @@ interface AuditResult {
   fails: { el: string; size: number; ratio: number; need: number; text: string }[];
 }
 
-const STATIC = ['/', '/loudness-targets', '/audio-formats', '/about', '/privacy'];
+const STATIC = ['/', '/loudness-targets', '/audio-formats', '/about', '/privacy', '/terms', '/support'];
 
 test.describe('contrast (AA)', () => {
   for (const path of STATIC) {

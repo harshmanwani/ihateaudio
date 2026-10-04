@@ -1,0 +1,104 @@
+---
+import Base from '../layouts/Base.astro';
+import { SITE } from '../consts';
+
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: 'Terms of Service',
+    url: new URL('/terms', SITE.url).href,
+    description:
+      'The terms for using ihateaudio.com and the iHateAudio app in ChatGPT: free, no account, your files stay yours.',
+    publisher: { '@id': `${SITE.url}/#organization` },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'All tools', item: SITE.url },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: 'Terms of Service',
+        item: new URL('/terms', SITE.url).href,
+      },
+    ],
+  },
+];
+---
+
+<Base
+  title="Terms of Service and Fair Use"
+  description="The terms for using ihateaudio.com and the iHateAudio app in ChatGPT. Free, no account, and your files stay yours."
+  path="/terms"
+  schema={schema}
+>
+  <div class="wrap page prose">
+    <h1>Terms of Service</h1>
+    <p class="toolhead__sub" style="margin-bottom: var(--s8)">
+      The short version: the tools are free, your files stay yours, and the
+      tools come with no guarantee, so keep your originals.
+    </p>
+
+    <h2>Who runs this</h2>
+    <p>
+      iHateAudio is ihateaudio.com and the iHateAudio app in ChatGPT. Both are
+      run by Harsh Manwani. In these terms, "we" and "us" mean that. By using
+      either one, you agree to these terms.
+    </p>
+
+    <h2>Using the tools</h2>
+    <p>
+      Every tool is free and needs no account. You can use them for personal
+      or commercial work.
+    </p>
+
+    <h2>Your files</h2>
+    <p>
+      You keep every right to the audio you bring and to what you make from it.
+      We claim nothing in either. You are responsible for having the right to
+      edit the audio you use.
+    </p>
+    <p>
+      On the website, your files never leave your device. In ChatGPT, they are
+      processed on our server and then deleted. The
+      <a href="/privacy">privacy page</a> explains both.
+    </p>
+
+    <h2>Fair use of the ChatGPT app</h2>
+    <p>
+      Every job in the ChatGPT app runs on servers we pay for. Do not call it
+      from scripts or anything other than ChatGPT, do not send it more work than
+      a person would, and do not try to break it or reach anything behind it.
+      We can limit or block use that harms the service or other people using
+      it.
+    </p>
+
+    <h2>No guarantee</h2>
+    <p>
+      The tools are provided as they are, with no warranty of any kind. They can
+      make mistakes: an AI tool can separate a voice badly, a transcript can
+      mishear a word, and a tempo or key reading can be wrong. Check the result
+      before you rely on it, and keep your original files.
+    </p>
+    <p>
+      To the extent the law allows, we are not liable for any loss that comes
+      from using iHateAudio, including lost files, lost work and lost income.
+    </p>
+
+    <h2>Changes</h2>
+    <p>
+      We can change these terms. The date below shows the current version, and
+      using iHateAudio after a change means you accept it.
+    </p>
+
+    <h2>Contact</h2>
+    <p>
+      Questions about these terms go to
+      <a href={`mailto:${SITE.email}`}>{SITE.email}</a>.
+    </p>
+
+    <p><small>Last updated 4 October 2026.</small></p>
+  </div>
+</Base>

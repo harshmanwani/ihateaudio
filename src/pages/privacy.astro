@@ -9,7 +9,7 @@ const schema = [
     name: 'Privacy',
     url: new URL('/privacy', SITE.url).href,
     description:
-      'No files are uploaded, no accounts exist, and no personal data is collected. How to verify that yourself.',
+      'On the website no files are uploaded, no accounts exist, and no personal data is collected. How the ChatGPT app differs, and how to verify all of it yourself.',
     publisher: { '@id': `${SITE.url}/#organization` },
   },
   {
@@ -29,16 +29,18 @@ const schema = [
 ---
 
 <Base
-  title="Privacy: Your Audio Never Leaves Your Device"
-  description="No files are uploaded, no accounts exist, and no personal data is collected. Here is exactly what happens to your audio and how to verify it yourself."
+  title="Privacy: What Happens to Your Audio"
+  description="On the website no files are uploaded and no personal data is collected. What happens to your audio, including in ChatGPT, and how to verify it yourself."
   path="/privacy"
   schema={schema}
 >
   <div class="wrap page prose">
     <h1>Privacy</h1>
     <p class="toolhead__sub" style="margin-bottom: var(--s8)">
-      The short version: your files never leave your device, and there is
-      nothing here to sign up for.
+      The short version: on this website your files never leave your device,
+      and there is nothing here to sign up for. The iHateAudio app in ChatGPT
+      is the one exception, because the work runs on our server instead of in
+      your browser. <a href="#chatgpt">That is explained in full below.</a>
     </p>
 
     <h2>What happens to your audio</h2>
@@ -72,6 +74,48 @@ const schema = [
         talk to.
       </li>
     </ul>
+
+    <h2 id="chatgpt">If you use iHateAudio in ChatGPT</h2>
+    <p>
+      ChatGPT cannot run a tool inside your browser tab, so the iHateAudio app
+      in ChatGPT works differently. When you share a file in the chat and ask
+      for a tool:
+    </p>
+    <ul>
+      <li>
+        ChatGPT gives our server a temporary link to the file. Our server
+        downloads it and stores it in Cloudflare R2, the storage this site
+        already runs on.
+      </li>
+      <li>
+        Our server opens the same tool page from this site in a browser run by
+        Cloudflare, loads your file into it, and runs the tool with the settings
+        ChatGPT chose. It is the same code that runs in your own browser here.
+      </li>
+      <li>
+        The result is stored in R2, and ChatGPT gets a link to it. The link has
+        a long random part that cannot be guessed, but anyone who has the link
+        can download the file until it is deleted.
+      </li>
+      <li>
+        Your original file is deleted as soon as the job finishes. Results are
+        deleted automatically one day after they are made, and Cloudflare can
+        take up to one more day to remove them.
+      </li>
+    </ul>
+    <p>
+      So in this case your audio does leave your device. It goes to OpenAI when
+      you share it in ChatGPT, under OpenAI's own privacy policy, and then to
+      our server on Cloudflare for the time above. We do not listen to it,
+      share it, sell it, or use it to train anything.
+    </p>
+    <p>
+      Cloudflare keeps our server's request logs for a few days. A log line can
+      include a file's name, because the name is part of its link, but never
+      the audio. And because the job runs on this site's own tool page, the
+      page analytics below count it like a visit: a page view, that a file was
+      accepted, and the output format. None of that identifies you.
+    </p>
 
     <h2>What we do collect</h2>
     <p>
@@ -131,5 +175,7 @@ const schema = [
       If this ever changes in a way that affects what happens to your files, it
       will be stated plainly on the affected tool page, not buried here.
     </p>
+
+    <p><small>Last updated 4 October 2026.</small></p>
   </div>
 </Base>

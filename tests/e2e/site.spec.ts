@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test';
 import { TOOLS, CATEGORIES } from '../../src/data/tools';
 import { FFMPEG_CORE_VERSION } from '../../src/lib/audio/ffmpeg-version';
 
-const STATIC_PAGES = ['/', '/loudness-targets', '/audio-formats', '/about', '/privacy'];
+const STATIC_PAGES = ['/', '/loudness-targets', '/audio-formats', '/about', '/privacy', '/terms', '/support'];
 const ALL_PATHS = [...STATIC_PAGES, ...TOOLS.map((tool) => `/${tool.slug}`)];
 
 /** Console errors that are environmental rather than our bugs. */
@@ -631,6 +631,12 @@ test.describe('analytics', () => {
     expect(text).toMatch(/no session recording/i);
     expect(text).toMatch(/Do Not Track/i);
     expect(text).not.toMatch(/No cookies are set/i);
+
+    // The ChatGPT app uploads audio to our server. The plugin listing points
+    // reviewers and users here, so the page must say so and say when it is
+    // deleted, rather than claim that nothing ever leaves the device.
+    expect(text).toMatch(/iHateAudio in ChatGPT/);
+    expect(text).toMatch(/deleted automatically one day/i);
   });
 });
 

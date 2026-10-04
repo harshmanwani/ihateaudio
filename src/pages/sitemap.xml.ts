@@ -26,6 +26,8 @@ const entries: Entry[] = [
   { path: '/audio-formats', priority: '0.7', changefreq: 'monthly' },
   { path: '/about', priority: '0.4', changefreq: 'yearly' },
   { path: '/privacy', priority: '0.3', changefreq: 'yearly' },
+  { path: '/terms', priority: '0.2', changefreq: 'yearly' },
+  { path: '/support', priority: '0.3', changefreq: 'yearly' },
 ];
 
 export const GET: APIRoute = () => {

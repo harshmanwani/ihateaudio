@@ -69,6 +69,8 @@ const NON_TOOL_PAGES = new Set([
   'index',
   'loudness-targets',
   'privacy',
+  'support',
+  'terms',
 ]);
 const pageFiles = readdirSync(pagesDir)
   .filter((name) => name.endsWith('.astro'))

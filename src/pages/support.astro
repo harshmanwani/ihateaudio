@@ -1,0 +1,81 @@
+---
+import Base from '../layouts/Base.astro';
+import { SITE } from '../consts';
+
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: 'Support',
+    url: new URL('/support', SITE.url).href,
+    description:
+      'How to report a problem with an iHateAudio tool or the iHateAudio app in ChatGPT, and what the ChatGPT app can do.',
+    publisher: { '@id': `${SITE.url}/#organization` },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'All tools', item: SITE.url },
+      {
+        '@type': 'ListItem',
+        position: 2,
+        name: 'Support',
+        item: new URL('/support', SITE.url).href,
+      },
+    ],
+  },
+];
+---
+
+<Base
+  title="Support: Report a Problem"
+  description="Report a problem with an iHateAudio tool or the iHateAudio app in ChatGPT, and see what the ChatGPT app can and cannot do."
+  path="/support"
+  schema={schema}
+>
+  <div class="wrap page prose">
+    <h1>Support</h1>
+    <p class="toolhead__sub" style="margin-bottom: var(--s8)">
+      Something broke or did the wrong thing? Email
+      <a href={`mailto:${SITE.email}`}>{SITE.email}</a>.
+    </p>
+
+    <h2>What helps us fix it</h2>
+    <ul>
+      <li>Which tool, and whether you used the website or ChatGPT.</li>
+      <li>Your browser and device.</li>
+      <li>The file type, and roughly how long the file is.</li>
+      <li>What you expected, and what happened instead.</li>
+      <li>Any error message, word for word.</li>
+    </ul>
+    <p>
+      You do not need to send the audio. If a problem only happens with one
+      file, say so and we will ask for it.
+    </p>
+
+    <h2>Using iHateAudio in ChatGPT</h2>
+    <p>
+      Share an audio or video file in the chat and say what you want done, for
+      example "remove the silence and normalize it for Spotify". ChatGPT picks
+      the tool, runs it, and gives you a link to the result.
+    </p>
+    <ul>
+      <li>Each job takes one file. The two joining tools take up to 12.</li>
+      <li>Files can be up to 250 MB.</li>
+      <li>
+        Results are deleted one day after they are made, so download them
+        first.
+      </li>
+      <li>
+        The voice recorder works only on the website, because it needs your
+        microphone.
+      </li>
+    </ul>
+    <p>
+      How your files are handled in ChatGPT is on the
+      <a href="/privacy">privacy page</a>. The rules of use are in the
+      <a href="/terms">terms of service</a>.
+    </p>
+  </div>
+</Base>
