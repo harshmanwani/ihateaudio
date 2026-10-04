@@ -19,10 +19,13 @@
  * the model download too, not only of the audio.
  */
 
+import { handleMcp, serveMcpFile } from './mcp';
+
 interface Env {
   FFMPEG: R2Bucket;
   MODELS: R2Bucket;
   ASSETS: Fetcher;
+  BROWSER: Parameters<typeof import('@cloudflare/playwright').launch>[0];
 }
 
 /** Path prefix to the bucket that backs it. */
@@ -67,6 +70,15 @@ function isConditionalOrPartial(request: Request): boolean {
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
+    if (url.pathname === '/mcp' || url.pathname === '/mcp/') {
+      return handleMcp(request, env, ctx);
+    }
+    if (url.pathname.startsWith('/mcp-files/')) {
+      if (request.method !== 'GET' && request.method !== 'HEAD') {
+        return new Response('Method not allowed', { status: 405, headers: { Allow: 'GET, HEAD' } });
+      }
+      return serveMcpFile(request, env);
+    }
     const route = ROUTES.find((r) => url.pathname.startsWith(r.prefix));
 
     // Anything else should never reach here, but if the routing config is ever
