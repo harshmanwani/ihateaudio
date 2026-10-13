@@ -9,7 +9,7 @@ const schema = [
     name: 'Support',
     url: new URL('/support', SITE.url).href,
     description:
-      'How to report a problem with an iHateAudio tool or the iHateAudio app in ChatGPT, and what the ChatGPT app can do.',
+      'How to report a problem with an iHateAudio tool, and how to use the tools from ChatGPT, Claude or another AI assistant.',
     publisher: { '@id': `${SITE.url}/#organization` },
   },
   {
@@ -30,7 +30,7 @@ const schema = [
 
 <Base
   title="Support: Report a Problem"
-  description="Report a problem with an iHateAudio tool or the iHateAudio app in ChatGPT, and see what the ChatGPT app can and cannot do."
+  description="Report a problem with an iHateAudio tool, and see how to use the tools from ChatGPT, Claude or another AI assistant through MCP."
   path="/support"
   schema={schema}
 >
@@ -43,7 +43,7 @@ const schema = [
 
     <h2>What helps us fix it</h2>
     <ul>
-      <li>Which tool, and whether you used the website or ChatGPT.</li>
+      <li>Which tool, and whether you used the website or an AI assistant (which one).</li>
       <li>Your browser and device.</li>
       <li>The file type, and roughly how long the file is.</li>
       <li>What you expected, and what happened instead.</li>
@@ -60,20 +60,45 @@ const schema = [
       example "remove the silence and normalize it for Spotify". ChatGPT picks
       the tool, runs it, and gives you a link to the result.
     </p>
+
+    <h2>Using iHateAudio from Claude or another MCP client</h2>
+    <p>
+      Every tool is also available to any assistant that supports MCP, through
+      one server: <code>https://ihateaudio.com/mcp</code>. It needs no account
+      and no key.
+    </p>
+    <ol>
+      <li>
+        In Claude, open Settings, then Connectors, and add a custom connector
+        named iHateAudio with the URL <code>https://ihateaudio.com/mcp</code>.
+        Other clients have their own place to add an MCP server by URL.
+      </li>
+      <li>
+        Give the assistant a public HTTPS link to the file, one that downloads
+        the file directly (a Dropbox link ending in <code>dl=1</code> works, a
+        page that shows a player does not).
+      </li>
+      <li>
+        Say what you want done. The assistant picks the tool, runs it, and gives
+        you a link to the result.
+      </li>
+    </ol>
+
+    <h2>Limits, in every assistant</h2>
     <ul>
       <li>Each job takes one file. The two joining tools take up to 12.</li>
       <li>Files can be up to 250 MB.</li>
       <li>
-        Results are deleted one day after they are made, so download them
-        first.
+        Result links stop working one hour after they are made, and results are
+        deleted after one day, so download them first.
       </li>
       <li>
-        The voice recorder works only on the website, because it needs your
-        microphone.
+        The voice recorder is not available to assistants, because it needs
+        your microphone. Use it on the website.
       </li>
     </ul>
     <p>
-      How your files are handled in ChatGPT is on the
+      How your files are handled through an assistant is on the
       <a href="/privacy">privacy page</a>. The rules of use are in the
       <a href="/terms">terms of service</a>.
     </p>

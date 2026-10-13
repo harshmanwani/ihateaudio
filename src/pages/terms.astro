@@ -9,7 +9,7 @@ const schema = [
     name: 'Terms of Service',
     url: new URL('/terms', SITE.url).href,
     description:
-      'The terms for using ihateaudio.com and the iHateAudio app in ChatGPT: free, no account, your files stay yours.',
+      'The terms for using ihateaudio.com and the iHateAudio MCP server in ChatGPT, Claude and other AI assistants: free, no account, your files stay yours.',
     publisher: { '@id': `${SITE.url}/#organization` },
   },
   {
@@ -30,7 +30,7 @@ const schema = [
 
 <Base
   title="Terms of Service and Fair Use"
-  description="The terms for using ihateaudio.com and the iHateAudio app in ChatGPT. Free, no account, and your files stay yours."
+  description="The terms for using ihateaudio.com and the iHateAudio MCP server in AI assistants. Free, no account, and your files stay yours."
   path="/terms"
   schema={schema}
 >
@@ -43,8 +43,9 @@ const schema = [
 
     <h2>Who runs this</h2>
     <p>
-      iHateAudio is ihateaudio.com and the iHateAudio app in ChatGPT. Both are
-      run by Harsh Manwani. In these terms, "we" and "us" mean that. By using
+      iHateAudio is ihateaudio.com and the iHateAudio MCP server at
+      ihateaudio.com/mcp, which ChatGPT, Claude and other AI assistants use.
+      Both are run by Harsh Manwani. In these terms, "we" and "us" mean that. By using
       either one, you agree to these terms.
     </p>
 
@@ -61,16 +62,17 @@ const schema = [
       edit the audio you use.
     </p>
     <p>
-      On the website, your files never leave your device. In ChatGPT, they are
-      processed on our server and then deleted. The
+      On the website, your files never leave your device. Through an AI
+      assistant, they are processed on our server and then deleted. The
       <a href="/privacy">privacy page</a> explains both.
     </p>
 
-    <h2>Fair use of the ChatGPT app</h2>
+    <h2>Fair use of the MCP server</h2>
     <p>
-      Every job in the ChatGPT app runs on servers we pay for. Do not call it
-      from scripts or anything other than ChatGPT, do not send it more work than
-      a person would, and do not try to break it or reach anything behind it.
+      Every job sent to the MCP server runs on servers we pay for. Use it
+      through an AI assistant or MCP client the way a person would. Do not send
+      it bulk or batch work from scripts, and do not try to break it or reach
+      anything behind it.
       We can limit or block use that harms the service or other people using
       it.
     </p>

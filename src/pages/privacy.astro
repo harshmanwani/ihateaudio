@@ -9,7 +9,7 @@ const schema = [
     name: 'Privacy',
     url: new URL('/privacy', SITE.url).href,
     description:
-      'On the website no files are uploaded, no accounts exist, and no personal data is collected. How the ChatGPT app differs, and how to verify all of it yourself.',
+      'On the website no files are uploaded, no accounts exist, and no personal data is collected. How ChatGPT and other AI assistants differ, and how to verify it yourself.',
     publisher: { '@id': `${SITE.url}/#organization` },
   },
   {
@@ -30,7 +30,7 @@ const schema = [
 
 <Base
   title="Privacy: What Happens to Your Audio"
-  description="On the website no files are uploaded and no personal data is collected. What happens to your audio, including in ChatGPT, and how to verify it yourself."
+  description="On the website no files are uploaded and no personal data is collected. What happens to your audio, including in AI assistants, and how to verify it."
   path="/privacy"
   schema={schema}
 >
@@ -38,9 +38,10 @@ const schema = [
     <h1>Privacy</h1>
     <p class="toolhead__sub" style="margin-bottom: var(--s8)">
       The short version: on this website your files never leave your device,
-      and there is nothing here to sign up for. The iHateAudio app in ChatGPT
-      is the one exception, because the work runs on our server instead of in
-      your browser. <a href="#chatgpt">That is explained in full below.</a>
+      and there is nothing here to sign up for. Using iHateAudio from ChatGPT,
+      Claude or another AI assistant is the one exception, because the work runs
+      on our server instead of in your browser.
+      <a href="#chatgpt">That is explained in full below.</a>
     </p>
 
     <h2>What happens to your audio</h2>
@@ -75,27 +76,32 @@ const schema = [
       </li>
     </ul>
 
-    <h2 id="chatgpt">If you use iHateAudio in ChatGPT</h2>
+    <h2 id="chatgpt">If you use iHateAudio from ChatGPT, Claude or another AI assistant</h2>
     <p>
-      ChatGPT cannot run a tool inside your browser tab, so the iHateAudio app
-      in ChatGPT works differently. When you share a file in the chat and ask
-      for a tool:
+      An AI assistant cannot run a tool inside your browser tab, so it reaches
+      iHateAudio through our MCP server at <code>ihateaudio.com/mcp</code>
+      instead, and the work happens on our server. When you ask an assistant
+      to use one of the tools:
     </p>
     <ul>
       <li>
-        ChatGPT gives our server a temporary link to the file. Our server
-        downloads it and stores it in Cloudflare R2, the storage this site
-        already runs on.
+        The assistant gives our server a link to the file. In ChatGPT that is a
+        temporary link to the file you shared in the chat; in other assistants
+        it is a public link that you or the assistant supply. Our server
+        downloads the file from that link and stores it in Cloudflare R2, the
+        storage this site already runs on.
       </li>
       <li>
         Our server opens the same tool page from this site in a browser run by
         Cloudflare, loads your file into it, and runs the tool with the settings
-        ChatGPT chose. It is the same code that runs in your own browser here.
+        the assistant chose. It is the same code that runs in your own browser
+        here.
       </li>
       <li>
-        The result is stored in R2, and ChatGPT gets a link to it. The link has
-        a long random part that cannot be guessed, but anyone who has the link
-        can download the file until it is deleted.
+        The result is stored in R2, and the assistant gets a link to it. The
+        link has a long random part that cannot be guessed, but anyone who has
+        it can download the file. It stops working one hour after the result is
+        made.
       </li>
       <li>
         Your original file is deleted as soon as the job finishes. Results are
@@ -104,17 +110,22 @@ const schema = [
       </li>
     </ul>
     <p>
-      So in this case your audio does leave your device. It goes to OpenAI when
-      you share it in ChatGPT, under OpenAI's own privacy policy, and then to
-      our server on Cloudflare for the time above. We do not listen to it,
-      share it, sell it, or use it to train anything.
+      So in this case your audio does leave your device. It goes to the
+      assistant's company (OpenAI for ChatGPT, Anthropic for Claude) under that
+      company's own privacy policy, and then to our server on Cloudflare for
+      the time above. Cloudflare is the only other company that handles it, as
+      our hosting provider. We do not listen to it, share it, sell it, or use
+      it to train anything.
     </p>
     <p>
-      Cloudflare keeps our server's request logs for a few days. A log line can
-      include a file's name, because the name is part of its link, but never
-      the audio. And because the job runs on this site's own tool page, the
-      page analytics below count it like a visit: a page view, that a file was
-      accepted, and the output format. None of that identifies you.
+      Cloudflare keeps our server's request logs for a few days. A log line
+      records the time of a request and can include the IP address it came
+      from, which for an assistant's request is usually the assistant's server
+      rather than you, and the link path, which can include a file's name. It
+      never includes the audio. And because the job runs on this site's own
+      tool page, the page analytics below count it like a visit: a page view,
+      that a file was accepted, and the output format. None of that identifies
+      you.
     </p>
 
     <h2>What we do collect</h2>
