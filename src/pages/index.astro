@@ -1,6 +1,7 @@
 ---
 import Base from '../layouts/Base.astro';
 import Icon from '../components/Icon.astro';
+import FeaturedOn from '../components/FeaturedOn.astro';
 import { SITE } from '../consts';
 import { CATEGORIES, TOOLS, toolsIn } from '../data/tools';
 
@@ -334,6 +335,8 @@ const schema = [
       }
     </div>
   </div>
+
+  <FeaturedOn />
 </Base>
 
 <style>

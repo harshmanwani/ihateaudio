@@ -1,0 +1,15 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.ihateaudio/ihateaudio",
+  "title": "ihateaudio",
+  "description": "49 audio tools: trim, convert, normalize, remove vocals, split stems, transcribe, and more.",
+  "version": "0.3.0",
+  "websiteUrl": "https://ihateaudio.com",
+  "icons": [
+    { "src": "https://ihateaudio.com/icon-192.png", "mimeType": "image/png", "sizes": ["192x192"] },
+    { "src": "https://ihateaudio.com/favicon.svg", "mimeType": "image/svg+xml", "sizes": ["any"] }
+  ],
+  "remotes": [
+    { "type": "streamable-http", "url": "https://ihateaudio.com/mcp" }
+  ]
+}

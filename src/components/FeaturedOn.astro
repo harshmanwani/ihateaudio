@@ -1,0 +1,143 @@
+---
+/**
+ * The "Featured on" strip, homepage only. See src/data/badges.ts for the rules.
+ *
+ * It is meant to be found, not looked at: the badges rest small, desaturated and
+ * at half opacity, and take their own colour back on hover or focus. The markup
+ * stays byte-identical whatever the styling does, which is what the directory
+ * verifiers check. Five or more badges scroll as a slow marquee (two copies, the
+ * second inert); reduced-motion users get a static row.
+ */
+import { DIRECTORY_BADGES } from '../data/badges';
+
+const badges = [...DIRECTORY_BADGES].sort((a, b) => a.since.localeCompare(b.since));
+const marquee = badges.length >= 5;
+const seconds = Math.max(24, badges.length * 6);
+---
+
+{
+  badges.length > 0 && (
+    <aside class="featured" aria-label="Featured on">
+      <p class="featured__label">Featured on</p>
+      <div class:list={['featured__viewport', { 'featured__viewport--marquee': marquee }]}>
+        <div class="featured__track" style={marquee ? `animation-duration:${seconds}s` : undefined}>
+          {(marquee ? [false, true] : [false]).map((copy) => (
+            <ul class="featured__row" aria-hidden={copy ? 'true' : undefined} inert={copy || undefined}>
+              {badges.map((badge) => (
+                <li>
+                  {badge.kind === 'html' ? (
+                    <Fragment set:html={badge.exactHtml} />
+                  ) : (
+                    <a href={badge.href} target="_blank" rel={badge.rel ?? 'noopener'} title={badge.platform}>
+                      <img
+                        src={badge.src}
+                        alt={badge.alt}
+                        width={badge.width}
+                        height={badge.height}
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    </a>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ))}
+        </div>
+      </div>
+    </aside>
+  )
+}
+
+<style>
+  .featured {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding: 40px 20px 48px;
+    text-align: center;
+  }
+  .featured__label {
+    margin: 0 0 14px;
+    font-size: 0.66rem;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    opacity: 0.7;
+  }
+  .featured__row {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: 16px 28px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .featured__row :global(a) {
+    display: inline-flex;
+    align-items: center;
+    height: 28px;
+  }
+  .featured__row :global(img) {
+    display: block;
+    width: auto;
+    height: 28px;
+    max-width: 150px;
+    filter: grayscale(1);
+    opacity: 0.45;
+    transition:
+      filter 0.25s ease,
+      opacity 0.25s ease;
+  }
+  .featured__row :global(a:hover img),
+  .featured__row :global(a:focus-visible img) {
+    filter: none;
+    opacity: 1;
+  }
+
+  .featured__viewport--marquee {
+    overflow: hidden;
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+    mask-image: linear-gradient(to right, transparent, #000 12%, #000 88%, transparent);
+  }
+  .featured__viewport--marquee .featured__track {
+    display: flex;
+    width: max-content;
+    animation: featured-scroll linear infinite;
+  }
+  .featured__viewport--marquee .featured__track:hover {
+    animation-play-state: paused;
+  }
+  .featured__viewport--marquee .featured__row {
+    flex-wrap: nowrap;
+    padding-right: 28px;
+  }
+  @keyframes featured-scroll {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .featured__viewport--marquee {
+      -webkit-mask-image: none;
+      mask-image: none;
+    }
+    .featured__viewport--marquee .featured__track {
+      animation: none;
+      width: auto;
+      justify-content: center;
+    }
+    .featured__viewport--marquee .featured__row {
+      flex-wrap: wrap;
+      padding-right: 0;
+    }
+    .featured__viewport--marquee .featured__row[aria-hidden] {
+      display: none;
+    }
+  }
+</style>

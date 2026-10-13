@@ -103,6 +103,49 @@ if (!allowsInline && offenders.length > 0) {
   process.exit(1);
 }
 
+/**
+ * Every cross-origin image the pages ship must be allowed by img-src.
+ *
+ * The directory badges on the homepage are the reason this exists: each one
+ * hot-links the directory's own image (their verifiers look for it), and a host
+ * missing from img-src paints a broken image instead of a badge, again with no
+ * error anywhere but the console of whoever happens to look.
+ */
+const imgSrc = (
+  csp
+    .split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith('img-src')) ?? ''
+)
+  .split(/\s+/)
+  .slice(1);
+
+function imageAllowed(href) {
+  const { protocol, host } = new URL(href);
+  return imgSrc.some((source) => {
+    if (source === '*' || source === `${protocol}`) return true;
+    const match = /^(https?:\/\/)?(\*\.)?([^/]+)$/.exec(source);
+    if (!match) return false;
+    const [, scheme, wildcard, domain] = match;
+    if (scheme && scheme !== `${protocol}//`) return false;
+    return wildcard ? host.endsWith(`.${domain}`) : host === domain;
+  });
+}
+
+const IMG = /<img\b[^>]*?\ssrc\s*=\s*["'](https?:\/\/[^"']+)["']/gi;
+const blockedImages = new Map();
+for (const file of pages(dist)) {
+  for (const match of readFileSync(file, 'utf8').matchAll(IMG)) {
+    if (!imageAllowed(match[1])) blockedImages.set(match[1], file.replace(`${dist}/`, ''));
+  }
+}
+if (blockedImages.size > 0) {
+  console.error(`\n${blockedImages.size} image(s) will be blocked by img-src in the shipped CSP:\n`);
+  for (const [href, page] of blockedImages) console.error(`  ${page}\n    ${href}\n`);
+  console.error('Add each host to img-src in public/_headers.\n');
+  process.exit(1);
+}
+
 const pageCount = pages(dist).length;
 if (allowsInline) {
   console.log(
