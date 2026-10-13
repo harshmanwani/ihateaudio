@@ -1,0 +1,12 @@
+import { chromium } from '@playwright/test';
+import { fileURLToPath } from 'node:url';
+import { dirname, join } from 'node:path';
+const here = dirname(fileURLToPath(import.meta.url));
+const b = await chromium.launch();
+const p = await b.newPage({ viewport: { width: 1080, height: 1080 } });
+await p.goto('file://' + join(here, 'overlay.html'));
+await p.evaluate(() => document.fonts.ready);
+await p.waitForTimeout(300);
+await p.screenshot({ path: join(here, 'overlay.png'), omitBackground: true });
+await b.close();
+console.log('overlay.png');

@@ -1,0 +1,167 @@
+<template>
+  <style>
+    @font-face{font-family:Instrument Sans;src:url("assets/fonts/captured-instrument-sans-latin.woff2")format("woff2-variations");font-weight:400 700;font-style:normal;font-display:swap;unicode-range:U+??,U+131,U+152-153,U+2BB-2BC,U+2C6,U+2DA,U+2DC,U+304,U+308,U+329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+
+    #root {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      container-type: size;
+      font-family: "Instrument Sans", sans-serif;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Green register ground: brand #006E3D, flat, full bleed. */
+    #wm-ground {
+      position: absolute;
+      inset: 0;
+      background: #006e3d;
+    }
+
+    /* Lockup band: 0 to 940px tall, so its centre sits at y = 470. */
+    #wm-lockup {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100cqw;
+      height: 87.037cqh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Shake layer (x / y only). */
+    #wm-mark {
+      position: relative;
+      flex: 0 0 auto;
+    }
+
+    /* Slam layer (scale only). 250px square at 1920 wide. */
+    #wm-tile {
+      width: 13.0208cqw;
+      height: 13.0208cqw;
+      transform-origin: 50% 50%;
+    }
+
+    #wm-logo {
+      display: block;
+      width: 100%;
+      height: 100%;
+      overflow: visible;
+    }
+
+    /* Wordmark: 210px, 700, tracking -0.03em. The 1.9cqw margin plus the
+       left side bearing of "i" gives an optical gap of about 48px. */
+    #wm-word {
+      display: flex;
+      flex: 0 0 auto;
+      margin-left: 1.9cqw;
+      font-size: 10.9375cqw;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -0.03em;
+      color: #ffffff;
+      white-space: nowrap;
+    }
+
+    .wm-ch {
+      display: inline-block;
+      line-height: 1;
+    }
+
+    .wm-hate {
+      color: #31d685;
+    }
+  </style>
+
+  <div data-hf-id="hf-fp4n" id="root" data-composition-id="04-wordmark" data-width="1920" data-height="1080" data-duration="2">
+    <div data-hf-id="hf-t0tu" id="wm-ground" class="clip" data-start="0" data-duration="2" data-track-index="0"></div>
+
+    <div data-hf-id="hf-5zi2" id="wm-lockup" class="clip" data-start="0" data-duration="2" data-track-index="1">
+      <div data-hf-id="hf-fdql" id="wm-mark">
+        <div data-hf-id="hf-a91y" id="wm-tile">
+          <svg data-hf-id="hf-v6d2" id="wm-logo" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" aria-hidden="true">
+            <rect data-hf-id="hf-bqkn" width="32" height="32" rx="7" fill="#0C3524" />
+            <g data-hf-id="hf-2c3u" fill="#38E08F">
+              <rect data-hf-id="hf-panc" class="wm-bar" x="4" y="12" width="3" height="8" rx="1.5" />
+              <rect data-hf-id="hf-t6nj" class="wm-bar" x="9" y="8" width="3" height="16" rx="1.5" />
+              <rect data-hf-id="hf-xttg" class="wm-bar" x="14" y="1" width="3" height="30" rx="1.5" />
+              <rect data-hf-id="hf-0v9v" class="wm-bar" x="19" y="9" width="3" height="14" rx="1.5" />
+              <rect data-hf-id="hf-2pcw" class="wm-bar" x="24" y="12" width="3" height="8" rx="1.5" />
+            </g>
+          </svg>
+        </div>
+      </div>
+      <div data-hf-id="hf-xy6y" id="wm-word" aria-label="ihateaudio"><span data-hf-id="hf-t8ui" class="wm-ch">i</span><span data-hf-id="hf-50dy" class="wm-ch wm-hate">h</span><span data-hf-id="hf-1fmp" class="wm-ch wm-hate">a</span><span data-hf-id="hf-6lm2" class="wm-ch wm-hate">t</span><span data-hf-id="hf-zuel" class="wm-ch wm-hate">e</span><span data-hf-id="hf-wfaq" class="wm-ch">a</span><span data-hf-id="hf-rnme" class="wm-ch">u</span><span data-hf-id="hf-xm7t" class="wm-ch">d</span><span data-hf-id="hf-w5ou" class="wm-ch">i</span><span data-hf-id="hf-vmoo" class="wm-ch">o</span></div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      window.__timelines = window.__timelines || {};
+      var tl = gsap.timeline({ paused: true });
+
+      // Logo geometry from assets/brand/logo.svg (32-unit grid). Every bar is centred on y = 16.
+      var BARS = [
+        { y: 12, h: 8 },
+        { y: 8, h: 16 },
+        { y: 1, h: 30 },
+        { y: 9, h: 14 },
+        { y: 12, h: 8 }
+      ];
+      var CY = 16;
+      var bars = document.querySelectorAll("#wm-logo .wm-bar");
+      var letters = document.querySelectorAll("#wm-word .wm-ch");
+
+      // Scene 1 (0.0-0.45s): the tile slams in on the DROP at 0.0.
+      // 2-frame shake: frame 0 offset, frame 1 opposite offset, frame 2 at rest.
+      var wmShakeEase = function (p) {
+        return p < 0.2 ? 0 : p < 0.55 ? 1.8 : 1;
+      };
+      tl.fromTo("#wm-mark", { x: -10, y: 5 }, { x: 0, y: 0, duration: 0.1, ease: wmShakeEase }, 0);
+      // Slam: scale 1.35 -> 1.0, long-tail settle, no overshoot.
+      tl.fromTo("#wm-tile", { scale: 1.35 }, { scale: 1, duration: 0.45, ease: "expo.out" }, 0);
+
+      // Bars grow from 0 height about their centre, left -> right 0.04s apart, middle bar last.
+      var GROW_ORDER = [0, 1, 3, 4, 2];
+      GROW_ORDER.forEach(function (bi, k) {
+        var b = BARS[bi];
+        tl.fromTo(
+          bars[bi],
+          { attr: { y: CY, height: 0 } },
+          { attr: { y: b.y, height: b.h }, duration: 0.26, ease: "expo.out" },
+          0.03 + k * 0.04
+        );
+      });
+
+      // Scene 2 (0.15-0.75s): the wordmark cascades in letter by letter.
+      for (var i = 0; i < letters.length; i++) {
+        tl.fromTo(
+          letters[i],
+          { y: 50, opacity: 0 },
+          { y: 0, opacity: 1, duration: 0.28, ease: "power3.out" },
+          0.15 + i * 0.035
+        );
+      }
+
+      // Scene 3 (0.75-2.0s): held lockup. The bars pulse on the kicks at 1.0 and 1.5:
+      // height jumps +18% on the kick frame, then settles back within 0.25s, 0.02s stagger.
+      var PULSE = 1.18;
+      [1.0, 1.5].forEach(function (T) {
+        BARS.forEach(function (b, bi) {
+          var H = b.h * PULSE;
+          tl.fromTo(
+            bars[bi],
+            { attr: { y: CY - H / 2, height: H } },
+            { attr: { y: b.y, height: b.h }, duration: 0.25, ease: "power3.out", immediateRender: false },
+            T + bi * 0.02
+          );
+        });
+      });
+
+      window.__timelines["04-wordmark"] = tl;
+    })();
+  </script>
+</template>

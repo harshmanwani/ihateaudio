@@ -1,0 +1,400 @@
+<template>
+  <style>
+@font-face{font-family:Instrument Sans;src:url("assets/fonts/captured-instrument-sans-latin.woff2")format("woff2-variations");font-weight:400 700;font-style:normal;font-display:swap;unicode-range:U+??,U+131,U+152-153,U+2BB-2BC,U+2C6,U+2DA,U+2DC,U+304,U+308,U+329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+
+    #root {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: "Instrument Sans", sans-serif;
+    }
+
+    /* White register: full-bleed ground on its own clip layer (never on #root). */
+    .prm-ground {
+      position: absolute;
+      inset: 0;
+      width: 1920px;
+      height: 1080px;
+      background: #FFFFFF;
+    }
+
+    /* Everything that moves rides this stage, so the slow camera drift keeps
+       the trace, strike and window aligned. */
+    .prm-stage {
+      position: absolute;
+      inset: 0;
+      width: 1920px;
+      height: 1080px;
+    }
+
+    /* ---------- copy (left column, x 120, max width 820) ---------- */
+    .prm-line {
+      position: absolute;
+      left: 120px;
+      width: 820px;
+      margin: 0;
+      font-family: "Instrument Sans", sans-serif;
+      font-weight: 700;
+      line-height: 1;
+      letter-spacing: -0.035em;
+      color: #0F1611;
+      font-synthesis: none;
+      font-kerning: normal;
+    }
+
+    .prm-line1 {
+      top: 250px;
+      font-size: 92px;
+    }
+
+    .prm-line2 {
+      top: 520px;
+      font-size: 76px;
+    }
+
+    .prm-word {
+      display: inline-block;
+    }
+
+    .prm-accent {
+      color: #006E3D;
+    }
+
+    /* ---------- browser window: x 980-1820, y 200-740 (840x540) ---------- */
+    .prm-window {
+      position: absolute;
+      left: 980px;
+      top: 200px;
+      width: 840px;
+      height: 540px;
+      box-sizing: border-box;
+      border: 1px solid #DEE3E0;
+      border-radius: 16px;
+      background: #FFFFFF;
+      overflow: hidden;
+      box-shadow: 0 32px 64px -32px rgba(15, 22, 17, 0.28);
+    }
+
+    .prm-bar {
+      position: relative;
+      height: 44px;
+      box-sizing: border-box;
+      border-bottom: 1px solid #DEE3E0;
+      background: #FFFFFF;
+    }
+
+    .prm-dot {
+      position: absolute;
+      top: 15px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #DEE3E0;
+    }
+
+    .prm-dot-1 { left: 18px; }
+    .prm-dot-2 { left: 38px; }
+    .prm-dot-3 { left: 58px; }
+
+    /* URL pill centred on the window (x 1400): left/right 0 + auto margins, no transform. */
+    .prm-url {
+      position: absolute;
+      top: 7px;
+      left: 0;
+      right: 0;
+      margin: 0 auto;
+      width: 340px;
+      height: 30px;
+      border-radius: 8px;
+      background: #F5F8F6;
+      color: #515954;
+      font-family: Menlo, ui-monospace, monospace;
+      font-size: 18px;
+      line-height: 30px;
+      text-align: center;
+      white-space: nowrap;
+    }
+
+    /* Screenshot at the window's inner width (838px), top-aligned.
+       838 x (1350 / 2400) = 471.375px tall. Percentages below map to this box. */
+    .prm-shotbox {
+      position: relative;
+      width: 838px;
+      height: 471.375px;
+    }
+
+    .prm-shot {
+      display: block;
+      width: 838px;
+      height: 471.375px;
+    }
+
+    /* Amber playhead over the real waveform canvas: x 22% -> 70%, y 33%-58% of the image. */
+    .prm-playhead {
+      position: absolute;
+      left: 22%;
+      top: 33%;
+      width: 3px;
+      height: 25%;
+      margin-left: -1.5px;
+      background: #E18518;
+    }
+
+    .prm-playhead-cap {
+      position: absolute;
+      left: -4.5px;
+      top: -6px;
+      width: 0;
+      height: 0;
+      border-left: 6px solid transparent;
+      border-right: 6px solid transparent;
+      border-top: 7px solid #E18518;
+    }
+
+    /* ---------- overlays in canvas pixels ---------- */
+    .prm-svg {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1920px;
+      height: 1080px;
+      overflow: visible;
+    }
+
+    .prm-icon-stroke {
+      fill: none;
+      stroke: #515954;
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .prm-dash {
+      fill: none;
+      stroke: #515954;
+      stroke-width: 3;
+      stroke-dasharray: 10 10;
+      stroke-linecap: butt;
+    }
+
+    .prm-dash-reveal {
+      fill: none;
+      stroke: #FFFFFF;
+      stroke-width: 10;
+      stroke-linecap: butt;
+    }
+
+    /* Amber strike: 10px bar, left end pinned at (1297.3, 167.8), rotated -12deg,
+       centre lands on (1400, 146) where the dashed line meets the cloud. */
+    .prm-strike {
+      position: absolute;
+      left: 1297.3px;
+      top: 162.8px;
+      width: 210px;
+      height: 10px;
+      background: #E18518;
+    }
+
+    .prm-trace {
+      fill: none;
+      stroke: #006E3D;
+      stroke-width: 4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+  </style>
+
+  <div data-hf-id="hf-vn5u" id="root" data-composition-id="07-promise" data-start="0" data-duration="4" data-width="1920" data-height="1080">
+    <div data-hf-id="hf-mres" id="prm-ground" class="clip prm-ground" data-start="0" data-duration="4" data-track-index="0"></div>
+
+    <div data-hf-id="hf-7w97" id="prm-stage" class="clip prm-stage" data-start="0" data-duration="4" data-track-index="1">
+      <div data-hf-id="hf-c5ee" id="prm-line1" class="prm-line prm-line1"><span data-hf-id="hf-6x6z" id="prm-a1" class="prm-word">runs</span> <span data-hf-id="hf-r3po" id="prm-a2" class="prm-word">right</span> <span data-hf-id="hf-4f6k" id="prm-a3" class="prm-word">in</span> <span data-hf-id="hf-wf8j" id="prm-a4" class="prm-word">your</span> <span data-hf-id="hf-xmu3" id="prm-a5" class="prm-word prm-accent">browser.</span></div>
+
+      <div data-hf-id="hf-5u64" id="prm-line2" class="prm-line prm-line2"><span data-hf-id="hf-07ov" id="prm-b1" class="prm-word">your</span> <span data-hf-id="hf-7bqp" id="prm-b2" class="prm-word">file</span> <span data-hf-id="hf-arpw" id="prm-b3" class="prm-word prm-accent">never</span> <span data-hf-id="hf-vq3d" id="prm-b4" class="prm-word prm-accent">leaves</span> <span data-hf-id="hf-y8y3" id="prm-b5" class="prm-word">your</span> <span data-hf-id="hf-nnm5" id="prm-b6" class="prm-word">device.</span></div>
+
+      <div data-hf-id="hf-uwpu" id="prm-window" class="prm-window">
+        <div data-hf-id="hf-kug8" id="prm-bar" class="prm-bar">
+          <span data-hf-id="hf-t83i" id="prm-dot-1" class="prm-dot prm-dot-1"></span>
+          <span data-hf-id="hf-p2nc" id="prm-dot-2" class="prm-dot prm-dot-2"></span>
+          <span data-hf-id="hf-do1y" id="prm-dot-3" class="prm-dot prm-dot-3"></span>
+          <div data-hf-id="hf-yqxc" id="prm-url" class="prm-url">ihateaudio.com/audio-trimmer</div>
+        </div>
+        <div data-hf-id="hf-p9nw" id="prm-shotbox" class="prm-shotbox">
+          <img data-hf-id="hf-sfe9" id="prm-shot" class="prm-shot" src="assets/pages/trimmer-page.jpg" alt="">
+          <div data-hf-id="hf-2jk2" id="prm-playhead" class="prm-playhead"><span data-hf-id="hf-1dsj" id="prm-playhead-cap" class="prm-playhead-cap"></span></div>
+        </div>
+      </div>
+
+      <!-- Upload path: dashed line from the window's top edge (y 200) up to an outline cloud centred on (1400, 110). -->
+      <svg data-hf-id="hf-7zdp" id="prm-upload-svg" class="prm-svg" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+        <defs data-hf-id="hf-mh0t">
+          <mask data-hf-id="hf-dkl1" id="prm-dash-mask" maskUnits="userSpaceOnUse" x="0" y="0" width="1920" height="1080">
+            <path data-hf-id="hf-4eke" id="prm-dash-reveal" class="prm-dash-reveal" d="M 1400 200 L 1400 149" />
+          </mask>
+        </defs>
+        <g data-hf-id="hf-r0js" id="prm-upload">
+          <path data-hf-id="hf-3ust" id="prm-dash" class="prm-dash" d="M 1400 200 L 1400 149" mask="url(#prm-dash-mask)" />
+          <path data-hf-id="hf-bigs" id="prm-cloud" class="prm-icon-stroke" d="M 1400 147 H 1433 A 22.5 22.5 0 0 0 1433 102 A 31 31 0 0 0 1371 105 A 22 22 0 0 0 1362 147 Z" />
+          <path data-hf-id="hf-fbvk" id="prm-arrow-shaft" class="prm-icon-stroke" d="M 1400 137 L 1400 98" />
+          <path data-hf-id="hf-m42i" id="prm-arrow-head" class="prm-icon-stroke" d="M 1387 111 L 1400 98 L 1413 111" />
+        </g>
+      </svg>
+
+      <div data-hf-id="hf-w46a" id="prm-strike" class="prm-strike"></div>
+
+      <!-- Green trace around the window, starting at top centre (where the upload line left) and running clockwise. -->
+      <svg data-hf-id="hf-1723" id="prm-trace-svg" class="prm-svg" viewBox="0 0 1920 1080" xmlns="http://www.w3.org/2000/svg">
+        <path data-hf-id="hf-dkuy" id="prm-trace" class="prm-trace" d="M 1400 199 H 1804 A 17 17 0 0 1 1821 216 V 724 A 17 17 0 0 1 1804 741 H 996 A 17 17 0 0 1 979 724 V 216 A 17 17 0 0 1 996 199 Z" />
+      </svg>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      window.__timelines = window.__timelines || {};
+
+      // 120 BPM: one beat = 0.5s. Breakdown (no kick) 0.0-2.0, kicks 2.0 / 2.5 / 3.0 / 3.5, riser 3.0-4.0.
+      var DURATION = 4;
+      var WORD_STEP = 0.06;
+      var WORD_DUR = 0.6;
+
+      var WINDOW_IN = 0.1;
+      var PLAYHEAD_START = 0.6;
+      var PLAYHEAD_END = 2.0;
+      var LINE2_START = 2.0;
+      var UPLOAD_START = 2.2;
+      var STRIKE_AT = 3.0;
+      var TRACE_START = 3.2;
+      var TRACE_DUR = 0.6;
+
+      // Playhead travel is measured on the rendered image box (838px wide), not the window.
+      var SHOT_W = 838;
+      var PLAYHEAD_TRAVEL = SHOT_W * (0.70 - 0.22);
+
+      var tl = gsap.timeline({ paused: true });
+
+      // svg-path-draw setup: one dash the measured length of each path, shifted fully out of view.
+      // The gap is longer than the path and the hidden offset sits 1px inside it, so a round
+      // cap never leaves a dot at the path start before the draw begins.
+      function prepDraw(id, fallback) {
+        var p = document.getElementById(id);
+        var len = (p && p.getTotalLength && p.getTotalLength()) || fallback;
+        var dash = len + 0.5;
+        var hidden = dash + 1;
+        p.style.strokeDasharray = dash + " " + (len + 4);
+        p.style.strokeDashoffset = String(hidden);
+        return hidden;
+      }
+
+      var dashLen = prepDraw("prm-dash-reveal", 51);
+      var cloudLen = prepDraw("prm-cloud", 292);
+      var shaftLen = prepDraw("prm-arrow-shaft", 39);
+      var headLen = prepDraw("prm-arrow-head", 37);
+      var traceLen = prepDraw("prm-trace", 2738);
+
+      // Macro camera: a slow upward drift under the whole shot (keeps every overlay aligned).
+      tl.fromTo("#prm-stage", { y: 0 }, { y: -10, duration: DURATION, ease: "none" }, 0);
+
+      // Scene 1 (0.0-0.6): line 1 word by word; the browser window rises in at 0.1.
+      ["#prm-a1", "#prm-a2", "#prm-a3", "#prm-a4", "#prm-a5"].forEach(function (sel, i) {
+        tl.fromTo(
+          sel,
+          { y: 20, opacity: i === 0 ? 0.4 : 0 },
+          { y: 0, opacity: 1, duration: WORD_DUR, ease: "expo.out" },
+          i * WORD_STEP
+        );
+      });
+
+      tl.fromTo(
+        "#prm-window",
+        { y: 60, opacity: 0 },
+        { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" },
+        WINDOW_IN
+      );
+
+      // Scene 2 (0.6-2.0): held read; the amber playhead runs across the real waveform, linear.
+      tl.fromTo(
+        "#prm-playhead",
+        { opacity: 0 },
+        { opacity: 1, duration: 0.1, ease: "power1.out" },
+        PLAYHEAD_START
+      );
+      tl.fromTo(
+        "#prm-playhead",
+        { x: 0 },
+        { x: PLAYHEAD_TRAVEL, duration: PLAYHEAD_END - PLAYHEAD_START, ease: "none", immediateRender: false },
+        PLAYHEAD_START
+      );
+
+      // Scene 3 (2.0-3.0): kick returns. Line 1 dims to 35%, line 2 reveals word by word.
+      tl.fromTo(
+        "#prm-line1",
+        { opacity: 1 },
+        { opacity: 0.35, duration: 0.35, ease: "power2.out" },
+        LINE2_START
+      );
+      ["#prm-b1", "#prm-b2", "#prm-b3", "#prm-b4", "#prm-b5", "#prm-b6"].forEach(function (sel, i) {
+        tl.fromTo(
+          sel,
+          { y: 20, opacity: 0 },
+          { y: 0, opacity: 1, duration: WORD_DUR, ease: "expo.out" },
+          LINE2_START + i * WORD_STEP
+        );
+      });
+
+      // 2.2: the upload path draws itself (svg-path-draw) over 0.4s:
+      // dashed line up from the window, then the cloud, then the arrow inside it.
+      tl.fromTo(
+        "#prm-dash-reveal",
+        { strokeDashoffset: dashLen },
+        { strokeDashoffset: 0, duration: 0.16, ease: "none" },
+        UPLOAD_START
+      );
+      tl.fromTo(
+        "#prm-cloud",
+        { strokeDashoffset: cloudLen },
+        { strokeDashoffset: 0, duration: 0.28, ease: "power2.out" },
+        UPLOAD_START + 0.12
+      );
+      tl.fromTo(
+        "#prm-arrow-shaft",
+        { strokeDashoffset: shaftLen },
+        { strokeDashoffset: 0, duration: 0.14, ease: "power2.out" },
+        UPLOAD_START + 0.2
+      );
+      tl.fromTo(
+        "#prm-arrow-head",
+        { strokeDashoffset: headLen },
+        { strokeDashoffset: 0, duration: 0.12, ease: "power2.out" },
+        UPLOAD_START + 0.28
+      );
+
+      // Scene 4 (3.0-4.0): on the beat, the amber strike slashes through the cloud and the line;
+      // the upload path fades to 30%.
+      tl.fromTo(
+        "#prm-strike",
+        { scaleX: 0, rotation: -12, transformOrigin: "0% 50%" },
+        { scaleX: 1, rotation: -12, transformOrigin: "0% 50%", duration: 0.15, ease: "power2.out" },
+        STRIKE_AT
+      );
+      tl.fromTo(
+        "#prm-upload",
+        { opacity: 1 },
+        { opacity: 0.3, duration: 0.3, ease: "power1.out" },
+        STRIKE_AT + 0.1
+      );
+
+      // 3.2: a 4px brand-green outline traces the browser window's perimeter. Hold to 4.0.
+      tl.fromTo(
+        "#prm-trace",
+        { strokeDashoffset: traceLen },
+        { strokeDashoffset: 0, duration: TRACE_DUR, ease: "power2.inOut" },
+        TRACE_START
+      );
+
+      window.__timelines["07-promise"] = tl;
+    })();
+  </script>
+</template>

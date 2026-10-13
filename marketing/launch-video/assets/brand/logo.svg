@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img">
+  <!--
+    Flat, one colour on one colour, five shapes. Everything sits on integer
+    positions in a 32 unit grid, so at 16, 32, 64 and 128 pixels every edge
+    lands on a whole device pixel and nothing is resampled.
+
+    The one idea: the middle bar runs almost the full height of the tile,
+    overflowing where a stock five-bar audio glyph would tuck neatly inside.
+    That is the whole distinguishing mark, and it survives being 16 pixels wide,
+    single colour, or engraved on something.
+  -->
+  <rect width="32" height="32" rx="7" fill="#0C3524"/>
+  <g fill="#38E08F">
+    <rect x="4" y="12" width="3" height="8" rx="1.5"/>
+    <rect x="9" y="8" width="3" height="16" rx="1.5"/>
+    <rect x="14" y="1" width="3" height="30" rx="1.5"/>
+    <rect x="19" y="9" width="3" height="14" rx="1.5"/>
+    <rect x="24" y="12" width="3" height="8" rx="1.5"/>
+  </g>
+</svg>

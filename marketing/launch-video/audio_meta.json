@@ -1,0 +1,13 @@
+{
+  "bgm": {
+    "path": "assets/audio/ihateaudio-bed.wav",
+    "source": "host",
+    "volume": 1,
+    "duration_s": 37.5,
+    "mode": "host",
+    "note": "Original synthesis by scripts/make-music.mjs (no samples or third-party material). 120 BPM, hits baked in on the frame starts."
+  },
+  "bgm_pending": false,
+  "voices": [],
+  "sfx": []
+}

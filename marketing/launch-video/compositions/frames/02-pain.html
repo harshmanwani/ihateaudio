@@ -1,0 +1,400 @@
+<template>
+  <style>
+    @font-face{font-family:Instrument Sans;src:url("assets/fonts/captured-instrument-sans-latin.woff2")format("woff2-variations");font-weight:400 700;font-style:normal;font-display:swap;unicode-range:U+??,U+131,U+152-153,U+2BB-2BC,U+2C6,U+2DA,U+2DC,U+304,U+308,U+329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+
+    /* Frame root: styled by #root only (never a class on the composition element). */
+    #root {
+      position: relative;
+      width: 1920px;
+      height: 1080px;
+      overflow: hidden;
+      font-family: "Instrument Sans", sans-serif;
+    }
+
+    /* Full-bleed ground: ink #0F1611 (dark register, frame 02). */
+    #pain-ground {
+      position: absolute;
+      inset: 0;
+      width: 1920px;
+      height: 1080px;
+      background: #0f1611;
+      z-index: 0;
+    }
+
+    #pain-stage {
+      position: absolute;
+      inset: 0;
+      width: 1920px;
+      height: 1080px;
+      z-index: 1;
+    }
+
+    #pain-fxdefs {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 0;
+      height: 0;
+      overflow: hidden;
+    }
+
+    /* ---- Ghost 3: diagonal WATERMARK tile (built in script, ~7%) ---- */
+    #pain-wm {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+    .pain-wm-word {
+      position: absolute;
+      width: 280px;
+      height: 40px;
+      margin-left: -140px;
+      margin-top: -20px;
+      line-height: 40px;
+      text-align: center;
+      white-space: nowrap;
+      font-family: Menlo, ui-monospace, monospace;
+      font-weight: 700;
+      font-size: 34px;
+      letter-spacing: 0.2em;
+      color: #ffffff;
+      transform: rotate(-20deg);
+    }
+
+    /* ---- Ghost UI artifacts (~20% white) ---- */
+    #pain-ghosts {
+      position: absolute;
+      inset: 0;
+    }
+    .pain-mono {
+      position: absolute;
+      white-space: nowrap;
+      font-family: Menlo, ui-monospace, monospace;
+      font-weight: 400;
+      color: #ffffff;
+    }
+
+    /* Ghost 1: progress bar stuck at 99% (x 1150-1750, y 180-300) */
+    #pain-g1 {
+      position: absolute;
+      left: 1150px;
+      top: 186px;
+      width: 600px;
+      height: 96px;
+    }
+    #pain-g1-label {
+      left: 0;
+      top: 0;
+      font-size: 28px;
+      line-height: 34px;
+      letter-spacing: 0.04em;
+    }
+    #pain-g1-track {
+      position: absolute;
+      left: 0;
+      top: 70px;
+      width: 600px;
+      height: 22px;
+      box-sizing: border-box;
+      border: 1.5px solid #ffffff;
+    }
+    #pain-g1-fill {
+      position: absolute;
+      left: 3px;
+      top: 3px;
+      right: 3px;
+      bottom: 3px;
+      background: #ffffff;
+      transform-origin: 0% 50%;
+    }
+
+    /* Ghost 2: sign-up modal outline (x 1200-1700, y 380-560) */
+    #pain-g2 {
+      position: absolute;
+      left: 1200px;
+      top: 380px;
+      width: 500px;
+      height: 180px;
+      box-sizing: border-box;
+      border: 1.5px solid #ffffff;
+      border-radius: 12px;
+      transform-origin: 50% 50%;
+    }
+    #pain-g2-line {
+      left: 30px;
+      top: 28px;
+      font-size: 22px;
+      line-height: 28px;
+      letter-spacing: 0.02em;
+    }
+    #pain-g2-input {
+      position: absolute;
+      left: 30px;
+      right: 30px;
+      top: 76px;
+      height: 38px;
+      box-sizing: border-box;
+      border: 1.5px solid #ffffff;
+      border-radius: 6px;
+    }
+    #pain-g2-btn {
+      position: absolute;
+      right: 30px;
+      top: 128px;
+      width: 150px;
+      height: 28px;
+      border-radius: 6px;
+      background: #ffffff;
+    }
+
+    /* ---- The pain stack ---- */
+    #pain-sag {
+      position: absolute;
+      inset: 0;
+    }
+    #pain-shake {
+      position: absolute;
+      inset: 0;
+    }
+    /* line box 140px, line-height 140px: baseline sits 120px below the box top
+       (Instrument Sans ascent 0.97 / descent 0.25), so tops 150/370/590 put the
+       baselines at y 270 / 490 / 710. Scale origin = left edge on the baseline. */
+    .pain-line {
+      position: absolute;
+      left: 120px;
+      height: 140px;
+      white-space: nowrap;
+      transform-origin: 0px 120px;
+    }
+    #pain-l1 { top: 150px; }
+    #pain-l2 { top: 370px; }
+    #pain-l3 { top: 590px; }
+    .pain-word {
+      display: block;
+      font-family: "Instrument Sans", sans-serif;
+      font-weight: 700;
+      font-size: 140px;
+      line-height: 140px;
+      letter-spacing: -0.04em;
+      color: #ffffff;
+    }
+    /* Strike: 10px amber bar at the x-height centre (baseline - 0.255em = 85px
+       into the box), tilted -2deg on a static wrapper; the child draws L->R. */
+    .pain-strike-rot {
+      position: absolute;
+      left: -14px;
+      right: -14px;
+      top: 80px;
+      height: 10px;
+      transform: rotate(-2deg);
+    }
+    .pain-strike {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      background: #ffbc79;
+      transform-origin: 0% 50%;
+    }
+  </style>
+
+  <div data-hf-id="hf-210i" id="root" data-composition-id="02-pain" data-width="1920" data-height="1080" data-duration="4">
+    <div data-hf-id="hf-bqpo" id="pain-ground" class="clip" data-start="0" data-duration="4" data-track-index="0"></div>
+
+    <div data-hf-id="hf-2o8w" id="pain-stage" class="clip" data-start="0" data-duration="4" data-track-index="1">
+      <svg data-hf-id="hf-7mdd" id="pain-fxdefs" width="0" height="0" aria-hidden="true" focusable="false">
+        <filter data-hf-id="hf-ih5l" id="pain-tapefx" x="-5%" y="-10%" width="110%" height="120%" color-interpolation-filters="sRGB">
+          <fegaussianblur data-hf-id="hf-mvb8" id="pain-fx-blur" in="SourceGraphic" stdDeviation="0 0" result="pain-fx-b" />
+          <fecolormatrix data-hf-id="hf-21bg" id="pain-fx-sat" in="pain-fx-b" type="saturate" values="1" result="pain-fx-s" />
+          <fecomponenttransfer data-hf-id="hf-bbgq" in="pain-fx-s">
+            <fefuncr data-hf-id="hf-531q" id="pain-fx-r" type="linear" slope="1" />
+            <fefuncg data-hf-id="hf-ccb4" id="pain-fx-g" type="linear" slope="1" />
+            <fefuncb data-hf-id="hf-pek4" id="pain-fx-bl" type="linear" slope="1" />
+          </fecomponenttransfer>
+        </filter>
+      </svg>
+
+      <div data-hf-id="hf-g2i0" id="pain-wm" data-layout-ignore="" aria-hidden="true"></div>
+
+      <div data-hf-id="hf-w5u3" id="pain-ghosts" aria-hidden="true">
+        <div data-hf-id="hf-9j92" id="pain-g1">
+          <div data-hf-id="hf-kcgg" id="pain-g1-label" class="pain-mono">uploading… 99%</div>
+          <div data-hf-id="hf-i0hw" id="pain-g1-track"><div data-hf-id="hf-zuko" id="pain-g1-fill"></div></div>
+        </div>
+        <div data-hf-id="hf-5l51" id="pain-g2">
+          <div data-hf-id="hf-7ymf" id="pain-g2-line" class="pain-mono">create an account to continue</div>
+          <div data-hf-id="hf-qnv2" id="pain-g2-input"></div>
+          <div data-hf-id="hf-kl4u" id="pain-g2-btn"></div>
+        </div>
+      </div>
+
+      <div data-hf-id="hf-636x" id="pain-sag">
+        <div data-hf-id="hf-6a7g" id="pain-shake">
+          <div data-hf-id="hf-582n" id="pain-l1" class="pain-line">
+            <span data-hf-id="hf-uqv6" id="pain-w1" class="pain-word">upload limits.</span>
+            <span data-hf-id="hf-id1w" class="pain-strike-rot"><span data-hf-id="hf-aupz" id="pain-s1" class="pain-strike"></span></span>
+          </div>
+          <div data-hf-id="hf-wk6s" id="pain-l2" class="pain-line">
+            <span data-hf-id="hf-2suz" id="pain-w2" class="pain-word">signup walls.</span>
+            <span data-hf-id="hf-ieng" class="pain-strike-rot"><span data-hf-id="hf-26u4" id="pain-s2" class="pain-strike"></span></span>
+          </div>
+          <div data-hf-id="hf-xbul" id="pain-l3" class="pain-line">
+            <span data-hf-id="hf-1yc2" id="pain-w3" class="pain-word">watermarks.</span>
+            <span data-hf-id="hf-h7qd" class="pain-strike-rot"><span data-hf-id="hf-2yhx" id="pain-s3" class="pain-strike"></span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var ID = "02-pain";
+      var F = 1 / 30; // one frame at 30 fps
+      var EPS = 0.004; // land discrete sets just before their frame boundary
+      // 120 BPM grid: one beat = 0.5 s. Every cue below reads from these arrays.
+      var SLAMS = [0.0, 1.0, 2.0]; // thuds: phrase slams
+      var STRIKES = [0.5, 1.5, 2.5]; // scratches + claps: amber strikes
+      var HOLD = 3.0; // held read, subtle jitter
+      var STOP = 3.5; // clap + tape stop begins
+      var STOP_LEN = 0.45; // sag resolves at 3.95 s
+
+      // Index-seeded deterministic noise (no Math.random).
+      function hash(n) {
+        var x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
+        return x - Math.floor(x);
+      }
+      function signed(n) {
+        return hash(n) * 2 - 1;
+      }
+
+      // ---- Ghost 3 DOM: WATERMARK tiled on a staggered diagonal grid (rows kept above y 900) ----
+      var wm = document.getElementById("pain-wm");
+      if (wm && wm.childElementCount === 0) {
+        var rows = [50, 180, 310, 440, 570, 700, 830];
+        for (var r = 0; r < rows.length; r++) {
+          var offset = (r % 2) * 180;
+          for (var x = -60 + offset; x <= 2040; x += 360) {
+            var w = document.createElement("span");
+            w.className = "pain-wm-word";
+            w.textContent = "WATERMARK";
+            w.style.left = x + "px";
+            w.style.top = rows[r] + "px";
+            wm.appendChild(w);
+          }
+        }
+      }
+
+      var tl = gsap.timeline({ paused: true });
+
+      // ---- Scene 1 (0.0-1.0): "upload limits." slam + ghost progress bar ----
+      tl.fromTo(
+        "#pain-l1",
+        { scale: 1.25, filter: "blur(8px)" },
+        { scale: 1, filter: "blur(0px)", duration: 0.35, ease: "power4.out" },
+        SLAMS[0],
+      );
+      tl.fromTo("#pain-g1", { opacity: 0, x: 24 }, { opacity: 0.2, x: 0, duration: 0.3, ease: "power3.out" }, SLAMS[0]);
+      // fill races up, then stops dead at 99%
+      tl.fromTo("#pain-g1-fill", { scaleX: 0.6 }, { scaleX: 0.99, duration: 0.4, ease: "expo.out" }, SLAMS[0]);
+
+      // ---- Scene 2 (1.0-2.0): "signup walls." slam (side snap) + ghost modal ----
+      tl.fromTo("#pain-l2", { opacity: 0 }, { opacity: 1, duration: 0.02, ease: "none" }, SLAMS[1] - 0.02);
+      tl.fromTo(
+        "#pain-l2",
+        { scale: 1.25, x: -72 },
+        { scale: 1, x: 0, duration: 0.35, ease: "expo.out", immediateRender: false },
+        SLAMS[1],
+      );
+      tl.fromTo(
+        "#pain-g2",
+        { opacity: 0, scale: 0.96 },
+        { opacity: 0.2, scale: 1, duration: 0.25, ease: "power3.out" },
+        SLAMS[1],
+      );
+
+      // ---- Scene 3 (2.0-3.0): "watermarks." slam (rise) + watermark tile ----
+      tl.fromTo("#pain-l3", { opacity: 0 }, { opacity: 1, duration: 0.02, ease: "none" }, SLAMS[2] - 0.02);
+      tl.fromTo(
+        "#pain-l3",
+        { scale: 1.25, y: 28 },
+        { scale: 1, y: 0, duration: 0.4, ease: "power3.out", immediateRender: false },
+        SLAMS[2],
+      );
+      tl.fromTo("#pain-wm", { opacity: 0 }, { opacity: 0.07, duration: 0.15, ease: "power1.out" }, SLAMS[2]);
+
+      // 2-frame micro-shake of the stack on every thud.
+      SLAMS.forEach(function (t, k) {
+        var dx = (hash(k * 7 + 1) > 0.5 ? 1 : -1) * (5 + 3 * hash(k * 7 + 2));
+        var dy = (hash(k * 7 + 3) > 0.5 ? 1 : -1) * (3 + 3 * hash(k * 7 + 4));
+        tl.set("#pain-shake", { x: dx, y: dy }, t + F - EPS);
+        tl.set("#pain-shake", { x: -dx * 0.6, y: -dy * 0.6 }, t + 2 * F - EPS);
+        tl.set("#pain-shake", { x: 0, y: 0 }, t + 3 * F - EPS);
+      });
+
+      // Amber strike draws L->R on each scratch; the struck phrase dims to 55%.
+      STRIKES.forEach(function (t, k) {
+        var n = k + 1;
+        tl.fromTo("#pain-s" + n, { scaleX: 0 }, { scaleX: 1, duration: 0.18, ease: "power2.out" }, t);
+        tl.fromTo(
+          "#pain-w" + n,
+          { opacity: 1 },
+          { opacity: 0.55, duration: 0.14, ease: "power2.out", immediateRender: false },
+          t + 0.18,
+        );
+      });
+
+      // ---- Scene 4 (3.0-3.5): held read, subtle per-line jitter (every 2 frames) ----
+      // It runs on into Scene 5 at a slowing cadence and shrinking amplitude, then stops.
+      var steps = [];
+      for (var f = Math.round(HOLD / F); f < Math.round(STOP / F); f += 2) steps.push({ f: f, a: 1.6 });
+      steps.push({ f: 105, a: 1.1 }, { f: 108, a: 0.7 }, { f: 112, a: 0.35 });
+      [1, 2, 3].forEach(function (li) {
+        steps.forEach(function (st, si) {
+          var n = li * 101 + si * 13;
+          tl.set("#pain-l" + li, { x: signed(n + 1) * st.a, y: signed(n + 2) * st.a }, st.f * F - EPS);
+        });
+        tl.set("#pain-l" + li, { x: 0, y: 0 }, 117 * F - EPS);
+      });
+
+      // ---- Scene 5 (3.5-4.0): tape-stop sag, synced to the music ----
+      tl.set("#pain-sag", { filter: "url(#pain-tapefx)" }, STOP - EPS);
+      tl.fromTo(
+        "#pain-sag",
+        { y: 0 },
+        { y: 40, duration: STOP_LEN, ease: "power2.out", immediateRender: false },
+        STOP,
+      );
+      tl.fromTo(
+        "#pain-fx-blur",
+        { attr: { stdDeviation: "0 0" } },
+        { attr: { stdDeviation: "0 3" }, duration: STOP_LEN, ease: "power1.in", immediateRender: false },
+        STOP,
+      );
+      tl.fromTo(
+        "#pain-fx-sat",
+        { attr: { values: 1 } },
+        { attr: { values: 0 }, duration: STOP_LEN, ease: "power1.inOut", immediateRender: false },
+        STOP,
+      );
+      tl.fromTo(
+        ["#pain-fx-r", "#pain-fx-g", "#pain-fx-bl"],
+        { attr: { slope: 1 } },
+        { attr: { slope: 0.82 }, duration: STOP_LEN, ease: "power1.inOut", immediateRender: false },
+        STOP,
+      );
+      // The ghost UI settles with it, a little less (depth).
+      tl.fromTo(
+        "#pain-ghosts",
+        { y: 0 },
+        { y: 16, duration: STOP_LEN, ease: "power2.out", immediateRender: false },
+        STOP,
+      );
+
+      window.__timelines = window.__timelines || {};
+      window.__timelines[ID] = tl;
+    })();
+  </script>
+</template>

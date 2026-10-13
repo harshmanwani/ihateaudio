@@ -1,0 +1,30 @@
+# Dependencies and caches
+node_modules/
+.cache/
+.hyperframes/artifacts/
+.hyperframes/frame-packets/
+.media/cache/
+
+# Renders and large media (regenerable)
+renders/
+out/*.mp4
+out/*.mov
+*.mp4
+*.mov
+*.wav
+*.aiff
+# Raw captures (regenerate with `npx hyperframes capture` and scripts/capture-tools.mjs)
+capture/
+captures/
+square/overlay.png
+
+# Scratch output from checks
+.verify/
+.render-*.log
+.capture-log.json
+.tools-log.txt
+
+# Studio caches
+.thumbnails/
+.waveform-cache/
+.hyperframes/preview/
