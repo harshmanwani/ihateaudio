@@ -409,7 +409,7 @@ const faq = [
 
 <script>
   import { createTool } from '../lib/tool';
-  import { applyCompressor } from '../lib/audio/effects';
+  import { applyCompressor, compressorCurve } from '../lib/audio/effects';
   import { db } from '../lib/format';
   import { panelColors, panelContext } from '../lib/canvas';
 
@@ -426,27 +426,21 @@ const faq = [
   const FLOOR = -60;
 
   /**
-   * The compressor's transfer function, in dB.
+   * The compressor's transfer function, in dB, makeup included.
    *
-   * This is the soft-knee curve the Web Audio DynamicsCompressorNode implements,
-   * written out rather than approximated: below the knee the signal passes
-   * through, above it the excess is divided by the ratio, and across the knee
-   * width the two are joined by a quadratic so the corner is smooth. Because it
-   * is the same formula the node uses, the drawing is a description of what will
-   * actually happen rather than an illustration of the idea.
+   * This is the curve the Web Audio DynamicsCompressorNode runs, taken from the
+   * same module that renders the file rather than redrawn from the textbook:
+   * below the threshold the signal passes through, from the threshold up to
+   * threshold + knee it bends over, and above that the excess is divided by the
+   * ratio. The knee sits above the threshold, not centred on it, because that
+   * is where the node puts it. applyCompressor cancels the node's own hidden
+   * makeup gain, so the makeup slider is the only lift, and the drawing is a
+   * description of what will actually happen rather than an illustration of
+   * the idea.
    */
-  function transfer(input: number, p: Params): number {
-    const over = input - p.threshold;
-    let out: number;
-    if (2 * over < -p.knee) {
-      out = input;
-    } else if (2 * Math.abs(over) <= p.knee) {
-      const x = over + p.knee / 2;
-      out = input + ((1 / p.ratio - 1) * x * x) / (2 * p.knee);
-    } else {
-      out = p.threshold + over / p.ratio;
-    }
-    return out + p.makeup;
+  function transfer(p: Params): (input: number) => number {
+    const curve = compressorCurve(p.threshold, p.knee, p.ratio);
+    return (input) => curve(input) + p.makeup;
   }
 
   /**
@@ -533,10 +527,11 @@ const faq = [
     context.fillText('threshold', x(p.threshold) + 5 * dpr, pad + 11 * dpr);
 
     // The curve itself.
+    const curve = transfer(p);
     context.beginPath();
     for (let i = 0; i <= 240; i += 1) {
       const input = FLOOR + (i / 240) * -FLOOR;
-      const point = transfer(input, p);
+      const point = curve(input);
       if (i === 0) context.moveTo(x(input), y(point));
       else context.lineTo(x(input), y(point));
     }
@@ -547,7 +542,7 @@ const faq = [
 
     // Where this file lands on it.
     if (level > FLOOR) {
-      const out = transfer(level, p);
+      const out = curve(level);
       context.setLineDash([3 * dpr, 3 * dpr]);
       context.lineWidth = dpr;
       context.strokeStyle = `color-mix(in oklch, ${ink} 40%, transparent)`;
@@ -680,7 +675,7 @@ const faq = [
 
         // Reduction is measured against unity at the same input, which is the
         // only definition that stays honest once makeup gain is in the picture.
-        const out = transfer(level, p);
+        const out = transfer(p)(level);
         const reduction = level + p.makeup - out;
 
         if (factLevel) factLevel.textContent = level <= FLOOR ? '—' : dbText(level);
