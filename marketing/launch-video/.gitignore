@@ -13,6 +13,9 @@ out/*.mov
 *.mov
 *.wav
 *.aiff
+# Downloaded music candidates and listening copies (sources in assets/audio/CREDITS.md)
+assets/audio/candidates/
+assets/audio/listen/
 # Raw captures (regenerate with `npx hyperframes capture` and scripts/capture-tools.mjs)
 capture/
 captures/
@@ -28,3 +31,15 @@ square/overlay.png
 .thumbnails/
 .waveform-cache/
 .hyperframes/preview/
+
+# Recorded tool takes (rebuild with scripts/record-tools.mjs)
+takes/
+# v2 audio: downloaded third-party tracks, HeyGen catalog and TTS output, and the tool
+# outputs made from them. Not ours to publish in a public repo. Sources are in
+# assets/audio/CREDITS.md; BRIEF.md (v2) has the rebuild steps.
+assets/audio/v2/
+assets/audio/memo/
+assets/audio/demo/
+
+# v1 renders kept for reference
+out/v1-*

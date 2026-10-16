@@ -1,0 +1,35 @@
+<template>
+  <style>
+    @font-face { font-family: "Instrument Serif"; src: url("assets/fonts/InstrumentSerif-Regular.woff2") format("woff2"); font-weight: 400; font-style: normal; }
+    #s3-trim { position: relative; width: 100%; height: 100%; overflow: hidden; background: #FFFFFF; }
+    .s3-take { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .s3-cap { position: absolute; left: 0; right: 0; bottom: 70px; display: flex; justify-content: center; }
+    .s3-cap span { padding: 16px 40px 20px; background: #FFFFFF; border-radius: 999px; box-shadow: 0 10px 30px -12px rgba(15,22,17,.45); font-family: "Instrument Serif", serif; font-size: 58px; line-height: 1; color: #0F1611; white-space: nowrap; }
+  </style>
+  <!--
+    Real recording of https://ihateaudio.com/audio-trimmer (scripts/record-tools.mjs trim).
+    Take events (s): drop 2.43, grab 4.19, release 5.78, play 7.36 (sound from 7.86), download 12.91.
+    Edit, take range -> scene time:
+      A 1.55-3.45  x1    -> 0.000-1.900   cursor brings the file, real drop
+      B 3.45-6.05  x1.6  -> 1.900-3.525   drag the start handle to 0:10.15
+      C 6.85-10.65 x1    -> 3.525-7.325   play: "Hi, it's me. The meeting moved to three."
+      D 10.65-12.60 x2.5 -> 7.325-8.105   scroll to Download
+      E 12.60-14.20 x1   -> 8.105-9.705   Download, the site's "Saved" bar
+  -->
+  <div id="s3-trim" data-composition-id="s3-trim" data-start="0" data-duration="9.705" data-width="1920" data-height="1080">
+    <video id="s3-a" data-hf-media-start-basis="local" class="clip s3-take" src="assets/video/take-trim.mp4" muted playsinline data-start="0" data-duration="1.9" data-media-start="1.55" data-track-index="0"></video>
+    <video id="s3-b" data-hf-media-start-basis="local" class="clip s3-take" src="assets/video/take-trim.mp4" muted playsinline data-start="1.9" data-duration="1.625" data-media-start="3.45" data-playback-rate="1.6" data-track-index="0"></video>
+    <video id="s3-c" data-hf-media-start-basis="local" class="clip s3-take" src="assets/video/take-trim.mp4" muted playsinline data-start="3.525" data-duration="3.8" data-media-start="6.85" data-track-index="0"></video>
+    <video id="s3-d" data-hf-media-start-basis="local" class="clip s3-take" src="assets/video/take-trim.mp4" muted playsinline data-start="7.325" data-duration="0.78" data-media-start="10.65" data-playback-rate="2.5" data-track-index="0"></video>
+    <video id="s3-e" data-hf-media-start-basis="local" class="clip s3-take" src="assets/video/take-trim.mp4" muted playsinline data-start="8.105" data-duration="1.6" data-media-start="12.6" data-track-index="0"></video>
+    <div id="s3-cap" class="clip s3-cap" data-start="8.5" data-duration="1.205" data-track-index="2"><span>that's it. that's the whole thing.</span></div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var tl = gsap.timeline({ paused: true });
+      tl.fromTo("#s3-cap span", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.25, ease: "power2.out" }, 8.5);
+      window.__timelines["s3-trim"] = tl;
+    })();
+  </script>
+</template>

@@ -17,9 +17,11 @@ be scheduled before that.
 | PH gallery, in this order | `assets/gallery/01-hero.jpg` … `07-agents.jpg` | 1270×760 (PNG at 2x beside each) |
 | Real screens, with audio loaded | `assets/screens/*.png` | 2880×1800 |
 | Social card | `public/og.png` | 1200×630 |
-| Launch video (37.5 s) | `../launch-video/out/ihateaudio-launch-16x9.mp4` | 1920×1080 |
-| Launch video, square | `../launch-video/out/ihateaudio-launch-1x1.mp4` | 1080×1080 |
-| Video poster / YouTube thumbnail | `../launch-video/out/poster.png` | 1920×1080 |
+| Launch video v2, "or." (40 s) | `../launch-video/out/ihateaudio-launch-16x9.mp4` | 1920×1080 |
+| Video poster / YouTube thumbnail | `../launch-video/out/poster.png` ("free forever.") | 1920×1080 |
+
+The video uses a CC BY song. Its credit line must go in the YouTube description:
+see `../launch-video/assets/audio/CREDITS.md`. There is no square cut of v2 yet.
 
 Gallery order and why: 01 says what it is, 02 shows a real tool, 03 is the AI hook,
 04 is the under-25 audience, 05 is the breadth, 06 is the promise, 07 is for the

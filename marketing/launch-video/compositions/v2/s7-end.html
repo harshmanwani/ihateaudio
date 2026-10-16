@@ -1,0 +1,46 @@
+<template>
+  <style>
+    @font-face { font-family: "Instrument Serif"; src: url("assets/fonts/InstrumentSerif-Regular.woff2") format("woff2"); font-weight: 400; font-style: normal; }
+    @font-face { font-family: "Instrument Serif"; src: url("assets/fonts/InstrumentSerif-Italic.woff2") format("woff2"); font-weight: 400; font-style: italic; }
+    @font-face { font-family: "Instrument Sans"; src: url("assets/fonts/captured-instrument-sans-latin.woff2") format("woff2-variations"); font-weight: 400 700; font-style: normal; }
+    #s7-end { position: relative; width: 100%; height: 100%; overflow: hidden; }
+    .s7-ground { position: absolute; inset: 0; background: #FFFFFF; }
+    .s7-stack { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; padding-bottom: 30px; }
+    .s7-lockup { display: flex; align-items: center; gap: 36px; }
+    .s7-mark { width: 170px; height: 170px; display: block; overflow: visible; }
+    /* The wordmark stays in the brand face; it is the logo, not a caption. */
+    .s7-word { font-family: "Instrument Sans", sans-serif; font-weight: 700; font-size: 168px; line-height: 1; letter-spacing: -0.03em; color: #0F1611; }
+    .s7-word b { font-weight: 700; color: #006E3D; }
+    .s7-url { margin-top: 46px; font-family: "Instrument Serif", serif; font-size: 72px; line-height: 1; color: #0F1611; }
+    .s7-free { margin-top: 18px; font-family: "Instrument Serif", serif; font-style: italic; font-size: 52px; line-height: 1; color: #006E3D; }
+  </style>
+  <div id="s7-end" data-composition-id="s7-end" data-start="0" data-duration="3.6" data-width="1920" data-height="1080">
+    <div id="s7-ground" class="clip s7-ground" data-start="0" data-duration="3.6" data-track-index="0"></div>
+    <div id="s7-stack" class="clip s7-stack" data-start="0" data-duration="3.6" data-track-index="1">
+      <div class="s7-lockup">
+        <svg class="s7-mark" viewBox="0 0 32 32" aria-label="ihateaudio">
+          <rect width="32" height="32" rx="7" fill="#0C3524"/>
+          <g fill="#38E08F">
+            <rect id="s7-b1" x="4" y="12" width="3" height="8" rx="1.5"/>
+            <rect id="s7-b2" x="9" y="8" width="3" height="16" rx="1.5"/>
+            <rect id="s7-b3" x="14" y="1" width="3" height="30" rx="1.5"/>
+            <rect id="s7-b4" x="19" y="9" width="3" height="14" rx="1.5"/>
+            <rect id="s7-b5" x="24" y="12" width="3" height="8" rx="1.5"/>
+          </g>
+        </svg>
+        <div class="s7-word">i<b>hate</b>audio</div>
+      </div>
+      <div id="s7-url" class="s7-url">ihateaudio.com</div>
+      <div id="s7-free" class="s7-free">free forever.</div>
+    </div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var tl = gsap.timeline({ paused: true });
+      tl.fromTo("#s7-url", { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: 0.35, ease: "power2.out" }, 0.25);
+      tl.fromTo("#s7-free", { opacity: 0, y: 10 }, { opacity: 1, y: 0, duration: 0.35, ease: "power2.out" }, 0.6);
+      window.__timelines["s7-end"] = tl;
+    })();
+  </script>
+</template>

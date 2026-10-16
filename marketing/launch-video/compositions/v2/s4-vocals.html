@@ -1,0 +1,39 @@
+<template>
+  <style>
+    @font-face { font-family: "Instrument Serif"; src: url("assets/fonts/InstrumentSerif-Regular.woff2") format("woff2"); font-weight: 400; font-style: normal; }
+    @font-face { font-family: "Instrument Serif"; src: url("assets/fonts/InstrumentSerif-Italic.woff2") format("woff2"); font-weight: 400; font-style: italic; }
+    #s4-vocals { position: relative; width: 100%; height: 100%; overflow: hidden; background: #FFFFFF; }
+    .s4-take { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .s4-later { position: absolute; inset: 0; background: #FFFFFF; display: flex; align-items: center; justify-content: center; padding-bottom: 30px;
+      font-family: "Instrument Serif", serif; font-style: italic; font-size: 130px; line-height: 1; color: #0F1611; }
+    .s4-cap { position: absolute; left: 0; right: 0; bottom: 70px; display: flex; justify-content: center; }
+    .s4-cap span { padding: 16px 40px 20px; background: #FFFFFF; border-radius: 999px; box-shadow: 0 10px 30px -12px rgba(15,22,17,.45); font-family: "Instrument Serif", serif; font-size: 58px; line-height: 1; color: #0F1611; white-space: nowrap; }
+  </style>
+  <!--
+    Real recording of https://ihateaudio.com/vocal-remover (scripts/record-tools.mjs vocals).
+    Take events (s): drop 2.42, separate 4.78, done 22.76 (18 s of real separation), mixplay 25.32
+    (mixer clock = take - 25.33), mute vocal 28.18.
+    Edit, take range -> scene time:
+      A 1.55-3.20  x1   -> 0.00-1.65   cursor brings the song, real drop
+      B 3.20-5.60  x1.5 -> 1.65-3.25   scroll, press Separate
+        "18 seconds later." card        3.25-4.25   (the real wait, said out loud)
+      C 22.60-25.00 x2  -> 4.25-5.45   separated, scroll to the mixer
+      D 25.00-30.38 x1  -> 5.45-10.83  play both halves, mute the vocal at 8.63
+  -->
+  <div id="s4-vocals" data-composition-id="s4-vocals" data-start="0" data-duration="10.83" data-width="1920" data-height="1080">
+    <video id="s4-a" data-hf-media-start-basis="local" class="clip s4-take" src="assets/video/take-vocals.mp4" muted playsinline data-start="0" data-duration="1.65" data-media-start="1.55" data-track-index="0"></video>
+    <video id="s4-b" data-hf-media-start-basis="local" class="clip s4-take" src="assets/video/take-vocals.mp4" muted playsinline data-start="1.65" data-duration="1.6" data-media-start="3.2" data-playback-rate="1.5" data-track-index="0"></video>
+    <div id="s4-later" class="clip s4-later" data-start="3.25" data-duration="1" data-track-index="1">18 seconds later.</div>
+    <video id="s4-c" data-hf-media-start-basis="local" class="clip s4-take" src="assets/video/take-vocals.mp4" muted playsinline data-start="4.25" data-duration="1.2" data-media-start="22.6" data-playback-rate="2" data-track-index="0"></video>
+    <video id="s4-d" data-hf-media-start-basis="local" class="clip s4-take" src="assets/video/take-vocals.mp4" muted playsinline data-start="5.45" data-duration="5.38" data-media-start="25" data-track-index="0"></video>
+    <div id="s4-cap" class="clip s4-cap" data-start="8.95" data-duration="1.88" data-track-index="2"><span>also removes vocals.</span></div>
+  </div>
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var tl = gsap.timeline({ paused: true });
+      tl.fromTo("#s4-cap span", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.25, ease: "power2.out" }, 8.95);
+      window.__timelines["s4-vocals"] = tl;
+    })();
+  </script>
+</template>

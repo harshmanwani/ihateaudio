@@ -1,0 +1,147 @@
+<template>
+  <style>
+    @font-face { font-family: "Instrument Serif"; src: url("assets/fonts/InstrumentSerif-Regular.woff2") format("woff2"); font-weight: 400; font-style: normal; }
+    @font-face { font-family: "Instrument Serif"; src: url("assets/fonts/InstrumentSerif-Italic.woff2") format("woff2"); font-weight: 400; font-style: italic; }
+
+    #s1-usual { position: relative; width: 100%; height: 100%; overflow: hidden; font-family: sans-serif; }
+
+    /* An invented, generic audio site. No real brand: the logo is redacted on purpose. */
+    .s1-page { position: absolute; inset: 0; background: #E9ECF1; font-family: sans-serif; color: #222; }
+    .s1-head { position: absolute; left: 0; top: 0; width: 1920px; height: 92px; background: #23395B; display: flex; align-items: center; padding: 0 60px; gap: 44px; }
+    .s1-logo { width: 280px; height: 38px; background: #050505; border-radius: 2px; }
+    .s1-nav { display: flex; gap: 38px; font-size: 24px; color: #E6ECF5; flex: 1; }
+    .s1-signup { padding: 12px 26px; background: #B85A08; color: #fff; font-weight: 700; font-size: 22px; border-radius: 6px; }
+    .s1-trust { position: absolute; left: 0; top: 92px; width: 1920px; height: 40px; background: #F7F8FA; border-bottom: 1px solid #D5DAE1; font-size: 18px; color: #555C66; display: flex; align-items: center; justify-content: center; gap: 30px; }
+
+    .s1-ad { position: absolute; top: 168px; width: 250px; height: 760px; border: 2px dashed #B9A800; background: #FFF6B8; padding: 18px; display: flex; flex-direction: column; gap: 18px; align-items: center; text-align: center; }
+    .s1-ad--l { left: 44px; }
+    .s1-ad--r { left: 1626px; background: #DCEBFF; border-color: #6E9BD6; }
+    .s1-adtag { align-self: flex-start; font-size: 14px; color: #5E5500; border: 1px solid currentColor; padding: 1px 6px; }
+    .s1-ad--r .s1-adtag { color: #3D6AA8; }
+    .s1-adbig { font-size: 40px; font-weight: 800; line-height: 1.05; color: #C3001A; margin-top: 60px; }
+    .s1-ad--r .s1-adbig { color: #13407E; }
+    .s1-adbtn { margin-top: auto; margin-bottom: 30px; width: 200px; padding: 16px 0; background: #1F7F2A; color: #fff; font-weight: 800; font-size: 24px; border-radius: 6px; }
+    .s1-ad--r .s1-adbtn { background: #E2241A; }
+
+    .s1-main { position: absolute; left: 340px; top: 168px; width: 1240px; height: 600px; background: #fff; border: 1px solid #D5DAE1; border-radius: 8px; padding: 46px 60px; }
+    .s1-h1 { font-size: 54px; font-weight: 800; color: #1B2533; letter-spacing: -0.5px; }
+    .s1-fine { font-size: 19px; color: #6A707A; margin-top: 10px; }
+    .s1-file { margin-top: 56px; display: flex; align-items: center; gap: 22px; padding: 26px; border: 1px solid #DDE2E8; border-radius: 8px; background: #FAFBFC; }
+    .s1-fileicon { width: 46px; height: 58px; background: #8FA4C2; border-radius: 4px; }
+    .s1-filemeta { width: 330px; font-size: 24px; }
+    .s1-filemeta small { display: block; font-size: 18px; color: #6A707A; margin-top: 6px; }
+    .s1-bar { position: relative; flex: 1; height: 18px; background: #E3E7ED; border-radius: 9px; overflow: hidden; }
+    .s1-fill { position: absolute; left: 0; top: 0; height: 100%; width: 100%; background: #3C7DD9; transform-origin: left center; }
+    .s1-pct { width: 200px; text-align: right; font-size: 22px; color: #3C4655; font-variant-numeric: tabular-nums; }
+    .s1-cut { margin-top: 44px; width: 340px; padding: 20px 0; text-align: center; background: #C9CFD8; color: #5A626E; font-size: 26px; font-weight: 700; border-radius: 8px; }
+    .s1-leader { position: absolute; left: 340px; top: 800px; width: 1240px; height: 128px; background: #F2F2F2; border: 2px dashed #AAB; display: flex; align-items: center; justify-content: center; gap: 30px; font-size: 32px; font-weight: 800; color: #555; }
+
+    .s1-pro-slot { position: absolute; inset: 0; pointer-events: none; }
+    .s1-pro { position: absolute; left: 1140px; top: 520px; width: 440px; padding: 26px 30px; background: #fff; border-radius: 10px; border: 3px solid #F28C1B; box-shadow: 0 18px 40px -10px rgba(0,0,0,.35); }
+    .s1-pro-x { position: absolute; right: 14px; top: 8px; font-size: 22px; color: #6E6E6E; }
+    .s1-pro-t { font-size: 34px; font-weight: 800; color: #1B2533; }
+    .s1-pro-s { font-size: 21px; color: #555; margin-top: 8px; }
+    .s1-pro-b { margin-top: 18px; display: inline-block; padding: 12px 24px; background: #B85A08; color: #fff; font-weight: 800; font-size: 22px; border-radius: 6px; }
+
+    .s1-dim { position: absolute; inset: 0; background: rgba(10, 14, 22, 0.58); }
+    .s1-modal { position: absolute; left: 560px; top: 210px; width: 800px; height: 520px; background: #fff; border-radius: 12px; box-shadow: 0 30px 80px -20px rgba(0,0,0,.6); }
+    .s1-panel { position: absolute; inset: 0; padding: 52px 64px; display: flex; flex-direction: column; align-items: center; text-align: center; }
+    .s1-m-t { font-size: 46px; font-weight: 800; color: #1B2533; }
+    .s1-m-s { font-size: 24px; color: #5A6372; margin-top: 12px; }
+    .s1-field { margin-top: 22px; width: 560px; height: 62px; border: 1px solid #C9D0DA; border-radius: 6px; text-align: left; padding: 18px; font-size: 21px; color: #757D89; }
+    .s1-m-b { margin-top: 28px; width: 560px; padding: 18px 0; background: #B85A08; color: #fff; font-size: 26px; font-weight: 800; border-radius: 6px; }
+    .s1-m-l { margin-top: 18px; font-size: 18px; color: #6A7280; }
+    .s1-count { font-size: 190px; font-weight: 800; color: #1B2533; line-height: 1; margin-top: 20px; font-variant-numeric: tabular-nums; }
+    .s1-skip { margin-top: 20px; font-size: 22px; color: #3C7DD9; text-decoration: underline; }
+    #s1-wait { opacity: 0; }
+
+    /* Deadpan caption: one plain line in a white pill, bottom centre. */
+    .s1-cap { position: absolute; left: 0; right: 0; bottom: 70px; display: flex; justify-content: center; }
+    .s1-cap span { padding: 16px 40px 20px; background: #FFFFFF; border-radius: 999px; box-shadow: 0 10px 30px -12px rgba(15,22,17,.45); font-family: "Instrument Serif", serif; font-size: 58px; line-height: 1; color: #0F1611; white-space: nowrap; }
+  </style>
+
+  <div id="s1-usual" data-composition-id="s1-usual" data-start="0" data-duration="8" data-width="1920" data-height="1080">
+    <div id="s1-page" data-layout-allow-occlusion data-layout-allow-overlap class="clip s1-page" data-start="0" data-duration="8" data-track-index="0">
+      <div class="s1-head"><div class="s1-logo"></div><div class="s1-nav"><span>Tools</span><span>Converter</span><span>Pricing</span><span>Blog</span><span>Login</span></div><div class="s1-signup">Sign up</div></div>
+      <div class="s1-trust"><span>★★★★★ Trusted by millions</span><span>·</span><span>Fast · Secure · Free*</span></div>
+      <div class="s1-ad s1-ad--l"><span class="s1-adtag">AD</span><div class="s1-adbig">MEGA DEALS TODAY ONLY</div><div class="s1-adbtn">CLICK HERE</div></div>
+      <div class="s1-ad s1-ad--r"><span class="s1-adtag">AD</span><div class="s1-adbig">Speed up your audio 300%*</div><div class="s1-adbtn">INSTALL</div></div>
+      <div class="s1-main">
+        <div class="s1-h1">Cut MP3 Online. 100% Free*</div>
+        <div class="s1-fine">*Free for files under 3 MB. Up to 2 files a day. Files are processed on our servers.</div>
+        <div class="s1-file">
+          <div class="s1-fileicon"></div>
+          <div class="s1-filemeta">voice-memo.mp3<small>328 KB</small></div>
+          <div class="s1-bar"><div id="s1-fill" class="s1-fill"></div></div>
+          <div id="s1-pct" class="s1-pct">Uploading… 11%</div>
+        </div>
+        <div class="s1-cut">Cut audio</div>
+      </div>
+      <div class="s1-leader"><span style="font-size:15px;font-weight:400;border:1px solid #555;padding:1px 6px">AD</span><span>Learn guitar in 3 days. Click now.</span></div>
+    </div>
+
+    <div id="s1-pro" class="clip s1-pro-slot" data-start="2" data-duration="6" data-track-index="1">
+      <div id="s1-pro-in" class="s1-pro" data-layout-allow-occlusion>
+        <div class="s1-pro-x">×</div>
+        <div class="s1-pro-t">Uploads 10× faster with PRO</div>
+        <div class="s1-pro-s">Only $9.99 a month. Cancel any time*</div>
+        <div class="s1-pro-b">Upgrade now</div>
+      </div>
+    </div>
+
+    <div id="s1-dim" class="clip s1-dim" data-start="3.8" data-duration="4.2" data-track-index="2"></div>
+    <div id="s1-modal" class="clip s1-modal" data-start="3.8" data-duration="4.2" data-track-index="3">
+      <div id="s1-signup" class="s1-panel" data-layout-allow-overlap>
+        <div class="s1-m-t">Your file is ready.</div>
+        <div class="s1-m-s">Create a free account to download it.</div>
+        <div class="s1-field">Email</div>
+        <div class="s1-field">Password</div>
+        <div class="s1-m-b">Sign up free</div>
+        <div class="s1-m-l">Already have an account? Log in</div>
+      </div>
+      <div id="s1-wait" class="s1-panel" data-layout-allow-overlap>
+        <div class="s1-m-t">Preparing your download</div>
+        <div class="s1-m-s">Your download will start in</div>
+        <div id="s1-count" class="s1-count">30</div>
+        <div class="s1-m-s">seconds</div>
+        <div class="s1-skip">Skip the wait with PRO</div>
+      </div>
+    </div>
+
+    <div id="s1-cap1" class="clip s1-cap" data-start="0.3" data-duration="1.7" data-track-index="5"><span>you want to cut ten seconds off a voice memo.</span></div>
+    <div id="s1-cap2" class="clip s1-cap" data-start="2.1" data-duration="1.7" data-track-index="5"><span>first, it uploads.</span></div>
+    <div id="s1-cap3" class="clip s1-cap" data-start="3.95" data-duration="1.85" data-track-index="5"><span>then, an account.</span></div>
+    <div id="s1-cap4" class="clip s1-cap" data-start="5.95" data-duration="2.05" data-track-index="5"><span>then, a countdown.</span></div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    (function () {
+      var tl = gsap.timeline({ paused: true });
+
+      // The upload crawls: 11% -> 12% -> 13%, then stays.
+      tl.fromTo("#s1-fill", { scaleX: 0.11 }, { scaleX: 0.12, duration: 1.0, ease: "none" }, 0);
+      tl.set("#s1-pct", { textContent: "Uploading… 12%" }, 1.0);
+      tl.to("#s1-fill", { scaleX: 0.13, duration: 1.6, ease: "none" }, 1.0);
+      tl.set("#s1-pct", { textContent: "Uploading… 13%" }, 2.6);
+
+      // PRO popup slides up from below its spot.
+      tl.fromTo("#s1-pro-in", { opacity: 0, y: 80 }, { opacity: 1, y: 0, duration: 0.35, ease: "back.out(1.4)" }, 2.0);
+
+      // Sign-up wall, then the countdown.
+      tl.fromTo("#s1-signup", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.3, ease: "power3.out" }, 3.8);
+      tl.to("#s1-signup", { opacity: 0, duration: 0.12 }, 5.8);
+      tl.to("#s1-wait", { opacity: 1, duration: 0.12 }, 5.82);
+      tl.set("#s1-count", { textContent: "29" }, 6.8);
+      tl.set("#s1-count", { textContent: "28" }, 7.8);
+
+      // Captions arrive with a small rise.
+      ["#s1-cap1", "#s1-cap2", "#s1-cap3", "#s1-cap4"].forEach(function (id, i) {
+        var at = [0.3, 2.1, 3.95, 5.95][i];
+        tl.fromTo(id + " span", { opacity: 0, y: 12 }, { opacity: 1, y: 0, duration: 0.25, ease: "power2.out" }, at);
+      });
+
+      window.__timelines["s1-usual"] = tl;
+    })();
+  </script>
+</template>

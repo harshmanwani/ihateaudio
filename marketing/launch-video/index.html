@@ -5,60 +5,54 @@
     <meta name="viewport" content="width=1920, height=1080">
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js" integrity="sha384-sG0Hv1tP1lZCk9KQmrIbY/XNwi+OY84GQqhMscbnsoBFqAz8KNCil1kvfL3Hbbk2" crossorigin="anonymous"></script>
     <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
-      html,
-      body {
-        width: 1920px;
-        height: 1080px;
-        overflow: hidden;
-        background: #000;
-      }
-      #root {
-        position: relative;
-        width: 1920px;
-        height: 1080px;
-        overflow: hidden;
-        background: #FFFFFF;
-      }
-      .scene {
-        position: absolute;
-        inset: 0;
-        width: 100%;
-        height: 100%;
-      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1920px; height: 1080px; overflow: hidden; background: #000; }
+      #root { position: relative; width: 100%; height: 100%; overflow: hidden; background: #FFFFFF; }
+      .scene { position: absolute; inset: 0; width: 100%; height: 100%; }
     </style>
   </head>
   <body>
-    <div data-hf-id="hf-yvpz" id="root" data-composition-id="main" data-start="0" data-duration="37.5" data-width="1920" data-height="1080">
-      <div data-hf-id="hf-g4jn" id="el-01-hook" class="scene" data-composition-id="01-hook" data-composition-src="compositions/frames/01-hook.html" data-start="0" data-duration="4" data-track-index="1"></div>
+    <!--
+      ihateaudio launch video v2, "or." (deadpan). Storyboard: STORYBOARD.md, section "v2".
+      Scenes (global s): usual way 0-8 · "or." 8-9.8 · trimmer 9.8-19.505 · vocal remover 19.505-30.335
+      · quick tools 30.335-33.035 · free forever 33.035-36.435 · end card 36.435-40.035.
+      Sound sources and licences: assets/audio/CREDITS.md.
+    -->
+    <div id="root" data-composition-id="main" data-start="0" data-duration="40.035" data-width="1920" data-height="1080">
+      <div id="el-s1" class="scene" data-composition-id="s1-usual" data-composition-src="compositions/v2/s1-usual.html" data-start="0" data-duration="8" data-track-index="1"></div>
+      <div id="el-s2" class="scene" data-composition-id="s2-or" data-composition-src="compositions/v2/s2-or.html" data-start="8" data-duration="1.8" data-track-index="1"></div>
+      <div id="el-s3" class="scene" data-composition-id="s3-trim" data-composition-src="compositions/v2/s3-trim.html" data-start="9.8" data-duration="9.705" data-track-index="1"></div>
+      <div id="el-s4" class="scene" data-composition-id="s4-vocals" data-composition-src="compositions/v2/s4-vocals.html" data-start="19.505" data-duration="10.83" data-track-index="1"></div>
+      <div id="el-s5" class="scene" data-composition-id="s5-quick" data-composition-src="compositions/v2/s5-quick.html" data-start="30.335" data-duration="2.7" data-track-index="1"></div>
+      <div id="el-s6" class="scene" data-composition-id="s6-free" data-composition-src="compositions/v2/s6-free.html" data-start="33.035" data-duration="3.4" data-track-index="1"></div>
+      <div id="el-s7" class="scene" data-composition-id="s7-end" data-composition-src="compositions/v2/s7-end.html" data-start="36.435" data-duration="3.6" data-track-index="1"></div>
 
-      <div data-hf-id="hf-gstn" id="el-02-pain" class="scene" data-composition-id="02-pain" data-composition-src="compositions/frames/02-pain.html" data-start="4" data-duration="4" data-track-index="1"></div>
+      <!-- Hold music, a little too loud, stopped dead on the cut to "or." -->
+      <audio id="au-hold" src="assets/audio/v2/hold-music.mp3" data-start="0" data-duration="8" data-media-start="0" data-track-index="10" data-volume="1"
+        data-automation='{"version":1,"lanes":[{"target":"volume","points":[{"t":0,"v":1},{"t":7.985,"v":1},{"t":8,"v":0}]}]}'></audio>
 
-      <div data-hf-id="hf-4ivz" id="el-03-turn" class="scene" data-composition-id="03-turn" data-composition-src="compositions/frames/03-turn.html" data-start="8" data-duration="2" data-track-index="1"></div>
+      <!-- The trimmer's own output: memo from 0:10.15, starting when the page starts playing (take 7.86 s). -->
+      <audio id="au-memo" src="assets/audio/v2/memo-trimmed.mp3" data-start="14.335" data-duration="2.79" data-media-start="0" data-track-index="11" data-volume="0.9"
+        data-automation='{"version":1,"lanes":[{"target":"volume","points":[{"t":0,"v":1},{"t":2.7,"v":1},{"t":2.79,"v":0}]}]}'></audio>
 
-      <div data-hf-id="hf-ugih" id="el-04-wordmark" class="scene" data-composition-id="04-wordmark" data-composition-src="compositions/frames/04-wordmark.html" data-start="10" data-duration="2" data-track-index="1"></div>
+      <!-- The vocal remover's own two halves of the clip, as its mixer plays them. The vocal stops on the Mute click. -->
+      <audio id="au-music" src="assets/audio/v2/song-music-stem.mp3" data-start="25.285" data-duration="5.05" data-media-start="0" data-track-index="12" data-volume="1"
+        data-automation='{"version":1,"lanes":[{"target":"volume","points":[{"t":0,"v":1},{"t":4.75,"v":1},{"t":5.05,"v":0}]}]}'></audio>
+      <audio id="au-vocal" src="assets/audio/v2/song-vocal-stem.mp3" data-start="25.285" data-duration="2.88" data-media-start="0" data-track-index="13" data-volume="1"
+        data-automation='{"version":1,"lanes":[{"target":"volume","points":[{"t":0,"v":1},{"t":2.84,"v":1},{"t":2.88,"v":0}]}]}'></audio>
 
-      <div data-hf-id="hf-ox2r" id="el-05-count" class="scene" data-composition-id="05-count" data-composition-src="compositions/frames/05-count.html" data-start="12" data-duration="2.5" data-track-index="1"></div>
+      <!-- Quick tools: the slowed + reverb output, then the song under the ringtone and BPM shots. -->
+      <audio id="au-slowed" src="assets/audio/v2/song-slowed-reverb.mp3" data-start="30.335" data-duration="0.9" data-media-start="0.3" data-track-index="14" data-volume="1"
+        data-automation='{"version":1,"lanes":[{"target":"volume","points":[{"t":0,"v":1},{"t":0.86,"v":1},{"t":0.9,"v":0}]}]}'></audio>
+      <audio id="au-song" src="assets/audio/v2/song.mp3" data-start="31.235" data-duration="1.8" data-media-start="3" data-track-index="15" data-volume="0.8"
+        data-automation='{"version":1,"lanes":[{"target":"volume","points":[{"t":0,"v":1},{"t":1.65,"v":1},{"t":1.8,"v":0}]}]}'></audio>
 
-      <div data-hf-id="hf-yhx1" id="el-06-montage" class="scene" data-composition-id="06-montage" data-composition-src="compositions/frames/06-montage.html" data-start="14.5" data-duration="12" data-track-index="1"></div>
-
-      <div data-hf-id="hf-zk98" id="el-07-promise" class="scene" data-composition-id="07-promise" data-composition-src="compositions/frames/07-promise.html" data-start="26.5" data-duration="4" data-track-index="1"></div>
-
-      <div data-hf-id="hf-537u" id="el-08-stack" class="scene" data-composition-id="08-stack" data-composition-src="compositions/frames/08-stack.html" data-start="30.5" data-duration="3" data-track-index="1"></div>
-
-      <div data-hf-id="hf-k1m6" id="el-09-endcard" class="scene" data-composition-id="09-endcard" data-composition-src="compositions/frames/09-endcard.html" data-start="33.5" data-duration="4" data-track-index="1"></div>
-
-      <!-- BGM -->
-      <audio data-hf-id="hf-uo49" id="el-bgm" src="assets/audio/ihateaudio-bed.wav" data-start="0" data-duration="37.5" data-track-index="11" data-volume="1"></audio>
-
+      <!-- End beat (HeyGen catalog), from "49 audio tools." to the logo. -->
+      <audio id="au-beat" src="assets/audio/v2/end-beat-funk.mp3" data-start="33.035" data-duration="7" data-media-start="0" data-track-index="16" data-volume="0.85"
+        data-automation='{"version":1,"lanes":[{"target":"volume","points":[{"t":0,"v":1},{"t":5.8,"v":1},{"t":7,"v":0}]}]}'></audio>
     </div>
 
     <script>
-      window.__timelines = window.__timelines || {};
       window.__timelines["main"] = gsap.timeline({ paused: true });
     </script>
   </body>

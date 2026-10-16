@@ -273,3 +273,23 @@ Scene 1 (0.0–0.5s): White ground #FFFFFF. At 0.0 the logo tile (inline SVG cop
 Scene 2 (0.5–1.0s): At 0.5 (the bell) the URL pill wipes open from its centre (scaleX 0 → 1, 0.3s, expo.out): brand-green #006E3D pill, radius 999px, padding 18px 44px, white text `ihateaudio.com` ~64px Instrument Sans 600, centred at y ≈ 620.
 Scene 3 (1.0–1.4s): At 1.0 `49 free audio tools` fades up (y +12px → 0) in ink-2 #515954, ~40px, centred at y ≈ 740.
 Scene 4 (1.4–4.0s): Still hold for reading. No camera move, no breathing.
+
+---
+
+# v2 "or." (16 Oct 2026, approved, built)
+
+Deadpan. White page, ink text, Instrument Serif for every caption and card, brand green as
+the only accent. Captions sit in a white pill at the bottom centre. Global times:
+
+| Time | Scene file | Picture | Sound |
+|---|---|---|---|
+| 0.000–8.000 | `compositions/v2/s1-usual.html` | An invented, cluttered audio site (logo redacted, no real brand). Upload crawls 11→13%, a PRO pop-up, a sign-up wall, then "download starts in 30 seconds" (30, 29, 28). Captions: "you want to cut ten seconds off a voice memo." · "first, it uploads." · "then, an account." · "then, a countdown." | Hold music, phone-filtered, a little too loud |
+| 8.000–9.800 | `s2-or.html` | White. "*or.*" appears at 8.3, no motion. | Hold music stops dead at 8.0. Silence. |
+| 9.800–19.505 | `s3-trim.html` | Real trimmer session: the cursor drops `voice-memo.mp3`, drags the start handle past the fumbling to 0:10.15, plays, downloads; the site's "Saved" bar. Caption: "that's it. that's the whole thing." | The trimmer's output: "Hi, it's me. The meeting moved to three." |
+| 19.505–30.335 | `s4-vocals.html` | Real vocal remover session: drop the song, press Separate, a white card "*18 seconds later.*" (the real wait), the mixer plays both halves, the cursor mutes the vocal. Caption: "also removes vocals." | The page's own music + vocal halves; the vocal stops on the Mute click |
+| 30.335–33.035 | `s5-quick.html` | Slowed + reverb, iPhone ringtone maker, BPM detector (133.3), 0.9 s each. Caption: "and 47 other things." | Slowed + reverb output, then the song |
+| 33.035–36.435 | `s6-free.html` | "49 audio tools." / "*free forever.*" (green) / "no upload. no account. no countdown." | Funk beat starts; lines land on its hits at 0.72 and 1.40 s |
+| 36.435–40.035 | `s7-end.html` | Logo + wordmark, "ihateaudio.com", "*free forever.*" | Funk beat fades out by 40.0 |
+
+Edit points inside each tool scene (take time → scene time, playback rates) are written
+at the top of each scene file.

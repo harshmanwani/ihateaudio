@@ -94,3 +94,49 @@ Deliverables (in out/):
 - Poster: `out/poster.png` is the 14.45 s frame ("49 audio tools. free." with the 49-icon grid), captured lossless with `hyperframes snapshot`.
 - 1:1 cut: `out/ihateaudio-launch-1x1.mp4` (`sh square/make-square.sh`) — the 16:9 master letterboxed to 1080x608 between a brand band (logo + wordmark) and a URL band. Not re-composed per frame.
 - Final look: the Studio preview was opened (`npx hyperframes preview --background`); the render was not gated on a question because the user asked for no questions.
+
+---
+
+## v2 "or." (16 Oct 2026)
+
+The owner rejected v1: the vibe did not land, the synthetic music was bad, and the
+glitched "audio editing" type had to go. They asked for "free forever" on screen.
+v2 replaces v1 in `index.html`; v1 is in git at `b63608b` (its renders are kept as
+`out/v1-*`).
+
+Agreed with the owner, one question at a time (no autonomous mode this time):
+
+- **Vibe:** deadpan funny. The usual audio site wastes your time; ihateaudio just does it.
+- **Type:** Instrument Serif for all display copy (`assets/fonts/`, OFL, copied from the
+  owner's yaktech project). The wordmark on the end card stays in Instrument Sans.
+- **Music:** cheesy phone-hold music (*Für Elise*, CC0) stops dead on "or.", then only the
+  real tool sounds, then a funk beat (HeyGen catalog) under "free forever" and the logo.
+  The owner listened to every candidate and picked them. Sources: `assets/audio/CREDITS.md`.
+- **Product footage:** real sessions on the live site, not screenshots.
+  `scripts/record-tools.mjs <take>` drives https://ihateaudio.com with a drawn cursor,
+  drops real files on the real drop zone, and records 1920x1080 frames with the DevTools
+  screencast; `scripts/encode-take.sh takes/<take>` makes the clip. Every sound in the
+  demo is the page's own output (the trimmed memo, the separated music and vocal).
+- **Review stops:** music candidates, then a rough cut, then the final render.
+
+Rebuild (the downloaded and generated audio is not in git, because the repo is public):
+
+1. Re-download the three sources listed in `assets/audio/CREDITS.md` into `assets/audio/candidates/`.
+2. Voice memo: four HeyGen TTS takes (voice "Lucian", `049413e41c334753984c294d694afb5c`):
+   "Um. Is this recording?", "Hello?", "Okay. Okay, it's recording.", "Hi, it's me. The
+   meeting moved to three." Placed at 0.9, 4.68, 7.56 and 10.0 s over light pink noise,
+   13.9 s long, saved as `assets/audio/demo/voice-memo.mp3`.
+3. Song clip: `Benjamin_Orth_-_Where_You_Are_Now.mp3` from 8.6 s, 12.4 s long, as
+   `assets/audio/demo/where-you-are-now.mp3`.
+4. `node scripts/record-tools.mjs trim|vocals|slowed|ringtone|bpm`, encode each, copy the
+   clips to `assets/video/take-<name>.mp4` and the saved outputs to `assets/audio/v2/`.
+   Re-measure the click times in `takes/<name>/events.json`: the edit points in each scene
+   file and the audio starts in `index.html` depend on them.
+5. `npx hyperframes render --quality delivery --crf 12 --output out/ihateaudio-launch-16x9.mp4`.
+
+Build record (16 Oct 2026): `npx hyperframes check` passes (lint 0 errors; the one warning
+is the four captions on one track in scene 1; contrast 28/28 AA). Pin bumped
+0.8.152 → 0.8.162. Master: H.264 1920x1080 30 fps + AAC 48 kHz, 40.0 s, −15.4 LUFS,
+−2.2 dBFS peak. Runtime is 40 s against a 36 s target; the owner approved the rough cut at
+that length. Poster: `out/poster.png`, the 35.9 s frame ("49 audio tools. free forever."),
+lossless from `hyperframes snapshot`. No square cut yet for v2.
