@@ -9,6 +9,7 @@
 import type { ToolRuntime } from './tool';
 import { formatById, estimateSize, outputSampleRate, writtenKbps } from './audio/export';
 import { fitsIn16Bits, type WavBitDepth } from './audio/encode-wav';
+import { audioTrack, fourcc } from './audio/mp4';
 import { filesize, duration, extensionOf, sampleRateLabel, channelLabel } from './format';
 
 /** Formats whose data has already been through a lossy encoder. */
@@ -100,82 +101,15 @@ export async function mp4Audio(file: Blob): Promise<Mp4Audio | null> {
         // A moov this large is a damaged file, not a long one.
         if (size > 64 * 1024 * 1024) return null;
         const view = new DataView(await file.slice(offset + header, offset + size).arrayBuffer());
-        return soundTrack(view);
+        const track = audioTrack(view, 0, view.byteLength);
+        if (!track) return null;
+        const { codec, bytes, seconds } = track;
+        return { codec, kbps: bytes && seconds ? Math.round((bytes * 8) / seconds / 1000) : null };
       }
       offset += size;
     }
   } catch {
     /* Unreadable is the same as unknown. */
-  }
-  return null;
-}
-
-function fourcc(view: DataView, at: number): string {
-  let out = '';
-  for (let i = 0; i < 4; i += 1) out += String.fromCharCode(view.getUint8(at + i));
-  return out;
-}
-
-/** The direct children of a box payload spanning [start, end). */
-function boxes(view: DataView, start: number, end: number): { type: string; at: number; end: number }[] {
-  const out: { type: string; at: number; end: number }[] = [];
-  let offset = start;
-  while (offset + 8 <= end) {
-    let size = view.getUint32(offset);
-    let header = 8;
-    if (size === 1 && offset + 16 <= end) {
-      size = view.getUint32(offset + 8) * 2 ** 32 + view.getUint32(offset + 12);
-      header = 16;
-    } else if (size === 0) {
-      size = end - offset;
-    }
-    if (size < header || offset + size > end) break;
-    out.push({ type: fourcc(view, offset + 4), at: offset + header, end: offset + size });
-    offset += size;
-  }
-  return out;
-}
-
-function soundTrack(moov: DataView): Mp4Audio | null {
-  const child = (at: number, end: number, type: string) =>
-    boxes(moov, at, end).find((box) => box.type === type);
-
-  for (const trak of boxes(moov, 0, moov.byteLength)) {
-    if (trak.type !== 'trak') continue;
-    const mdia = child(trak.at, trak.end, 'mdia');
-    if (!mdia) continue;
-    const hdlr = child(mdia.at, mdia.end, 'hdlr');
-    if (!hdlr || fourcc(moov, hdlr.at + 8) !== 'soun') continue;
-
-    const mdhd = child(mdia.at, mdia.end, 'mdhd');
-    const stbl = (() => {
-      const minf = child(mdia.at, mdia.end, 'minf');
-      return minf ? child(minf.at, minf.end, 'stbl') : undefined;
-    })();
-    const stsz = stbl ? child(stbl.at, stbl.end, 'stsz') : undefined;
-    // stsd: version and flags, an entry count, then the first entry's size
-    // and its type, which names the codec.
-    const stsd = stbl ? child(stbl.at, stbl.end, 'stsd') : undefined;
-    const codec = stsd && stsd.at + 16 <= stsd.end ? fourcc(moov, stsd.at + 12) : null;
-    if (!mdhd || !stsz) return { codec, kbps: null };
-
-    const v1 = moov.getUint8(mdhd.at) === 1;
-    const timescale = moov.getUint32(mdhd.at + (v1 ? 20 : 12));
-    const length = v1
-      ? moov.getUint32(mdhd.at + 24) * 2 ** 32 + moov.getUint32(mdhd.at + 28)
-      : moov.getUint32(mdhd.at + 16);
-    const seconds = timescale > 0 ? length / timescale : 0;
-
-    const fixed = moov.getUint32(stsz.at + 4);
-    const count = moov.getUint32(stsz.at + 8);
-    let bytes = fixed * count;
-    if (fixed === 0) {
-      if (stsz.at + 12 + count * 4 > stsz.end) return { codec, kbps: null };
-      for (let i = 0; i < count; i += 1) bytes += moov.getUint32(stsz.at + 12 + i * 4);
-    }
-
-    if (count === 0 || seconds <= 0) return { codec, kbps: null };
-    return { codec, kbps: Math.round((bytes * 8) / seconds / 1000) };
   }
   return null;
 }

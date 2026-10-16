@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { isLossySource, mp4Audio } from '../../src/lib/conversion';
+import { mp4AudioTrack } from '../../src/lib/audio/mp4';
 
 /*
  * Real files, 50 ms of mono music at 8 kHz, made with ffmpeg 8:
@@ -78,6 +79,18 @@ describe('mp4Audio', () => {
 
   it('answers null for something that is not an MP4', async () => {
     expect(await mp4Audio(new Blob([new Uint8Array(64)]))).toBeNull();
+  });
+});
+
+describe('mp4AudioTrack on real files', () => {
+  const bytes = (base64: string): ArrayBuffer =>
+    Uint8Array.from(atob(base64), (c) => c.charCodeAt(0)).buffer;
+
+  it('reads the rate both files decode at', () => {
+    // The ALAC rate comes from its cookie, the AAC rate from a config that
+    // signals SBR absent, so 8 kHz is safe to decode at.
+    expect(mp4AudioTrack(bytes(ALAC_M4A))).toMatchObject({ codec: 'alac', rate: 8000, channels: 1 });
+    expect(mp4AudioTrack(bytes(AAC_M4A))).toMatchObject({ codec: 'mp4a', rate: 8000 });
   });
 });
 

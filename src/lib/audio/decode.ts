@@ -8,6 +8,8 @@
  * than crashing the tab.
  */
 import { audioError, toAudioError } from './errors';
+import { decodeVia, isFFmpegReady } from './ffmpeg';
+import { isMp4, mp4AudioTrack } from './mp4';
 
 const BYTES_PER_SAMPLE = 4;
 
@@ -114,6 +116,12 @@ export function detectSampleRate(bytes: ArrayBuffer): number | null {
       (view.getUint8(18) << 12) | (view.getUint8(19) << 4) | (view.getUint8(20) >> 4);
     return rate >= 3000 && rate <= 768000 ? rate : null;
   }
+
+  // MP4 family (.m4a, .mp4, .mov): the audio track's sample description.
+  // Without this every one of them decoded at the device rate, so on a 48 kHz
+  // device a 44.1 kHz Apple Lossless file was resampled and stopped being
+  // bit-exact, and the converter called its 16 bits more than 16.
+  if (isMp4(bytes)) return mp4AudioTrack(bytes)?.rate ?? null;
 
   // MPEG audio: skip an ID3v2 tag, then find two frame headers in a row.
   let start = 0;
@@ -234,8 +242,12 @@ export function probeDuration(file: Blob): Promise<number | null> {
 export interface DecodeOptions {
   /** Preserve the file's own sample rate instead of the device's. Default true. */
   nativeRate?: boolean;
-  /** Called with 0..1 while reading the file off disk. */
-  onProgress?: (ratio: number) => void;
+  /**
+   * Called with 0..1 while reading the file off disk. A label comes with it
+   * when the work is something other than reading: loading ffmpeg for a
+   * codec the browser cannot decode, then decoding with it.
+   */
+  onProgress?: (ratio: number, label?: string) => void;
   signal?: AbortSignal;
 }
 
@@ -264,16 +276,7 @@ export async function decodeFile(
   const seconds = await probeDuration(file);
   if (signal?.aborted) throw audioError('cancelled');
 
-  if (seconds !== null) {
-    // Assume stereo at 48k for the estimate; it is the pessimistic common case.
-    const needed = estimateDecodedBytes(seconds, 2, 48000);
-    if (needed > memoryBudget()) {
-      throw audioError(
-        'too-long',
-        `This device can hold about ${Math.floor(maxDurationSeconds() / 60)} minutes of audio at once, and that file is ${Math.round(seconds / 60)} minutes. Split it into shorter parts first.`
-      );
-    }
-  }
+  if (seconds !== null) assertFits(seconds);
 
   onProgress?.(0.1);
   let bytes: ArrayBuffer;
@@ -286,19 +289,31 @@ export async function decodeFile(
   onProgress?.(0.5);
 
   const detected = nativeRate ? detectSampleRate(bytes) : null;
+  const track = mp4AudioTrack(bytes);
+  if (track?.codec && ENCRYPTED_CODECS.has(track.codec)) throw audioError('drm-protected');
+  // A browser that cannot decode the track often cannot read its length
+  // either, which skipped the check above for exactly the files that go on
+  // to the heavier ffmpeg path.
+  if (seconds === null && track?.seconds) assertFits(track.seconds);
 
   let buffer: AudioBuffer;
+  let viaFFmpeg = false;
   try {
-    buffer = await decodeAt(bytes, detected);
+    buffer = await decodeNatively(bytes, detected);
   } catch (err) {
-    if (detected !== null) {
-      // A wrong rate guess must never be the reason a file fails to open.
-      try {
-        buffer = await decodeAt(bytes, null);
-      } catch (retryErr) {
-        throw classifyDecodeFailure(retryErr, file);
-      }
-    } else {
+    // Chromium and Firefox have no Apple Lossless decoder, and no browser
+    // reads every codec an MP4 can carry. ffmpeg does, at the cost of a
+    // one-time download, so it gets the files the browser refused.
+    if (!track) throw classifyDecodeFailure(err, file);
+    if (signal?.aborted) throw audioError('cancelled');
+    try {
+      buffer = await decodeWithFFmpeg(bytes, file, track.codec, nativeRate, onProgress, signal);
+      viaFFmpeg = true;
+    } catch (ffmpegErr) {
+      // What went wrong with ffmpeg itself is worth saying; a file it could
+      // not decode either is the same failure the browser reported.
+      const failure = toAudioError(ffmpegErr);
+      if (failure.code !== 'decode-failed' && failure.code !== 'unknown-error') throw failure;
       throw classifyDecodeFailure(err, file);
     }
   }
@@ -307,7 +322,67 @@ export async function decodeFile(
   if (buffer.length === 0) throw audioError('no-audio-track');
 
   onProgress?.(1);
-  return { buffer, sourceRate: detected, bytes: file.size };
+  // ffmpeg keeps the file's own rate, which the headers may not have stated.
+  const sourceRate = viaFFmpeg && nativeRate ? buffer.sampleRate : detected;
+  return { buffer, sourceRate, bytes: file.size };
+}
+
+/** Sample entries whose audio is encrypted: iTunes FairPlay, and common encryption. */
+const ENCRYPTED_CODECS = new Set(['drms', 'enca']);
+
+/** Refuses a file whose decoded audio would not fit in this device's memory. */
+function assertFits(seconds: number): void {
+  // Assume stereo at 48k for the estimate; it is the pessimistic common case.
+  const needed = estimateDecodedBytes(seconds, 2, 48000);
+  if (needed > memoryBudget()) {
+    throw audioError(
+      'too-long',
+      `This device can hold about ${Math.floor(maxDurationSeconds() / 60)} minutes of audio at once, and that file is ${Math.round(seconds / 60)} minutes. Split it into shorter parts first.`
+    );
+  }
+}
+
+async function decodeNatively(bytes: ArrayBuffer, rate: number | null): Promise<AudioBuffer> {
+  try {
+    return await decodeAt(bytes, rate);
+  } catch (err) {
+    // A wrong rate guess must never be the reason a file fails to open.
+    if (rate === null) throw err;
+    return decodeAt(bytes, null);
+  }
+}
+
+const CODEC_NAMES: Record<string, string> = { alac: 'Apple Lossless' };
+
+/**
+ * Decodes with ffmpeg.wasm, reporting the download and then the decode.
+ * `bytes` is handed to ffmpeg's worker and is unusable afterwards.
+ */
+function decodeWithFFmpeg(
+  bytes: ArrayBuffer,
+  file: File | Blob,
+  codec: string | null,
+  nativeRate: boolean,
+  onProgress: DecodeOptions['onProgress'],
+  signal: AbortSignal | undefined
+): Promise<AudioBuffer> {
+  const name = (codec && CODEC_NAMES[codec]) ?? null;
+  const decoding = name ? `Decoding ${name}` : 'Decoding';
+  if (isFFmpegReady()) onProgress?.(0, decoding);
+  // ffmpeg reads the container from the bytes; the extension only names the file.
+  const fileName = 'name' in file && typeof file.name === 'string' ? file.name : '';
+  const ext = fileName.slice(fileName.lastIndexOf('.') + 1).toLowerCase();
+  return decodeVia(bytes, /^[a-z0-9]{1,5}$/.test(ext) ? ext : 'mp4', {
+    // Without a native rate the buffer must match the device, as decodeAudioData's would.
+    rate: nativeRate ? undefined : getAudioContext().sampleRate,
+    // The load reports 1 once ffmpeg is up, which is when the decode starts.
+    onLoadProgress: (ratio) =>
+      ratio >= 1
+        ? onProgress?.(0, decoding)
+        : onProgress?.(ratio, `Loading the ${name ?? 'audio'} decoder (one time, ~10 MB)`),
+    onProgress: (ratio) => onProgress?.(ratio, decoding),
+    signal,
+  });
 }
 
 async function decodeAt(bytes: ArrayBuffer, rate: number | null): Promise<AudioBuffer> {

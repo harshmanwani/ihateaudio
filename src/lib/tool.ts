@@ -421,9 +421,9 @@ export class ToolRuntime {
       for (let i = 0; i < files.length; i += 1) {
         const { buffer } = await decodeFile(files[i], {
           signal,
-          onProgress: (ratio) => {
+          onProgress: (ratio, label) => {
             const overall = (i + ratio) / files.length;
-            this.showProgress(overall, `Reading ${files[i].name}`);
+            this.showProgress(overall, label ?? `Reading ${files[i].name}`);
           },
         });
         decoded.push(buffer);

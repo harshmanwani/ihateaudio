@@ -7,7 +7,7 @@
  * core is served from our own origin, so using it still involves no third-party
  * request and no upload.
  */
-import { audioError } from './errors';
+import { audioError, type AudioErrorCode } from './errors';
 import { encodeWav, type WavBitDepth } from './encode-wav';
 import { FFMPEG_CORE_VERSION } from './ffmpeg-version';
 
@@ -159,6 +159,22 @@ export async function transcode(
   outputName: string,
   options: TranscodeOptions = {}
 ): Promise<Blob> {
+  const data = await run(input, inputName, outputName, options, 'encode-failed');
+  return new Blob([data as BlobPart], { type: mimeForName(outputName) });
+}
+
+/**
+ * One ffmpeg invocation, returning the output file's bytes. A failure throws
+ * `failure`. An ArrayBuffer input is moved to ffmpeg's worker rather than
+ * copied, so the caller cannot use it afterwards.
+ */
+async function run(
+  input: Blob | ArrayBuffer,
+  inputName: string,
+  outputName: string,
+  options: TranscodeOptions,
+  failure: AudioErrorCode
+): Promise<Uint8Array> {
   const { args = [], onProgress, onLoadProgress, signal } = options;
 
   const ff = await loadFFmpeg(onLoadProgress);
@@ -171,7 +187,7 @@ export async function transcode(
   ff.on('progress', handler);
 
   try {
-    const bytes = new Uint8Array(await input.arrayBuffer());
+    const bytes = new Uint8Array(input instanceof ArrayBuffer ? input : await input.arrayBuffer());
     await ff.writeFile(inputName, bytes);
     if (signal?.aborted) throw audioError('cancelled');
 
@@ -188,15 +204,13 @@ export async function transcode(
        * export loads a clean one, from the HTTP cache rather than the network.
        */
       releaseFFmpeg();
-      throw audioError('encode-failed');
+      throw audioError(failure);
     }
-    if (code !== 0) throw audioError('encode-failed');
+    if (code !== 0) throw audioError(failure);
 
     const data = await ff.readFile(outputName);
-    if (typeof data === 'string') throw audioError('encode-failed');
-    if (data.length === 0) throw audioError('encode-failed');
-
-    return new Blob([data as BlobPart], { type: mimeForName(outputName) });
+    if (typeof data === 'string' || data.length === 0) throw audioError(failure);
+    return data;
   } finally {
     ff.off('progress', handler);
     // Clean the virtual filesystem so repeat runs don't accumulate megabytes.
@@ -230,6 +244,78 @@ export async function encodeVia(
   const { bitDepth = 24, ...rest } = options;
   const wav = encodeWav(buffer, { bitDepth });
   return transcode(wav, 'in.wav', `out.${outputExtension}`, rest);
+}
+
+export interface DecodeViaOptions extends TranscodeOptions {
+  /** Resample to this rate. Left out, the audio keeps the file's own rate. */
+  rate?: number;
+}
+
+/**
+ * Decodes audio the browser has no decoder for: Apple Lossless in Chromium
+ * and Firefox, and the other codecs an MP4 can hold that a browser refuses.
+ *
+ * ffmpeg hands back 32-bit float WAV, which holds every sample exactly and
+ * keeps the overs a lossy decoder can produce above full scale. The samples
+ * go straight into an AudioBuffer instead of back through decodeAudioData,
+ * whose WAV support differs from browser to browser.
+ *
+ * `bytes` is moved to ffmpeg's worker, not copied: an hour of Apple Lossless
+ * is half a gigabyte, and the caller has no more use for it. It is detached
+ * once this returns.
+ */
+export async function decodeVia(
+  bytes: ArrayBuffer,
+  extension: string,
+  options: DecodeViaOptions = {}
+): Promise<AudioBuffer> {
+  const { rate, ...rest } = options;
+  const args = ['-vn', '-c:a', 'pcm_f32le', ...(rate ? ['-ar', String(rate)] : []), '-f', 'wav'];
+  const wav = await run(bytes, `in.${extension}`, 'out.wav', { ...rest, args }, 'decode-failed');
+  return floatWavToBuffer(wav);
+}
+
+/** A 32-bit float WAV, as ffmpeg writes it, in an AudioBuffer. */
+function floatWavToBuffer(wav: Uint8Array): AudioBuffer {
+  const view = new DataView(wav.buffer, wav.byteOffset, wav.byteLength);
+  const id = (at: number): string =>
+    String.fromCharCode(wav[at]!, wav[at + 1]!, wav[at + 2]!, wav[at + 3]!);
+  let channels = 0;
+  let rate = 0;
+  let float = false;
+
+  let offset = 12;
+  while (offset + 8 <= wav.length) {
+    const size = view.getUint32(offset + 4, true);
+    const body = offset + 8;
+    if (id(offset) === 'fmt ' && body + 16 <= wav.length) {
+      const tag = view.getUint16(body, true);
+      channels = view.getUint16(body + 2, true);
+      rate = view.getUint32(body + 4, true);
+      // 3 is IEEE float; 0xFFFE is the extensible header, which ffmpeg uses
+      // past two channels and which names float in its subformat instead.
+      const subformat = tag === 0xfffe && body + 26 <= wav.length ? view.getUint16(body + 24, true) : tag;
+      float = subformat === 3 && view.getUint16(body + 14, true) === 32;
+    } else if (id(offset) === 'data') {
+      if (!float || channels === 0 || rate === 0) break;
+      const frames = Math.floor(Math.min(size, wav.length - body) / (4 * channels));
+      if (frames === 0) throw audioError('no-audio-track');
+      const buffer = new AudioBuffer({ numberOfChannels: channels, length: frames, sampleRate: rate });
+      // DataView, not a Float32Array over the bytes: the header leaves the
+      // samples off 4-byte alignment, and realigning them would mean a second
+      // copy of the whole file for about the same speed.
+      const stride = 4 * channels;
+      for (let c = 0; c < channels; c += 1) {
+        const out = buffer.getChannelData(c);
+        for (let i = 0, at = body + 4 * c; i < frames; i += 1, at += stride) {
+          out[i] = view.getFloat32(at, true);
+        }
+      }
+      return buffer;
+    }
+    offset = body + size + (size % 2);
+  }
+  throw audioError('decode-failed');
 }
 
 /**
