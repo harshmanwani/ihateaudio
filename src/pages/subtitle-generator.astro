@@ -276,6 +276,9 @@ const faq = [
         })
       );
 
+      // The last file's cues, and its save buttons, are not this file's.
+      const cues = runtime.root.querySelector<HTMLElement>('[data-cues]');
+      if (cues) cues.hidden = true;
     },
 
     async process(ctx) {
@@ -351,12 +354,12 @@ const faq = [
       const srt = new Blob([toSrt(segments)], { type: 'text/plain;charset=utf-8' });
       const vtt = new Blob([toVtt(segments)], { type: 'text/vtt;charset=utf-8' });
 
-      root
-        .querySelector<HTMLButtonElement>('[data-save-srt]')
-        ?.addEventListener('click', () => saveBlob(srt, `${stem}.srt`));
-      root
-        .querySelector<HTMLButtonElement>('[data-save-vtt]')
-        ?.addEventListener('click', () => saveBlob(vtt, `${stem}.vtt`));
+      // Assigned, not added: the buttons outlive each run, and a listener added
+      // per run made one click save every file subtitled so far.
+      const saveSrt = root.querySelector<HTMLButtonElement>('[data-save-srt]');
+      if (saveSrt) saveSrt.onclick = () => saveBlob(srt, `${stem}.srt`);
+      const saveVtt = root.querySelector<HTMLButtonElement>('[data-save-vtt]');
+      if (saveVtt) saveVtt.onclick = () => saveBlob(vtt, `${stem}.vtt`);
 
       return srt;
     },

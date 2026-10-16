@@ -20,6 +20,7 @@
  * The worker is handed our own origin and the library is configured to refuse
  * anything else.
  */
+import { resampleChannel } from '../audio/resample';
 import { MODELS_VERSION, WHISPER } from './models';
 import { TRANSFORMERS_VERSION } from './transformers-version';
 
@@ -97,32 +98,25 @@ function resetWorker(): void {
  * frequency the model learned by a factor of nearly three, and the transcript comes
  * back as confident nonsense.
  *
- * OfflineAudioContext resamples with a real anti-aliasing filter, which matters
- * here more than usual because this is a large downsample and linear interpolation
- * would fold everything above 8 kHz back into the speech band.
+ * The downsample is band-limited (resample.ts). This is a large one, and without
+ * the filter everything between 8 and 24 kHz folds back into the speech band.
+ * The browser's resampler does not filter: an OfflineAudioContext at 16 kHz put
+ * a 10 kHz tone at 6 kHz at full level.
  */
 export async function toWhisperInput(buffer: AudioBuffer): Promise<Float32Array> {
   const frames = Math.max(1, Math.round((buffer.length / buffer.sampleRate) * WHISPER.rate));
-  const context = new OfflineAudioContext(1, frames, WHISPER.rate);
-  const source = context.createBufferSource();
 
-  // Downmix before rendering rather than after, so the resampler sees one channel.
+  // Downmix before resampling, so the filter runs over one channel.
+  let mono = buffer.getChannelData(0);
   if (buffer.numberOfChannels > 1) {
-    const mono = context.createBuffer(1, buffer.length, buffer.sampleRate);
-    const out = mono.getChannelData(0);
+    mono = new Float32Array(buffer.length);
     for (let c = 0; c < buffer.numberOfChannels; c += 1) {
       const data = buffer.getChannelData(c);
-      for (let i = 0; i < data.length; i += 1) out[i] = out[i]! + data[i]! / buffer.numberOfChannels;
+      for (let i = 0; i < data.length; i += 1) mono[i] = mono[i]! + data[i]! / buffer.numberOfChannels;
     }
-    source.buffer = mono;
-  } else {
-    source.buffer = buffer;
   }
 
-  source.connect(context.destination);
-  source.start();
-  const rendered = await context.startRendering();
-  return Float32Array.from(rendered.getChannelData(0));
+  return resampleChannel(mono, buffer.sampleRate, WHISPER.rate, frames);
 }
 
 interface RawChunk {
@@ -264,11 +258,13 @@ export async function transcribe(
 
 /** `HH:MM:SS,mmm`, which is SRT's format and is not negotiable. */
 function srtTime(seconds: number): string {
-  const clamped = Math.max(0, seconds);
-  const hours = Math.floor(clamped / 3600);
-  const minutes = Math.floor((clamped % 3600) / 60);
-  const secs = Math.floor(clamped % 60);
-  const ms = Math.round((clamped - Math.floor(clamped)) * 1000);
+  // Whole milliseconds first: rounding only the fraction turned 2.9996 s into
+  // "00:00:02,1000".
+  const total = Math.round(Math.max(0, seconds) * 1000);
+  const hours = Math.floor(total / 3_600_000);
+  const minutes = Math.floor((total % 3_600_000) / 60_000);
+  const secs = Math.floor((total % 60_000) / 1000);
+  const ms = total % 1000;
   const pad = (n: number, width = 2) => String(n).padStart(width, '0');
   return `${pad(hours)}:${pad(minutes)}:${pad(secs)},${pad(ms, 3)}`;
 }

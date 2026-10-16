@@ -235,6 +235,33 @@ export function setChannels(buffer: AudioBuffer, channels: number): AudioBuffer 
     return out;
   }
 
+  /**
+   * Surround down to stereo by the Web Audio "speakers" rules for the layouts
+   * they define. Copying the first two channels kept only front left and right,
+   * and a film's 5.1 track lost its centre, which is where the dialogue is.
+   */
+  const n = buffer.numberOfChannels;
+  if (channels === 2 && (n === 4 || n === 6)) {
+    const [left, right] = [out.getChannelData(0), out.getChannelData(1)];
+    const [l, r] = [buffer.getChannelData(0), buffer.getChannelData(1)];
+    if (n === 4) {
+      // L R SL SR
+      const [sl, sr] = [buffer.getChannelData(2), buffer.getChannelData(3)];
+      for (let i = 0; i < left.length; i += 1) {
+        left[i] = 0.5 * (l[i] + sl[i]);
+        right[i] = 0.5 * (r[i] + sr[i]);
+      }
+    } else {
+      // L R C LFE SL SR; the LFE is left out, as the spec does.
+      const [centre, sl, sr] = [buffer.getChannelData(2), buffer.getChannelData(4), buffer.getChannelData(5)];
+      for (let i = 0; i < left.length; i += 1) {
+        left[i] = l[i] + Math.SQRT1_2 * (centre[i] + sl[i]);
+        right[i] = r[i] + Math.SQRT1_2 * (centre[i] + sr[i]);
+      }
+    }
+    return out;
+  }
+
   for (let c = 0; c < channels; c += 1) {
     const source = buffer.getChannelData(Math.min(c, buffer.numberOfChannels - 1));
     out.copyToChannel(source.slice(), c);

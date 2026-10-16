@@ -7,7 +7,8 @@
  * shifts by 9%, which does not fail — it just separates noticeably worse, for a
  * reason nothing in the output points at.
  */
-import { createBuffer } from '../audio/dsp';
+import { createBuffer, setChannels } from '../audio/dsp';
+import { resampleBuffer } from '../audio/resample';
 import { MDX_RATE, type MdxModel, type Stem } from './models';
 import type { SeparateRequest, SeparateResponse } from './separate.worker';
 import { loadModel } from './store';
@@ -30,28 +31,6 @@ export interface SeparateOptions {
 export interface SeparateResult {
   primary?: AudioBuffer;
   complement?: AudioBuffer;
-}
-
-/**
- * Resamples with the browser's own resampler.
- *
- * `resampleLinear` in dsp.ts exists for the sample-rate converter tool, where the
- * user asked for exactly that and can hear the result. It is the wrong tool here:
- * linear interpolation has no anti-aliasing filter, so downsampling folds
- * everything above the new Nyquist back down into the audible band as inharmonic
- * junk, and that junk is then fed to a network that has never seen anything like
- * it. OfflineAudioContext resamples with a proper polyphase filter.
- */
-async function resample(buffer: AudioBuffer, rate: number): Promise<AudioBuffer> {
-  if (buffer.sampleRate === rate) return buffer;
-
-  const frames = Math.max(1, Math.round((buffer.length / buffer.sampleRate) * rate));
-  const context = new OfflineAudioContext(buffer.numberOfChannels, frames, rate);
-  const source = context.createBufferSource();
-  source.buffer = buffer;
-  source.connect(context.destination);
-  source.start();
-  return context.startRendering();
 }
 
 /** Deinterleaved stereo, duplicating a mono source into both sides. */
@@ -115,8 +94,9 @@ export async function separate(
 
   const originalRate = buffer.sampleRate;
   const mono = buffer.numberOfChannels === 1;
-  const at441 = await resample(buffer, MDX_RATE);
-  const channels = toStereo(at441);
+  const at441 = await resampleBuffer(buffer, MDX_RATE);
+  // Surround is folded to stereo first, or toStereo keeps only front left and right.
+  const channels = toStereo(at441.numberOfChannels > 2 ? setChannels(at441, 2) : at441);
 
   const worker = new Worker(new URL('./separate.worker.ts', import.meta.url), {
     type: 'module',
@@ -245,7 +225,7 @@ async function restore(
   mono: boolean
 ): Promise<AudioBuffer> {
   const at441 = toBuffer(channels, MDX_RATE, mono);
-  return rate === MDX_RATE ? at441 : resample(at441, rate);
+  return rate === MDX_RATE ? at441 : resampleBuffer(at441, rate);
 }
 
 /** Label for a stem, used in filenames and in the results list. */

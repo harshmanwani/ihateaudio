@@ -20,6 +20,7 @@
  * Yielding every couple of seconds of audio costs nothing measurable and makes all
  * three work.
  */
+import { resampleBuffer } from '../audio/resample';
 import {
   loadRnnoise,
   RNNOISE_DELAY,
@@ -104,20 +105,6 @@ function breathe(): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-/** Rate conversion through the browser's own resampler, which has a proper filter. */
-async function resample(
-  buffer: AudioBuffer,
-  rate: number,
-  frames: number
-): Promise<AudioBuffer> {
-  const context = new OfflineAudioContext(buffer.numberOfChannels, frames, rate);
-  const source = context.createBufferSource();
-  source.buffer = buffer;
-  source.connect(context.destination);
-  source.start();
-  return context.startRendering();
-}
-
 function peakOf(buffer: AudioBuffer): number {
   let peak = 0;
   for (let c = 0; c < buffer.numberOfChannels; c += 1) {
@@ -157,7 +144,7 @@ export async function denoise(
   const working =
     sourceRate === RNNOISE_RATE
       ? buffer
-      : await resample(
+      : await resampleBuffer(
           buffer,
           RNNOISE_RATE,
           Math.max(1, Math.round((buffer.length / sourceRate) * RNNOISE_RATE))
@@ -250,7 +237,7 @@ export async function denoise(
   }
 
   if (sourceRate === RNNOISE_RATE) return cleaned;
-  return resample(cleaned, sourceRate, buffer.length);
+  return resampleBuffer(cleaned, sourceRate, buffer.length);
 }
 
 /**

@@ -276,6 +276,9 @@ const faq = [
         })
       );
 
+      // The last file's transcript, and its buttons, are not this file's.
+      const transcript = runtime.root.querySelector<HTMLElement>('[data-transcript]');
+      if (transcript) transcript.hidden = true;
     },
 
     async process(ctx) {
@@ -340,22 +343,24 @@ const faq = [
       const name = `${baseName(ctx.files[0]?.name ?? 'transcript')}-transcript.txt`;
       const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
 
-      root.querySelector<HTMLButtonElement>('[data-save-txt]')?.addEventListener(
-        'click',
-        () => saveBlob(blob, name),
-        { once: true }
-      );
+      // Assigned, not added: the buttons outlive each run, and a listener added
+      // per run made one click act on every transcript made so far.
+      const saveTxt = root.querySelector<HTMLButtonElement>('[data-save-txt]');
+      if (saveTxt) saveTxt.onclick = () => saveBlob(blob, name);
 
-      root.querySelector<HTMLButtonElement>('[data-copy]')?.addEventListener('click', () => {
-        void navigator.clipboard.writeText(text).then(
-          () => runtime.showNote('Transcript copied to the clipboard.', 'info'),
-          () =>
-            runtime.showNote(
-              'The browser would not let us write to the clipboard. Select the text and copy it.',
-              'warn'
-            )
-        );
-      });
+      const copy = root.querySelector<HTMLButtonElement>('[data-copy]');
+      if (copy) {
+        copy.onclick = () => {
+          void navigator.clipboard.writeText(text).then(
+            () => runtime.showNote('Transcript copied to the clipboard.', 'info'),
+            () =>
+              runtime.showNote(
+                'The browser would not let us write to the clipboard. Select the text and copy it.',
+                'warn'
+              )
+          );
+        };
+      }
 
       // The transcript is the deliverable and it is on the page. Returning the blob
       // hands the shared plumbing something to offer as a download too.
