@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { encodeWav, wavSize } from '../../src/lib/audio/encode-wav';
+import { encodeWav, fitsIn16Bits, wavSize } from '../../src/lib/audio/encode-wav';
 import { createBuffer } from '../../src/lib/audio/dsp';
 import { detectSampleRate } from '../../src/lib/audio/decode';
 
@@ -104,6 +104,105 @@ describe('encodeWav samples', () => {
     expect(dv.getInt16(44, true)).toBeGreaterThan(0); // L
     expect(dv.getInt16(46, true)).toBeLessThan(0); // R
     expect(dv.getInt16(48, true)).toBeGreaterThan(0); // L
+  });
+});
+
+/*
+ * Decoding a 16-bit file and writing it straight back must give the same
+ * file, or "lossless" is a lie. The decoders differ, so both conventions are
+ * driven through every one of the 65,536 values. Chrome multiplies a positive
+ * int16 by the float32 nearest 1 / 32767 and a negative one by 1 / 32768
+ * (matched against decodeAudioData for every value); Firefox and Safari
+ * divide both by 32768.
+ */
+describe('encodeWav 16-bit round trip', () => {
+  const chrome = (k: number) => (k < 0 ? k / 32768 : Math.fround(k * Math.fround(1 / 32767)));
+  const symmetric = (k: number) => k / 32768;
+
+  async function roundTrip(decode: (k: number) => number): Promise<number[]> {
+    const buffer = createBuffer(1, 65536, RATE);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < 65536; i += 1) data[i] = decode(i - 32768);
+    const dv = await view(encodeWav(buffer));
+    const changed: number[] = [];
+    for (let i = 0; i < 65536; i += 1) {
+      if (dv.getInt16(44 + i * 2, true) !== i - 32768) changed.push(i - 32768);
+    }
+    return changed;
+  }
+
+  it("returns every value unchanged through Chrome's decode", async () => {
+    // Truncating instead of rounding changed 16,639 of these, all positive.
+    expect(await roundTrip(chrome)).toEqual([]);
+  });
+
+  it('returns every value through a symmetric decode, bar the top 64 steps', async () => {
+    // Before rounding: 32,767 changed, half the file, all biased downwards.
+    const changed = await roundTrip(symmetric);
+    expect(changed.length).toBeLessThanOrEqual(64);
+    // The only casualties are where the two conventions share a float32.
+    for (const k of changed) expect(k).toBeGreaterThan(32700);
+  });
+
+  it('rounds rather than truncating a value between two steps', async () => {
+    const buffer = createBuffer(1, 2, RATE);
+    buffer.getChannelData(0)[0] = 100.9 / 32768;
+    buffer.getChannelData(0)[1] = -100.9 / 32768;
+    const dv = await view(encodeWav(buffer));
+    expect(dv.getInt16(44, true)).toBe(101);
+    expect(dv.getInt16(46, true)).toBe(-101);
+  });
+});
+
+describe('encodeWav 24-bit round trip', () => {
+  it('returns 24-bit values unchanged, including the far negative half', async () => {
+    // Scaling by 8388607 moved every sample beyond half scale by a step.
+    const step = 97;
+    const count = Math.floor(16777216 / step);
+    const buffer = createBuffer(1, count, RATE);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < count; i += 1) data[i] = (i * step - 8388608) / 8388608;
+    const dv = await view(encodeWav(buffer, { bitDepth: 24 }));
+    let changed = 0;
+    for (let i = 0; i < count; i += 1) {
+      const at = 44 + i * 3;
+      let v = dv.getUint8(at) | (dv.getUint8(at + 1) << 8) | (dv.getUint8(at + 2) << 16);
+      if (v & 0x800000) v -= 0x1000000;
+      if (v !== i * step - 8388608) changed += 1;
+    }
+    expect(changed).toBe(0);
+  });
+
+  it('clamps full scale positive to the largest 24-bit value', async () => {
+    const buffer = createBuffer(1, 1, RATE);
+    buffer.getChannelData(0)[0] = 1;
+    const dv = await view(encodeWav(buffer, { bitDepth: 24 }));
+    expect(dv.getUint8(44) | (dv.getUint8(45) << 8) | (dv.getUint8(46) << 16)).toBe(0x7fffff);
+  });
+});
+
+describe('fitsIn16Bits', () => {
+  it('accepts audio decoded from 16 bits, by either convention', () => {
+    const buffer = createBuffer(2, 4000, RATE);
+    for (let c = 0; c < 2; c += 1) {
+      const data = buffer.getChannelData(c);
+      for (let i = 0; i < data.length; i += 1) {
+        const k = Math.round(Math.sin(i / 7) * 30000);
+        data[i] = c === 0 ? k / 32768 : k < 0 ? k / 32768 : Math.fround(k * Math.fround(1 / 32767));
+      }
+    }
+    expect(fitsIn16Bits(buffer)).toBe(true);
+  });
+
+  it('rejects audio with more resolution than 16 bits', () => {
+    const buffer = createBuffer(1, 4000, RATE);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i += 1) data[i] = Math.round(Math.sin(i / 7) * 8e6) / 8388608;
+    expect(fitsIn16Bits(buffer)).toBe(false);
+  });
+
+  it('treats silence as fitting', () => {
+    expect(fitsIn16Bits(createBuffer(1, 100, RATE))).toBe(true);
   });
 });
 

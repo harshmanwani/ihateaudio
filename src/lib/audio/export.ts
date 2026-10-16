@@ -7,7 +7,7 @@
  * format escalates.
  */
 import { encodeWav, wavSize, type WavBitDepth } from './encode-wav';
-import { encodeMp3, mp3Size, type Mp3Bitrate } from './encode-mp3';
+import { encodeMp3, mp3Size, nearestMp3Rate, type Mp3Bitrate } from './encode-mp3';
 import { encodeVia } from './ffmpeg';
 import { audioError } from './errors';
 
@@ -128,7 +128,10 @@ export function formatById(id: string): FormatSpec {
 export interface ExportOptions {
   /** MP3 and other lossy formats. Ignored for WAV/FLAC. */
   bitrate?: number;
-  /** WAV only. */
+  /**
+   * WAV, and FLAC, which stores 16 bits unless 24 or 32 is asked for (32
+   * becomes 24, since FLAC has no floating-point mode).
+   */
   bitDepth?: WavBitDepth;
   onProgress?: (ratio: number) => void;
   /** Fired separately while the 31 MB ffmpeg core downloads. */
@@ -167,17 +170,38 @@ export async function exportAudio(
         signal,
       });
 
-    default:
+    default: {
+      const depth = losslessDepth(format.id, bitDepth);
       return encodeVia(buffer, format.extension, {
-        args: ffmpegArgsFor(format, bitrate),
+        args: ffmpegArgsFor(format, bitrate, buffer.numberOfChannels, depth),
+        bitDepth: depth ?? 24,
         onProgress,
         onLoadProgress: onEngineLoad,
         signal,
       });
+    }
   }
 }
 
-function ffmpegArgsFor(format: FormatSpec, bitrate: number): string[] {
+/**
+ * The bit depth a lossless ffmpeg format stores, or null for a lossy one.
+ *
+ * FLAC defaults to 16 bits, like WAV does, so that a FLAC made from a 16-bit
+ * file is the roughly-half-a-WAV the format promises rather than a 24-bit
+ * file 50% larger with nothing extra in it. AIFF is written as 16-bit PCM.
+ */
+function losslessDepth(formatId: string, bitDepth: WavBitDepth): 16 | 24 | null {
+  if (formatId === 'flac') return bitDepth === 16 ? 16 : 24;
+  if (formatId === 'aiff') return 16;
+  return null;
+}
+
+function ffmpegArgsFor(
+  format: FormatSpec,
+  bitrate: number,
+  channels: number,
+  depth: 16 | 24 | null
+): string[] {
   switch (format.id) {
     case 'm4a':
     case 'm4r':
@@ -188,9 +212,41 @@ function ffmpegArgsFor(format: FormatSpec, bitrate: number): string[] {
     case 'ogg':
       return ['-c:a', 'libvorbis', '-b:a', `${bitrate}k`];
     case 'opus':
-      return ['-c:a', 'libopus', '-b:a', `${bitrate}k`];
+      /*
+       * Constrained VBR, because libopus's default unconstrained VBR treats
+       * the bitrate as a loose average: speech at 64k came out at 81 kbps and
+       * dense music at 128k at 147, which broke every size promise the send
+       * tools make. Constrained lands within 1-3% of the request.
+       *
+       * 10 ms frames for anything wider than mono, because the stereo encoder
+       * at its default 20 ms overflows the stack of @ffmpeg/core 0.12.10 and
+       * the wasm traps ("memory access out of bounds") on the first frame, for
+       * every stereo file. Halving the frame halves the per-frame buffers back
+       * to what the mono path uses, which fits. The other way out, complexity
+       * 4, keeps 20 ms frames but switches off the pitch pre-filter and the
+       * tonality analysis, libopus's main tools for music; a 10 ms frame keeps
+       * both and pays in coding efficiency instead, a few percent of bitrate.
+       */
+      return [
+        '-c:a',
+        'libopus',
+        '-b:a',
+        `${bitrate}k`,
+        '-vbr',
+        'constrained',
+        ...(channels > 1 ? ['-frame_duration', '10'] : []),
+      ];
     case 'flac':
-      return ['-c:a', 'flac', '-compression_level', '5'];
+      // The WAV handed over already has this depth; naming the sample format
+      // as well keeps ffmpeg from widening it on its own.
+      return [
+        '-c:a',
+        'flac',
+        '-compression_level',
+        '5',
+        '-sample_fmt',
+        depth === 24 ? 's32' : 's16',
+      ];
     case 'aiff':
       return ['-c:a', 'pcm_s16be'];
     case 'wma':
@@ -198,6 +254,167 @@ function ffmpegArgsFor(format: FormatSpec, bitrate: number): string[] {
     default:
       return [];
   }
+}
+
+/**
+ * What lamejs actually writes for a requested MP3 bitrate.
+ *
+ * Two of its decisions are invisible from outside. Below 32 kHz the MPEG-2
+ * and MPEG-2.5 tables top out at 160 and 64 kbps, so asking for 320 at
+ * 22.05 kHz gets 160, and a file half the predicted size. And when it is not
+ * told an output rate it picks one from the lowpass it intends to use, so 64
+ * kbps stereo from a 44.1 kHz source comes out at 24 kHz and 96 kbps at
+ * 32 kHz. This mirrors lame_init_params (optimum_bandwidth,
+ * optimum_samplefreq, FindNearestBitrate) for the constant-bitrate encoder
+ * encode-mp3 sets up.
+ */
+export function mp3Output(
+  sampleRate: number,
+  bitrate: number,
+  channels: number
+): { sampleRate: number; bitrate: number } {
+  // encode-mp3 resamples to the nearest legal rate before lamejs sees it.
+  const input = nearestMp3Rate(sampleRate);
+
+  // optimum_bandwidth: the lowpass that goes with the nearest table bitrate.
+  // Mono gets half again, having only one channel to spend the bits on.
+  let index = MP3_LOWPASS.length - 1;
+  for (let i = 0; i < MP3_LOWPASS.length - 1; i += 1) {
+    const [low] = MP3_LOWPASS[i]!;
+    const [high] = MP3_LOWPASS[i + 1]!;
+    if (high > bitrate) {
+      index = high - bitrate > bitrate - low ? i : i + 1;
+      break;
+    }
+  }
+  let lowpass = MP3_LOWPASS[index]![1] * (channels === 1 ? 1.5 : 1);
+  if (2 * lowpass > input) lowpass = input / 2;
+
+  // optimum_samplefreq: the lowest rate that still carries that lowpass,
+  // never above the input.
+  let rate = MP3_RATES_DOWN.find((candidate) => candidate <= input) ?? 8000;
+  for (const [ceiling, candidate] of MP3_RATE_FOR_LOWPASS) {
+    if (lowpass <= ceiling) rate = candidate;
+  }
+  if (input < rate) rate = MP3_RATES_UP.find((candidate) => candidate >= input) ?? input;
+
+  // FindNearestBitrate in the table for that rate's MPEG version. Ties go to
+  // the lower rate, as LAME's strict comparison does.
+  const table = rate >= 32000 ? MP3_MPEG1 : rate >= 16000 ? MP3_MPEG2 : MP3_MPEG25;
+  let nearest = table[0]!;
+  for (const candidate of table) {
+    if (Math.abs(candidate - bitrate) < Math.abs(nearest - bitrate)) nearest = candidate;
+  }
+  return { sampleRate: rate, bitrate: nearest };
+}
+
+const MP3_LOWPASS: [number, number][] = [
+  [8, 2000], [16, 3700], [24, 3900], [32, 5500], [40, 7000], [48, 7500],
+  [56, 10000], [64, 11000], [80, 13500], [96, 15100], [112, 15600],
+  [128, 17000], [160, 17500], [192, 18600], [224, 19400], [256, 19700],
+  [320, 20500],
+];
+/** [highest lowpass, rate], applied in order so the last match wins. */
+const MP3_RATE_FOR_LOWPASS: [number, number][] = [
+  [15960, 44100], [15250, 32000], [11220, 24000], [9970, 22050],
+  [7230, 16000], [5420, 12000], [4510, 11025], [3970, 8000],
+];
+const MP3_RATES_DOWN = [48000, 44100, 32000, 24000, 22050, 16000, 12000, 11025, 8000];
+const MP3_RATES_UP = [...MP3_RATES_DOWN].reverse();
+const MP3_MPEG1 = [32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320];
+const MP3_MPEG2 = [8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160];
+const MP3_MPEG25 = [8, 16, 24, 32, 40, 48, 56, 64];
+
+/**
+ * The most ffmpeg's AAC encoder will spend, in kbps, at this rate and width.
+ *
+ * It is not a setting but a measurement: past a point the encoder runs out of
+ * spectrum worth coding, so asking for 192k at 22.05 kHz mono gets about 105,
+ * and at 16 kHz about 79. Measured on speech and music with the
+ * @ffmpeg/core 0.12.10 build the site ships: roughly 4.4 kbps per kHz plus a
+ * little, per channel, with a second channel adding 80% rather than 100%.
+ */
+function aacCeiling(sampleRate: number, channels: number): number {
+  const mono = (4.4 * sampleRate) / 1000 + 6;
+  return channels === 1 ? mono : mono * 0.9 * channels;
+}
+
+/**
+ * Bitrate an encoder really averages, in kbps, for a requested one.
+ *
+ * Every ffmpeg encoder here treats the request as a target rather than a
+ * cap, and the size promises the send tools make depend on the difference.
+ * The factors are the worst cases measured with the shipped core: constrained
+ * Opus 1-3% over (the Ogg pages and 10 ms stereo frames are most of it), AAC
+ * up to 8% over at 32 kHz and above and up to 15% below that, WMA 8% (ASF
+ * framing). Vorbis's managed mode comes in at or under its target.
+ */
+export function effectiveKbps(
+  formatId: string,
+  bitrate: number,
+  sampleRate: number,
+  channels: number
+): number {
+  switch (formatId) {
+    case 'mp3':
+      return mp3Output(sampleRate, bitrate, Math.min(2, channels)).bitrate;
+    case 'm4a':
+    case 'm4r':
+    case 'aac':
+      return Math.min(
+        bitrate * (sampleRate >= 32000 ? 1.08 : 1.15),
+        aacCeiling(sampleRate, channels)
+      );
+    case 'opus':
+      return bitrate * 1.03;
+    case 'wma':
+      return bitrate * 1.08;
+    default:
+      return bitrate;
+  }
+}
+
+/**
+ * The bitrate to put on a label: what the encoder writes, not what was asked.
+ * Unlike `effectiveKbps` it leaves out the overshoot, which is a margin for
+ * sizing rather than something anyone chose.
+ */
+export function writtenKbps(
+  formatId: string,
+  bitrate: number,
+  sampleRate: number,
+  channels: number
+): number {
+  switch (formatId) {
+    case 'mp3':
+      return mp3Output(sampleRate, bitrate, Math.min(2, channels)).bitrate;
+    case 'm4a':
+    case 'm4r':
+    case 'aac':
+      return Math.round(Math.min(bitrate, aacCeiling(sampleRate, channels)));
+    default:
+      return bitrate;
+  }
+}
+
+/**
+ * The sample rate a format comes out at. MP3 can drop it on its own (see
+ * `mp3Output`), and Opus always decodes at 48 kHz whatever went in.
+ */
+export function outputSampleRate(
+  formatId: string,
+  sampleRate: number,
+  bitrate: number,
+  channels: number
+): number {
+  if (formatId === 'mp3') return mp3Output(sampleRate, bitrate, Math.min(2, channels)).sampleRate;
+  if (formatId === 'opus') return 48000;
+  return sampleRate;
+}
+
+/** Bytes of a lossy file averaging `kbps` for `seconds`, plus header room. */
+export function lossyBytes(seconds: number, kbps: number): number {
+  return Math.round((kbps * 1000 * seconds) / 8) + 2048;
 }
 
 /**
@@ -212,19 +429,23 @@ export function estimateSize(
   const format = formatById(formatId);
   const { bitrate = 192, bitDepth = 16 } = options;
   const seconds = buffer.duration;
+  const channels = buffer.numberOfChannels;
 
   switch (format.id) {
     case 'wav':
-      return wavSize(buffer.length, buffer.numberOfChannels, bitDepth);
+      return wavSize(buffer.length, channels, bitDepth);
     case 'aiff':
-      return 54 + buffer.length * buffer.numberOfChannels * 2;
+      return 54 + buffer.length * channels * 2;
     case 'flac':
-      // FLAC typically lands near 55% of the equivalent PCM.
-      return Math.round(wavSize(buffer.length, buffer.numberOfChannels, 16) * 0.55);
+      // 16-bit FLAC typically lands near 55% of the equivalent PCM. At 24
+      // bits the bottom byte is mostly noise, which barely compresses.
+      return losslessDepth('flac', bitDepth) === 16
+        ? Math.round(wavSize(buffer.length, channels, 16) * 0.55)
+        : Math.round(wavSize(buffer.length, channels, 24) * 0.65);
     case 'mp3':
-      return mp3Size(seconds, bitrate);
+      return mp3Size(seconds, effectiveKbps('mp3', bitrate, buffer.sampleRate, channels));
     default:
-      return Math.round((bitrate * 1000 * seconds) / 8) + 2048;
+      return lossyBytes(seconds, effectiveKbps(format.id, bitrate, buffer.sampleRate, channels));
   }
 }
 

@@ -8,7 +8,7 @@
  * request and no upload.
  */
 import { audioError } from './errors';
-import { encodeWav } from './encode-wav';
+import { encodeWav, type WavBitDepth } from './encode-wav';
 import { FFMPEG_CORE_VERSION } from './ffmpeg-version';
 
 export interface FFmpegProgress {
@@ -175,7 +175,21 @@ export async function transcode(
     await ff.writeFile(inputName, bytes);
     if (signal?.aborted) throw audioError('cancelled');
 
-    const code = await ff.exec(['-i', inputName, ...args, outputName]);
+    let code: number;
+    try {
+      code = await ff.exec(['-i', inputName, ...args, outputName]);
+    } catch {
+      /*
+       * A throw here is the wasm itself trapping (libopus overflowing the
+       * core's stack was the case that surfaced it), not ffmpeg reporting an
+       * error. The trap leaves the core's memory in whatever state it died in,
+       * and every later exec on it failed the same way, whatever the format,
+       * until the page was reloaded. Dropping the instance means the next
+       * export loads a clean one, from the HTTP cache rather than the network.
+       */
+      releaseFFmpeg();
+      throw audioError('encode-failed');
+    }
     if (code !== 0) throw audioError('encode-failed');
 
     const data = await ff.readFile(outputName);
@@ -191,6 +205,17 @@ export async function transcode(
   }
 }
 
+export interface EncodeViaOptions extends TranscodeOptions {
+  /**
+   * Bit depth of the WAV handed to ffmpeg. 24 suits a lossy encoder, which
+   * works in floating point and benefits from the extra precision. A lossless
+   * target must get the depth it is meant to store instead, because ffmpeg's
+   * FLAC encoder copies the depth of its input: a 24-bit hand-over made every
+   * FLAC 24-bit, half as big again as a 16-bit one for no audible gain.
+   */
+  bitDepth?: WavBitDepth;
+}
+
 /**
  * Encodes an AudioBuffer to any ffmpeg-supported format.
  *
@@ -200,10 +225,11 @@ export async function transcode(
 export async function encodeVia(
   buffer: AudioBuffer,
   outputExtension: string,
-  options: TranscodeOptions = {}
+  options: EncodeViaOptions = {}
 ): Promise<Blob> {
-  const wav = encodeWav(buffer, { bitDepth: 24 });
-  return transcode(wav, 'in.wav', `out.${outputExtension}`, options);
+  const { bitDepth = 24, ...rest } = options;
+  const wav = encodeWav(buffer, { bitDepth });
+  return transcode(wav, 'in.wav', `out.${outputExtension}`, rest);
 }
 
 /**

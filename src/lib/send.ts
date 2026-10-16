@@ -9,7 +9,8 @@
  *    user who overrides the format afterwards gets a part count recomputed
  *    around their choice instead of a plan that quietly no longer applies.
  * 2. Nothing claims a fit it has not costed. Every number on screen comes from
- *    the same `bytesFor` the slicing uses.
+ *    the same `bytesFor` the slicing uses, and every file handed back has been
+ *    weighed after encoding, not just predicted to fit.
  */
 import { createTool, type NamedOutput, type ToolContext, type ToolRuntime } from './tool';
 import {
@@ -24,12 +25,27 @@ import {
 } from './audio/fit';
 import { classify } from './audio/classify';
 import { findSilence, setChannels, slice } from './audio/dsp';
-import { exportAudio } from './audio/export';
+import { exportAudio, formatById } from './audio/export';
+import { audioError } from './audio/errors';
+import type { WavBitDepth } from './audio/encode-wav';
 import { getAudioContext } from './audio/decode';
 import { baseName, duration as fmtDuration, extensionOf, filesize } from './format';
 import { panelColors, panelContext } from './canvas';
 
 const AUDITION_SECONDS = 15;
+
+/** The runtime's WAV/FLAC depth, read the way it reads it: 16 unless a page asks. */
+function depthOf(runtime: ToolRuntime | null): WavBitDepth {
+  const raw = Number(runtime?.text('bitdepth'));
+  return raw === 24 || raw === 32 ? raw : 16;
+}
+
+/** What the export bar will produce, costed the way the plan is. */
+interface Outcome {
+  parts: number;
+  partBytes: number;
+  totalBytes: number;
+}
 
 export function createSendTool(destinationId: string): ToolRuntime | null {
   const destination = DESTINATIONS[destinationId];
@@ -128,6 +144,31 @@ export function createSendTool(destinationId: string): ToolRuntime | null {
           quality.value = best;
         }
         quality.dispatchEvent(new Event('change', { bubbles: true }));
+      };
+
+      /**
+       * The route's numbers until someone overrides the export bar, then the
+       * numbers for what they chose instead. Without this, switching to WAV
+       * left the caption promising "one file of about 9 MB" for a file seven
+       * times that size.
+       */
+      const outcomeOf = (route: Route): Outcome => {
+        if (route.kind === 'asis' || route.kind === 'escape' || !plan) return route;
+        const format = runtime.getFormat();
+        const lossy = formatById(format).lossy;
+        const bitrate = runtime.getBitrate();
+        if (format === route.format && (!lossy || bitrate === route.bitrate)) return route;
+        const channels = route.mono ? 1 : ctx.buffer.numberOfChannels;
+        const totalBytes = bytesFor(
+          ctx.buffer.duration,
+          bitrate,
+          format,
+          ctx.buffer.sampleRate,
+          channels,
+          depthOf(runtime)
+        );
+        const parts = Math.max(1, Math.ceil(totalBytes / plan.budget));
+        return { parts, partBytes: Math.ceil(totalBytes / parts), totalBytes };
       };
 
       const renderRoutes = (): void => {
@@ -284,9 +325,10 @@ export function createSendTool(destinationId: string): ToolRuntime | null {
           if (route.kind === 'escape') {
             bar(bottomY, sourceBytes, `color-mix(in oklch, ${ink} 30%, transparent)`, false);
           } else {
+            const outcome = outcomeOf(route);
             let x = padL;
-            for (let i = 0; i < route.parts; i += 1) {
-              const w = Math.max(route.partBytes * scale, 3 * dpr);
+            for (let i = 0; i < outcome.parts; i += 1) {
+              const w = Math.max(outcome.partBytes * scale, 3 * dpr);
               context.fillStyle = `color-mix(in oklch, ${hue} 85%, transparent)`;
               roundRect(context, x, bottomY, w, rowH, 4 * dpr);
               context.fill();
@@ -329,16 +371,17 @@ export function createSendTool(destinationId: string): ToolRuntime | null {
             ? ` ${ceiling.label.split(',')[0]?.trim() ?? 'The limit'} is ${filesize(ceiling.bytes)}, but attachments are encoded on the way out, so the real ceiling is ${filesize(plan.budget)}.`
             : '';
 
+        const outcome = outcomeOf(route);
         if (route.kind === 'asis') {
           caption.textContent = `This is already under ${filesize(plan.budget)}.${tax}`;
         } else if (route.kind === 'escape') {
           caption.textContent = `${route.reason}${tax}`;
-        } else if (route.parts > 1) {
+        } else if (outcome.parts > 1) {
           caption.textContent =
-            `${route.parts} files, each under ${filesize(plan.budget)}, cut at pauses so ` +
+            `${outcome.parts} files, each under ${filesize(plan.budget)}, cut at pauses so ` +
             `none of them opens mid-word.${tax}`;
         } else {
-          caption.textContent = `One file of about ${filesize(route.totalBytes)}, under the ${filesize(plan.budget)} that fits.${tax}`;
+          caption.textContent = `One file of about ${filesize(outcome.totalBytes)}, under the ${filesize(plan.budget)} that fits.${tax}`;
         }
 
         if (audition) audition.disabled = route.kind === 'asis' || route.kind === 'escape';
@@ -353,6 +396,8 @@ export function createSendTool(destinationId: string): ToolRuntime | null {
           destination,
           ceiling,
           kind,
+          sampleRate: ctx.buffer.sampleRate,
+          channels: ctx.buffer.numberOfChannels,
         });
 
         // Drop a pinned choice that the new settings no longer offer.
@@ -434,42 +479,94 @@ export function createSendTool(destinationId: string): ToolRuntime | null {
         return [{ name: file.name, blob: file }] satisfies NamedOutput[];
       }
 
-      // Bitrate only: the format is read straight off the export bar by the
-      // runtime when it encodes each part, so reading it here too would just
-      // be a second copy of the same truth.
+      // The export bar owns format and bitrate, so an override made after
+      // choosing a route is what gets encoded, and what the parts are cut for.
+      const format = runtime?.getFormat() ?? route.format;
       const bitrate = runtime?.getBitrate() ?? route.bitrate;
+      const bitDepth = depthOf(runtime);
       const ceiling = ceilingFor(runtime?.root ?? document.body);
       const budget = budgetFor(destination, ceiling);
 
-      let buffer = ctx.buffer;
-      if (route.mono && buffer.numberOfChannels > 1) buffer = setChannels(buffer, 1);
-
-      const total = bytesFor(buffer.duration, bitrate);
-      const wanted = Math.max(1, Math.ceil(total / budget));
+      const source =
+        route.mono && ctx.buffer.numberOfChannels > 1 ? setChannels(ctx.buffer, 1) : ctx.buffer;
       const stem = (baseName(file?.name ?? 'audio') || 'audio').replace(/\./g, '-');
+      const estimate = (seconds: number): number =>
+        bytesFor(seconds, bitrate, format, source.sampleRate, source.numberOfChannels, bitDepth);
 
-      if (wanted === 1) return buffer;
+      /*
+       * Encoded here rather than by the runtime, so every file can be weighed
+       * before it is handed over. The estimate is built on the worst
+       * overshoot measured for each encoder, but an encoder's average is
+       * still a property of the material, and FLAC's ratio is nothing but.
+       * When a file comes back over, the cuts are planned again at the rate
+       * the encoder actually managed, and everything is encoded again. Rare,
+       * and slow when it happens, but it is the difference between "should
+       * fit" and "fits".
+       */
+      let inflation = 1;
+      let wanted = Math.max(1, Math.ceil(estimate(source.duration) / budget));
+      const planned = wanted;
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const cost = (seconds: number): number => estimate(seconds) * inflation;
+        let points = [0, source.duration];
+        let parts = 1;
+        if (wanted > 1 || cost(source.duration) > budget) {
+          ctx.progress(0, 'Finding the pauses');
+          ({ points, parts } = verifiedCuts(
+            source.duration,
+            Math.max(2, wanted),
+            getSilences(ctx.buffer),
+            cost,
+            budget
+          ));
+        }
 
-      ctx.progress(0, 'Finding the pauses');
-      const { points, parts } = verifiedCuts(
-        buffer.duration,
-        wanted,
-        getSilences(ctx.buffer),
-        bitrate,
-        budget
-      );
+        const blobs: Blob[] = [];
+        let worst = 0;
+        for (let i = 0; i < parts; i += 1) {
+          const piece = parts === 1 ? source : slice(source, points[i]!, points[i + 1]!);
+          const label = parts === 1 ? 'Encoding' : `Encoding ${i + 1} of ${parts}`;
+          const blob = await exportAudio(piece, format, {
+            bitrate,
+            bitDepth,
+            signal: ctx.signal,
+            onProgress: (ratio) => ctx.progress((i + ratio) / parts, label),
+            onEngineLoad: (ratio) =>
+              ctx.progress(ratio, 'Loading the converter (one time, ~10 MB)'),
+          });
+          worst = Math.max(worst, blob.size / estimate(piece.duration));
+          blobs.push(blob);
+        }
 
-      const outputs: NamedOutput[] = [];
-      for (let i = 0; i < points.length - 1; i += 1) {
-        outputs.push({
-          // "1 of 3" rather than the splitter's "01", because the person
-          // receiving these reads the filename in a chat thread and needs to
-          // know when they have them all.
-          name: `${stem}-part-${i + 1}-of-${parts}`,
-          buffer: slice(buffer, points[i]!, points[i + 1]!),
-        });
+        if (blobs.every((blob) => blob.size <= budget)) {
+          if (attempt > 0) {
+            // Deferred, because the note shares a slot with the progress bar,
+            // and the runtime clears that once it has delivered these files.
+            const note = `The encoder ran larger than predicted on this audio, so it comes as ${parts} files instead of ${planned === 1 ? 'one' : planned}, each under ${filesize(budget)}.`;
+            setTimeout(() => runtime?.showNote(note, 'info'), 0);
+          }
+          // One file goes back as a finished blob, which the runtime saves
+          // under the export bar's extension; parts get the result list.
+          if (parts === 1) return blobs[0]!;
+          return blobs.map((blob, i) => ({
+            // "1 of 3" rather than the splitter's "01", because the person
+            // receiving these reads the filename in a chat thread and needs to
+            // know when they have them all.
+            name: `${stem}-part-${i + 1}-of-${parts}`,
+            blob,
+          })) satisfies NamedOutput[];
+        }
+
+        // A little over what was observed, so the second pass is not another
+        // near miss on the part that was nearly over the first time.
+        inflation = Math.max(inflation, worst) * 1.02;
+        wanted = Math.max(parts + 1, Math.ceil(cost(source.duration) / budget));
       }
-      return outputs;
+
+      throw audioError(
+        'encode-failed',
+        `This would not come in under ${filesize(budget)} at these settings. Lower the bitrate or pick a smaller format.`
+      );
     },
   });
 

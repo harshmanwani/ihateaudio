@@ -11,7 +11,15 @@
  * than no tool at all, so `partBytes <= budget` is the invariant everything
  * else is arranged around.
  */
-import { bitratesFor, formatById, isInstant } from './export';
+import {
+  bitratesFor,
+  effectiveKbps,
+  estimateSize,
+  formatById,
+  isInstant,
+  lossyBytes,
+} from './export';
+import type { WavBitDepth } from './encode-wav';
 
 export type ContentKind = 'speech' | 'music';
 
@@ -180,6 +188,14 @@ export interface FitInput {
   destination: Destination;
   ceiling: Ceiling;
   kind: ContentKind;
+  /**
+   * The decoded audio's rate and width. They matter because the encoders do
+   * not all honour a bitrate at every rate: MP3 tops out at 160 kbps below
+   * 32 kHz, and AAC runs out of things to spend bits on. Assumed 44.1 kHz
+   * stereo when absent.
+   */
+  sampleRate?: number;
+  channels?: number;
 }
 
 export interface Plan {
@@ -190,23 +206,54 @@ export interface Plan {
 }
 
 /**
- * Bytes a lossy encode of this length takes.
+ * Bytes an encode of this length takes.
  *
- * Mirrors `estimateSize`'s lossy branch but takes a duration rather than a
- * buffer, so a part can be costed before the audio is sliced. The constant is
- * the larger of the two the encoders use (2048 rather than MP3's 512), because
- * every rounding decision in this file should err towards the file being
- * smaller than predicted rather than larger.
+ * Mirrors `estimateSize` but takes a duration rather than a buffer, so a part
+ * can be costed before the audio is sliced. A lossy format is costed at what
+ * its encoder really averages (`effectiveKbps`), not at the number asked
+ * for: libopus and ffmpeg's AAC both overshoot, and a plan built on the
+ * nominal rate handed back Discord files 8% over the limit. The header
+ * constant is the larger of the two the encoders use (2048 rather than MP3's
+ * 512), because every rounding decision in this file should err towards the
+ * file being smaller than predicted rather than larger.
+ *
+ * A lossless format is costed by its PCM size, since a bitrate means nothing
+ * to it. Without that, someone who switched the export bar to WAV got parts
+ * sized for 192 kbps and seven times over the limit.
  */
-export function bytesFor(seconds: number, bitrate: number): number {
-  return Math.round((bitrate * 1000 * seconds) / 8) + 2048;
+export function bytesFor(
+  seconds: number,
+  bitrate: number,
+  format = 'mp3',
+  sampleRate = 44100,
+  channels = 2,
+  bitDepth: WavBitDepth = 16
+): number {
+  if (formatById(format).lossy) {
+    return lossyBytes(seconds, effectiveKbps(format, bitrate, sampleRate, channels));
+  }
+  const proxy = {
+    duration: seconds,
+    length: Math.round(seconds * sampleRate),
+    numberOfChannels: channels,
+    sampleRate,
+  } as AudioBuffer;
+  return estimateSize(proxy, format, { bitDepth });
 }
 
 /**
- * The byte budget one file has to come in under.
+ * The hard limit one file has to come in under: the advertised cap, less
+ * email's encoding tax. Nothing over this arrives.
+ */
+export function limitFor(destination: Destination, ceiling: Ceiling): number {
+  return Math.floor(ceiling.bytes / destination.overhead);
+}
+
+/**
+ * The byte budget one file is planned to.
  *
- * The 5% is headroom for container overhead, tags and the gap between our
- * estimate and what the encoder actually writes. Losing 5% of a limit is
+ * The 5% is headroom for tags and for the gap between our estimate and what
+ * the encoder actually writes on unusual material. Losing 5% of a limit is
  * invisible; exceeding it by 1% means the send fails.
  */
 export function budgetFor(destination: Destination, ceiling: Ceiling): number {
@@ -239,6 +286,8 @@ export function planFor(input: FitInput): Plan {
   const { seconds, sourceBytes, sourceExt, destination, ceiling, kind } = input;
   const budget = budgetFor(destination, ceiling);
   const mono = kind === 'speech';
+  const sampleRate = input.sampleRate ?? 44100;
+  const channels = mono ? 1 : (input.channels ?? 2);
   const routes: Route[] = [];
 
   // Nobody builds this case and everybody hits it.
@@ -263,6 +312,8 @@ export function planFor(input: FitInput): Plan {
     const ladder = bitratesFor(format);
     const instant = isInstant(format);
     const comfortable = COMFORTABLE[format]?.[kind] ?? 128;
+    const cost = (span: number, bitrate: number): number =>
+      bytesFor(span, bitrate, format, sampleRate, channels);
 
     /*
      * Having room to spare is not a reason to use it. Past the comfortable
@@ -280,14 +331,14 @@ export function planFor(input: FitInput): Plan {
     let single: number | null = null;
     for (let i = cap; i >= 0; i -= 1) {
       const bitrate = ladder[i]!;
-      if (bytesFor(seconds, bitrate) <= budget) {
+      if (cost(seconds, bitrate) <= budget) {
         single = bitrate;
         break;
       }
     }
 
     if (single !== null) {
-      const bytes = bytesFor(seconds, single);
+      const bytes = cost(seconds, single);
       routes.push({
         id: `${format}-single`,
         kind: 'single',
@@ -306,7 +357,7 @@ export function planFor(input: FitInput): Plan {
 
     // Splitting is the "I refuse to sacrifice quality" answer, so it is always
     // costed at the comfortable bitrate and takes however many files that needs.
-    const total = bytesFor(seconds, comfortable);
+    const total = cost(seconds, comfortable);
     const parts = Math.max(1, Math.ceil(total / budget));
     if (parts > 1) {
       routes.push({
@@ -497,16 +548,18 @@ export function verifiedCuts(
   seconds: number,
   parts: number,
   silences: { start: number; end: number }[],
-  bitrate: number,
+  /** A bitrate costed as MP3, or the bytes a span of this many seconds takes. */
+  cost: number | ((seconds: number) => number),
   budget: number
 ): { points: number[]; snapped: number; parts: number } {
+  const bytes = typeof cost === 'number' ? (span: number) => bytesFor(span, cost) : cost;
   let count = Math.max(1, parts);
 
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const { points, snapped } = cutPoints(seconds, count, silences);
     const fits = points
       .slice(1)
-      .every((end, index) => bytesFor(end - points[index]!, bitrate) <= budget);
+      .every((end, index) => bytes(end - points[index]!) <= budget);
     if (fits) return { points, snapped, parts: count };
     count += 1;
   }

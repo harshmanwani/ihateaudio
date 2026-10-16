@@ -170,7 +170,10 @@ const faq = [
       from the limit is simple arithmetic: a target of 10 MB over a 40-minute
       recording is 10 megabytes divided by 2400 seconds, about 4.2 kilobytes per
       second, which is 33 kbps. Too low for MP3, comfortable for Opus, and a
-      sign that mono and a 16 kHz sample rate are not optional.
+      sign that mono and a 16 kHz sample rate are not optional. For email, aim
+      about a quarter lower again: the cap counts the attachment after it has
+      been encoded for sending, which adds roughly a third, so Gmail's 25 MB
+      holds a file of about 18 MB.
     </p>
     <p>
       For reference points at ordinary settings: an hour of mono speech is about
@@ -234,6 +237,7 @@ const faq = [
   import { createTool } from '../lib/tool';
   import { setChannels, resample } from '../lib/audio/dsp';
   import { estimateSize } from '../lib/audio/export';
+  import { DESTINATIONS, budgetFor, limitFor } from '../lib/audio/fit';
   import { filesize } from '../lib/format';
   import { panelColors, panelContext } from '../lib/canvas';
 
@@ -243,17 +247,39 @@ const faq = [
   const MB = 1024 * 1024;
 
   /**
-   * The caps people actually hit.
+   * The caps people actually hit, read from the send tools' own table so the
+   * two pages cannot drift apart again. They had: this one still said Discord
+   * was 8 MB and drew Gmail at the full 25 MB, when an attachment loses about
+   * a quarter of that to encoding on the way out, so a 25-minute file was told
+   * it fitted Gmail at a bitrate that produced a 32 MB attachment.
    *
-   * Only drawn when they fall inside the range this file can reach, so a
-   * three-minute voice note is not cluttered with a 25 MB line it was never going
-   * to approach.
+   * Each carries three numbers. `nominal` is what the service advertises,
+   * `limit` what actually arrives, and `fits` the size to aim for, with the
+   * same 5% headroom the send tools plan to. Lines are drawn at `fits`, since
+   * that is the crossing that matters, and only when they fall inside the range
+   * this file can reach, so a three-minute voice note is not cluttered with a
+   * line it was never going to approach.
    */
-  const LIMITS: { bytes: number; label: string }[] = [
-    { bytes: 8 * MB, label: 'Discord' },
-    { bytes: 10 * MB, label: 'Mail server' },
-    { bytes: 25 * MB, label: 'Gmail' },
-  ];
+  const LIMITS = (
+    [
+      ['discord', 'free', 'Discord'],
+      ['email', 'work', 'Mail server'],
+      ['email', 'gmail', 'Gmail'],
+    ] as const
+  ).flatMap(([id, ceilingId, label]) => {
+    const destination = DESTINATIONS[id];
+    const ceiling = destination?.ceilings.find((c) => c.id === ceilingId);
+    if (!destination || !ceiling) return [];
+    return [
+      {
+        label,
+        nominal: ceiling.bytes,
+        limit: limitFor(destination, ceiling),
+        fits: budgetFor(destination, ceiling),
+        encoded: destination.overhead > 1,
+      },
+    ];
+  });
 
   function drawSizePlot(
     panel: HTMLElement,
@@ -335,8 +361,10 @@ const faq = [
     }
 
     // The size line, filled underneath so "less is under here" reads immediately.
+    // It starts from the origin rather than from sizeAt(0): no encoder writes
+    // a zero bitrate, so asking for one returns its smallest real setting.
     context.beginPath();
-    context.moveTo(padL, y(sizeAt(0)));
+    context.moveTo(padL, y(0));
     for (const bitrate of bitrates) context.lineTo(x(bitrate), y(sizeAt(bitrate)));
     context.lineTo(x(maxBitrate), padT + plotH);
     context.lineTo(padL, padT + plotH);
@@ -345,7 +373,7 @@ const faq = [
     context.fill();
 
     context.beginPath();
-    context.moveTo(padL, y(sizeAt(0)));
+    context.moveTo(padL, y(0));
     for (const bitrate of bitrates) context.lineTo(x(bitrate), y(sizeAt(bitrate)));
     context.strokeStyle = hue;
     context.lineWidth = 2.5 * dpr;
@@ -371,7 +399,7 @@ const faq = [
       context.font = `${10 * dpr}px system-ui, sans-serif`;
     };
 
-    for (const limit of LIMITS) limitLine(limit.bytes, limit.label, false);
+    for (const limit of LIMITS) limitLine(limit.fits, limit.label, false);
     limitLine(originalBytes, 'Original', true);
 
     // The current choice.
@@ -584,12 +612,15 @@ const faq = [
           // Size is proportional to bitrate, so the highest setting that fits a
           // cap is arithmetic rather than trial and error. Only caps the file is
           // actually over are worth naming.
-          const binding = LIMITS.filter((limit) => bytes <= 0 || limit.bytes < bytes);
+          const binding = LIMITS.filter((limit) => bytes <= 0 || limit.limit < bytes);
           const lines = binding.map((limit) => {
-            const best = [...bitrates].reverse().find((rate) => sizeAt(rate) <= limit.bytes);
+            const best = [...bitrates].reverse().find((rate) => sizeAt(rate) <= limit.fits);
+            const name = limit.encoded
+              ? `${limit.label} ${filesize(limit.nominal)} (${filesize(limit.limit)} once attached)`
+              : `${limit.label} ${filesize(limit.nominal)}`;
             return best
-              ? `${limit.label} ${filesize(limit.bytes)}: up to ${best} kbps`
-              : `${limit.label} ${filesize(limit.bytes)}: out of reach at any bitrate, the file is too long`;
+              ? `${name}: up to ${best} kbps`
+              : `${name}: out of reach at any bitrate, the file is too long`;
           });
 
           sizeCaption.textContent = lines.length

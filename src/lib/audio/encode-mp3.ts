@@ -66,7 +66,9 @@ function toInt16(input: Float32Array): Int16Array {
     if (!Number.isFinite(s)) s = 0;
     if (s > 1) s = 1;
     else if (s < -1) s = -1;
-    out[i] = s < 0 ? s * 32768 : s * 32767;
+    // Rounded: assigning into an Int16Array truncates towards zero, which
+    // biases every sample half a step towards silence.
+    out[i] = Math.round(s < 0 ? s * 32768 : s * 32767);
   }
   return out;
 }

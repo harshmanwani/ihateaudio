@@ -4,6 +4,7 @@ import {
   budgetFor,
   bytesFor,
   cutPoints,
+  limitFor,
   planFor,
   verifiedCuts,
   type ContentKind,
@@ -236,5 +237,60 @@ describe('cut points', () => {
     const { points } = verifiedCuts(2700, 3, silences, 96, 20 * MB);
     const total = points.slice(1).reduce((sum, end, i) => sum + (end - points[i]!), 0);
     expect(total).toBeCloseTo(2700, 5);
+  });
+});
+
+/*
+ * The estimate has to cover what the encoders really write, not what they
+ * were asked for. These figures are measured with the ffmpeg.wasm core the
+ * site ships and lamejs; the plan is only as honest as they are.
+ */
+describe('costing what the encoders write', () => {
+  it('keeps 20 minutes of speech for free Discord under the real limit', () => {
+    // The case that bounced: "Opus 64k mono, 9.16 MB" came out at 10.8 MB with
+    // libopus's default VBR. Constrained, it measures at most 2.7% over.
+    const discord = DESTINATIONS.discord!;
+    const result = plan('discord', 20, 'speech');
+    const opus = result.routes.find((r) => r.id === 'opus-single')!;
+    expect(opus.totalBytes).toBeLessThanOrEqual(result.budget);
+    const worstReal = (opus.bitrate * 1.027 * 1000 * 1200) / 8 + 2048;
+    expect(worstReal).toBeLessThanOrEqual(limitFor(discord, discord.ceilings[0]!));
+    // And the plan no longer prices it at the nominal rate.
+    expect(opus.totalBytes).toBeGreaterThan((opus.bitrate * 1000 * 1200) / 8);
+  });
+
+  it('covers AAC at its measured worst, 7.5% over the request', () => {
+    const result = plan('email', 30, 'speech');
+    for (const route of result.routes.filter((r) => r.format === 'm4a')) {
+      const seconds = (30 * 60) / route.parts;
+      const worstReal = (route.bitrate * 1.075 * 1000 * seconds) / 8 + 2048;
+      expect(worstReal).toBeLessThanOrEqual(result.budget);
+    }
+  });
+
+  it('costs a lossless format by its samples, not by a bitrate', () => {
+    // Three minutes of 44.1 kHz stereo WAV is 31.8 MB whatever the bitrate box says.
+    expect(bytesFor(180, 192, 'wav', 44100, 2)).toBe(44 + 180 * 44100 * 4);
+    expect(bytesFor(180, 64, 'wav', 44100, 2)).toBe(bytesFor(180, 320, 'wav', 44100, 2));
+  });
+
+  it('cuts WAV parts that each fit, where a bitrate-only plan gave seven times the limit', () => {
+    const discord = DESTINATIONS.discord!;
+    const budget = budgetFor(discord, discord.ceilings[0]!);
+    const cost = (span: number) => bytesFor(span, 192, 'wav', 44100, 2);
+    const wanted = Math.ceil(cost(180) / budget);
+    const { points, parts } = verifiedCuts(180, wanted, [], cost, budget);
+    expect(parts).toBeGreaterThanOrEqual(4);
+    for (let i = 1; i < points.length; i += 1) {
+      expect(cost(points[i]! - points[i - 1]!)).toBeLessThanOrEqual(budget);
+    }
+  });
+
+  it('prices MP3 below 32 kHz at the 160 kbps lamejs actually writes', () => {
+    expect(bytesFor(60, 320, 'mp3', 22050, 2)).toBe(bytesFor(60, 160, 'mp3', 22050, 2));
+  });
+
+  it('keeps the old MP3 arithmetic at ordinary rates', () => {
+    expect(bytesFor(60, 128)).toBe(Math.round((128 * 1000 * 60) / 8) + 2048);
   });
 });

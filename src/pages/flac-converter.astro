@@ -8,7 +8,7 @@ const tool = getTool('flac-converter');
 
 const steps = [
   'Drop a WAV, AIFF or other lossless file onto the page. FLAC is worth doing from a lossless source; from an MP3 it only wastes space.',
-  'There is no quality setting to choose. FLAC keeps every sample exactly, so the only thing that varies is how hard the encoder works to shrink it.',
+  'There is no quality setting to choose. The FLAC is written at 16 bits, CD resolution, and keeps every sample of a 16-bit source exactly, so the only thing that varies is how hard the encoder works to shrink it. A 24-bit source is rounded to 16 bits, and the panel says so when that happens.',
   'Click Download. The first FLAC of your session loads the encoder, about 31 MB, reported as its own progress step.',
   'Expect roughly half the size of the equivalent WAV. Sparse or quiet material compresses further; dense loud masters compress less.',
 ];

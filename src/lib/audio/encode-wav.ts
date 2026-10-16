@@ -72,8 +72,7 @@ export function encodeWav(buffer: AudioBuffer, options: WavOptions = {}): Blob {
   } else if (bitDepth === 24) {
     for (let i = 0; i < frames; i += 1) {
       for (let c = 0; c < channels; c += 1) {
-        const s = clampSample(data[c][i]);
-        const v = Math.round(s * 8388607);
+        const v = toInt24(clampSample(data[c][i]));
         view.setUint8(offset, v & 0xff);
         view.setUint8(offset + 1, (v >> 8) & 0xff);
         view.setUint8(offset + 2, (v >> 16) & 0xff);
@@ -83,11 +82,7 @@ export function encodeWav(buffer: AudioBuffer, options: WavOptions = {}): Blob {
   } else {
     for (let i = 0; i < frames; i += 1) {
       for (let c = 0; c < channels; c += 1) {
-        const s = clampSample(data[c][i]);
-        // Asymmetric scaling: int16 runs -32768..32767, so the negative side
-        // uses a larger multiplier. Using 32767 for both wastes a step and
-        // makes full-scale negative peaks measurably quieter.
-        view.setInt16(offset, s < 0 ? s * 32768 : s * 32767, true);
+        view.setInt16(offset, toInt16(clampSample(data[c][i])), true);
         offset += 2;
       }
     }
@@ -100,6 +95,75 @@ function clampSample(value: number): number {
   if (value > 1) return 1;
   if (value < -1) return -1;
   return Number.isFinite(value) ? value : 0;
+}
+
+/**
+ * Float to int16, chosen so a 16-bit file survives decode and re-encode
+ * bit for bit. That is what lets a trimmed 16-bit WAV, or a FLAC made from
+ * one, honestly be called lossless.
+ *
+ * Rounding rather than truncating is most of it. DataView.setInt16 truncates
+ * towards zero, and a decoded sample is rarely the exact integer it came
+ * from, so truncation changed a quarter to a half of all samples by one step
+ * and biased the whole file half a step towards silence.
+ *
+ * The rest is the scale, because browsers disagree on it. Chrome decodes a
+ * positive int16 by multiplying it by the float32 nearest 1 / 32767, and a
+ * negative one by 1 / 32768 (both checked against decodeAudioData for all
+ * 65,536 values); Firefox and Safari divide both by 32768. A negative sample
+ * is k / 32768 everywhere, so it scales straight back. A positive one is tried
+ * as Chrome's reading first and kept if that reproduces the float exactly;
+ * anything else is scaled by 32768 like the negative side, which is also the
+ * right reading for audio that never came from an int16 at all. In the top 64
+ * steps below full scale the two conventions land on the same float32 and
+ * cannot be told apart, and there Chrome's reading wins, so a Firefox decode
+ * of a sample that close to clipping can come back one step low.
+ */
+export function toInt16(sample: number): number {
+  if (sample < 0) return Math.max(-32768, Math.round(sample * 32768));
+  const chrome = Math.round(sample * 32767);
+  if (fromChrome(chrome) === sample) return chrome;
+  return Math.min(32767, Math.round(sample * 32768));
+}
+
+const INVERSE_32767 = Math.fround(1 / 32767);
+
+/** A positive int16 as Chrome decodes it: a float32 multiply, not a division. */
+function fromChrome(k: number): number {
+  return Math.fround(k * INVERSE_32767);
+}
+
+/**
+ * Float to int24. One scale serves every browser here: Chrome widens 24-bit
+ * PCM to 32 bits before converting, and the result rounds to the same float32
+ * as k / 8388608, which is what everyone else produces.
+ */
+function toInt24(sample: number): number {
+  return Math.max(-8388608, Math.min(8388607, Math.round(sample * 8388608)));
+}
+
+/**
+ * True when every sample is exactly a value a 16-bit file could have decoded
+ * to, i.e. writing it at 16 bits loses nothing.
+ *
+ * Reads a strided subset, capped at `limit` samples, because the answer is
+ * almost never close: a 24-bit recording or a processed signal fails within
+ * the first few samples, and a 16-bit source passes everywhere. Silence passes
+ * too, which is correct, since zeros fit in any bit depth.
+ */
+export function fitsIn16Bits(buffer: AudioBuffer, limit = 1_000_000): boolean {
+  const total = buffer.length * buffer.numberOfChannels;
+  const stride = Math.max(1, Math.floor(total / limit));
+  for (let c = 0; c < buffer.numberOfChannels; c += 1) {
+    const data = buffer.getChannelData(c);
+    for (let i = c % stride; i < data.length; i += stride) {
+      const s = data[i]!;
+      if (s === 0) continue;
+      const k = toInt16(clampSample(s));
+      if (Math.fround(k / 32768) !== s && fromChrome(k) !== s) return false;
+    }
+  }
+  return true;
 }
 
 /** Predicts output size so the export bar can show it before encoding. */
