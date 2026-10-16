@@ -408,10 +408,19 @@ export function detectTempo(buffer: AudioBuffer, minBpm = 60, maxBpm = 200): Tem
     acf[lag] = sum / (frames - lag);
   }
 
-  let bestLag = 0;
-  let bestScore = 0;
-  let total = 0;
-  let count = 0;
+  /** The strongest lag within `slack` frames of `centre`, as [lag, value]. */
+  const peakNear = (centre: number, slack: number): [number, number] => {
+    let lag = 0;
+    let value = 0;
+    const last = Math.min(longest, Math.round(centre + slack));
+    for (let l = Math.max(1, Math.round(centre - slack)); l <= last; l += 1) {
+      if (acf[l] > value) {
+        value = acf[l];
+        lag = l;
+      }
+    }
+    return [lag, value];
+  };
 
   /**
    * Each candidate beat is scored by its own lag plus the half-bar and bar lags
@@ -423,18 +432,23 @@ export function detectTempo(buffer: AudioBuffer, minBpm = 60, maxBpm = 200): Tem
    * at three sixteenths: a 92 BPM acoustic song read as 120. The real beat is
    * the lag whose doubles also line up: the 3-sixteenth lag doubles to a beat
    * and a half and quadruples to three beats, neither of which repeats. Each
-   * multiple k is allowed k/2 frames of slack for the rounding of the lag.
+   * multiple k is allowed k/2 frames of slack for the rounding of the lag, and
+   * a period that is not a whole number of frames gets one frame more.
    */
-  for (let lag = minLag; lag <= maxLag; lag += 1) {
+  const scoreAt = (period: number): number => {
+    const extra = Number.isInteger(period) ? 0 : 1;
     let score = 0;
-    for (const k of harmonics) {
-      const slack = k >> 1;
-      let peak = 0;
-      for (let l = lag * k - slack; l <= lag * k + slack && l <= longest; l += 1) {
-        if (acf[l] > peak) peak = acf[l];
-      }
-      score += peak;
-    }
+    for (const k of harmonics) score += peakNear(period * k, (k >> 1) + extra)[1];
+    return score;
+  };
+
+  let bestLag = 0;
+  let bestScore = 0;
+  let total = 0;
+  let count = 0;
+
+  for (let lag = minLag; lag <= maxLag; lag += 1) {
+    const score = scoreAt(lag);
     total += score;
     count += 1;
     if (score > bestScore) {
@@ -453,12 +467,52 @@ export function detectTempo(buffer: AudioBuffer, minBpm = 60, maxBpm = 200): Tem
   const strength = Math.min(1, flux / 0.06);
   const confidence = contrast * strength;
 
-  let bpm = (60 * framesPerSecond) / bestLag;
+  /**
+   * The period to a fraction of a frame, from where each harmonic actually
+   * peaks.
+   *
+   * A whole-frame lag is up to half a frame out, which is 0.75% at 90 BPM. That
+   * reads 90.9 for a 91.0 song, and over a three-minute track the grid drifts
+   * two beats off the music. The bar lag pins the period four times as finely
+   * as the beat lag, so each peak, refined by a parabola through it and its
+   * neighbours, votes in proportion to its strength and its multiple.
+   */
+  const vertex = (lag: number): number => {
+    if (lag < 2 || lag >= longest) return lag;
+    const a = acf[lag - 1];
+    const b = acf[lag];
+    const c = acf[lag + 1];
+    const curve = a - 2 * b + c;
+    return curve < 0 ? lag + Math.max(-0.5, Math.min(0.5, (0.5 * (a - c)) / curve)) : lag;
+  };
+  let weighted = 0;
+  let weight = 0;
+  for (const k of harmonics) {
+    const [lag, value] = peakNear(bestLag * k, k >> 1);
+    if (lag === 0) continue;
+    weighted += value * vertex(lag);
+    weight += value * k;
+  }
+  const beatLag = weight > 0 ? weighted / weight : bestLag;
 
-  // Autocorrelation happily locks onto half or double time; fold into the
-  // range most music actually sits in.
-  while (bpm < 70) bpm *= 2;
-  while (bpm > 180) bpm /= 2;
+  let bpm = (60 * framesPerSecond) / beatLag;
+
+  /**
+   * Autocorrelation happily locks onto a multiple of the beat; fold into the
+   * range most music actually sits in.
+   *
+   * A slow reading is two beats taken as one, or three: 180 BPM reads as 60,
+   * and doubling that gives 120, a tempo that is not in the music at all. So
+   * a reading below 70 is tripled when a third of its period correlates better
+   * than half of it.
+   */
+  const triple = bpm < 70 && bpm * 3 <= maxBpm && scoreAt(beatLag / 3) > scoreAt(beatLag / 2);
+  if (triple) {
+    bpm *= 3;
+  } else {
+    while (bpm < 70) bpm *= 2;
+    while (bpm > 180) bpm /= 2;
+  }
 
   /**
    * Phase: which alignment of a pulse train at the beat period lands on the
@@ -468,14 +522,33 @@ export function detectTempo(buffer: AudioBuffer, minBpm = 60, maxBpm = 200): Tem
    * number on screen. Halving the tempo doubles the spacing, and a grid drawn
    * at the un-folded period would be twice as dense as the reading it claims to
    * illustrate.
+   *
+   * Read from a [1 2 3 2 1] blur of the onsets. An onset is one frame wide and
+   * the pulse train lands on whole frames, so on the raw onsets a period change
+   * of a third of a millisecond decides which beats hit their onset and which
+   * miss it by one frame. On a 3+3+2 song, where the off-beat collects as much
+   * kick as the beat does, that was enough to put the grid on the "and".
    */
+  const blurred = new Float32Array(frames);
+  for (let f = 0; f < frames; f += 1) {
+    let sum = 0;
+    let taps = 0;
+    for (let d = -2; d <= 2; d += 1) {
+      const value = onset[f + d];
+      if (value === undefined) continue;
+      sum += value * (3 - Math.abs(d));
+      taps += 3 - Math.abs(d);
+    }
+    blurred[f] = sum / taps;
+  }
+
   const period = (60 / bpm) * framesPerSecond;
   let bestOffset = 0;
   let bestPhase = -1;
   for (let offset = 0; offset < Math.ceil(period); offset += 1) {
     let sum = 0;
     for (let at = offset; at < frames; at += period) {
-      sum += onset[Math.round(at)] ?? 0;
+      sum += blurred[Math.round(at)] ?? 0;
     }
     if (sum > bestPhase) {
       bestPhase = sum;

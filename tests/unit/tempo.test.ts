@@ -51,8 +51,10 @@ describe('detectTempo', () => {
     // The grid is drawn from beatPeriod, so the two must not be able to
     // disagree — the folding from half or double time happens after the
     // period is chosen, and this is what catches it if only one of them folds.
+    // The period is finer than the BPM, which is rounded to 0.1 for display,
+    // so they agree to a millisecond rather than exactly.
     const result = detectTempo(clickTrack(100, 12));
-    expect(result.beatPeriod).toBeCloseTo(60 / result.bpm, 6);
+    expect(result.beatPeriod).toBeCloseTo(60 / result.bpm, 3);
   });
 
   it('finds the phase when the first beat is not at zero', () => {
@@ -122,13 +124,35 @@ describe('detectTempo', () => {
         add(at, 0.25, (t) => Math.sin(2 * Math.PI * (50 + 70 * Math.exp(-30 * t)) * t) * Math.exp(-12 * t) * 0.5);
         add(at, sixteenth * 2, (t) => Math.sin(2 * Math.PI * 55 * t) * Math.min(1, t / 0.01) * 0.3);
       }
-      if (inBar === 4 || inBar === 12) add(at, 0.2, (t) => noise() * Math.exp(-22 * t) * 0.3);
+      if (inBar === 4 || inBar === 12) add(at, 0.2, (t) => noise() * Math.exp(-22 * t) * 0.6);
       add(at, 0.05, (t) => noise() * Math.exp(-90 * t) * (inBar % 4 === 0 ? 0.1 : 0.06));
     }
 
     const result = detectTempo(buffer);
-    expect(result.bpm).toBeGreaterThan(90);
-    expect(result.bpm).toBeLessThan(94);
+    expect(result.bpm).toBeGreaterThan(91.5);
+    expect(result.bpm).toBeLessThan(92.5);
+
+    // The off-beat collects as much kick and bass as the beat does here, so
+    // only the snare and hats say where the beat is. A grid on the "and" looks
+    // just as regular as one on the beat.
+    const error = Math.abs((((result.beatOffset - 0.11) % result.beatPeriod) + result.beatPeriod) % result.beatPeriod);
+    expect(Math.min(error, result.beatPeriod - error)).toBeLessThan(0.03);
+  });
+
+  it('reads 180 BPM as 180, not as a third of it doubled', () => {
+    // Three beats of 180 is exactly 100 onset frames, so the 60 BPM lag can
+    // win. Doubling that into range gave 120, which is not in the music at all.
+    const result = detectTempo(clickTrack(180, 12));
+    expect(result.bpm).toBeGreaterThan(178);
+    expect(result.bpm).toBeLessThan(182);
+  });
+
+  it('measures a period that falls between whole frames', () => {
+    // 93 BPM is a 64.5-frame beat. A whole-frame lag reads 92.3 or 93.8, and
+    // the grid drawn from it walks off the clicks within a minute.
+    const result = detectTempo(clickTrack(93, 30));
+    expect(result.bpm).toBeGreaterThan(92.8);
+    expect(result.bpm).toBeLessThan(93.2);
   });
 
   it('returns no grid for material with no beat in it', () => {
