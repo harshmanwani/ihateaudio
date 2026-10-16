@@ -95,6 +95,36 @@ describe('toAudioError', () => {
   });
 
   /**
+   * The AI tools stop on the run panel's Cancel by throwing the platform's
+   * AbortError, and so does any fetch handed the same signal. Left unrecognised
+   * it became 'unknown-error', so pressing Cancel on the stem splitter, the noise
+   * remover or the transcriber answered "Something went wrong processing that
+   * file" — for a run the visitor stopped on purpose. 'cancelled' is the one code
+   * the runtime shows nothing for.
+   */
+  it('treats an abort as a cancel, not a failure', () => {
+    const controller = new AbortController();
+    controller.abort();
+    for (const thrown of [
+      // What src/lib/ai/ throws when the signal fires.
+      new DOMException('Aborted', 'AbortError'),
+      // What an aborted signal carries, and what fetch rejects with.
+      controller.signal.reason,
+      // Libraries that cannot rely on DOMException name a plain Error instead.
+      Object.assign(new Error('The operation was aborted.'), { name: 'AbortError' }),
+    ]) {
+      expect(toAudioError(thrown).code, String(thrown)).toBe('cancelled');
+    }
+  });
+
+  it('does not take a timed-out download for a cancel', () => {
+    // AbortSignal.timeout() fires TimeoutError: nobody pressed anything, so the
+    // visitor has to be told it failed.
+    const err = toAudioError(new DOMException('signal timed out', 'TimeoutError'));
+    expect(err.code).not.toBe('cancelled');
+  });
+
+  /**
    * The regression this file exists for. An unrecognised throw is one of our own
    * bugs, and it used to be relabelled 'decode-failed' — the same code a corrupt
    * file produces. Since tool_error sends the code and nothing else, that made a

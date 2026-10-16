@@ -99,6 +99,15 @@ export function audioError(code: AudioErrorCode, fix?: string): AudioError {
 export function toAudioError(err: unknown): AudioError {
   if (err instanceof AudioError) return err;
 
+  // The AI tools and fetch stop on an aborted signal by throwing AbortError,
+  // which is a cancel the visitor asked for, not a failure. Matched by name:
+  // older Safari does not make DOMException an Error, and some libraries throw a
+  // plain Error named this way. TimeoutError stays a failure, since nobody
+  // pressed anything.
+  if ((err as { name?: unknown } | null)?.name === 'AbortError') {
+    return audioError('cancelled');
+  }
+
   const text = err instanceof Error ? err.message : String(err);
 
   // Browsers report OOM inconsistently; these are the observed shapes.
