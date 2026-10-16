@@ -34,6 +34,32 @@ type FFmpegInstance = {
 let instance: FFmpegInstance | null = null;
 let loading: Promise<FFmpegInstance> | null = null;
 
+/**
+ * Runs one instance gets before a fresh one replaces it.
+ *
+ * Every run on @ffmpeg/core 0.12.10 ends in abort(), which unwinds the wasm
+ * stack without putting the stack pointer back, so each run loses 224 bytes of
+ * the 64 KB stack until the instance is gone (an error exit loses 4.7 KB). The
+ * encoders that go deepest trap once that eats their headroom, measured in
+ * Chromium on songs and speech:
+ *
+ *   - mono Opus at 32 and 48 kbps: 3.7 KB spare, traps on the 19th run;
+ *   - stereo Opus at 32 and 48 kbps, and Vorbis at the bottom of each band from
+ *     26 kHz up: 7.5 KB, traps on about the 36th;
+ *   - AAC, FLAC, WMA and AIFF: 32 KB.
+ *
+ * Eight runs spend 1.8 KB, half of the tightest margin. A replacement loads
+ * from the HTTP cache in about 50 ms, and its first encode is about 30 ms
+ * slower while the wasm warms up.
+ */
+const RUNS_PER_INSTANCE = 8;
+
+/** ffmpeg runs started on the current instance. */
+let runs = 0;
+
+/** The end of the last transcode, which the next one waits for. */
+let queue: Promise<unknown> = Promise.resolve();
+
 /** True once the core is in memory — lets the UI skip the "loading" copy. */
 export function isFFmpegReady(): boolean {
   return instance?.loaded === true;
@@ -84,6 +110,7 @@ export async function loadFFmpeg(
       onStatus?.(1);
 
       instance = ff;
+      runs = 0;
       return ff;
     } catch {
       loading = null;
@@ -138,6 +165,7 @@ export function releaseFFmpeg(): void {
   }
   instance = null;
   loading = null;
+  runs = 0;
 }
 
 export interface TranscodeOptions {
@@ -168,17 +196,64 @@ export async function transcode(
  * `failure`. An ArrayBuffer input is moved to ffmpeg's worker rather than
  * copied, so the caller cannot use it afterwards.
  */
-async function run(
+function run(
   input: Blob | ArrayBuffer,
   inputName: string,
   outputName: string,
   options: TranscodeOptions,
   failure: AudioErrorCode
 ): Promise<Uint8Array> {
-  const { args = [], onProgress, onLoadProgress, signal } = options;
+  // One at a time: runs share file names in ffmpeg's virtual filesystem, and
+  // the instance can be replaced between runs, which must not happen under one.
+  const job = queue.then(() => runNow(input, inputName, outputName, options, failure));
+  queue = job.catch(() => {});
+  return job;
+}
 
-  const ff = await loadFFmpeg(onLoadProgress);
+const TRAPPED = Symbol('trapped');
+
+async function runNow(
+  input: Blob | ArrayBuffer,
+  inputName: string,
+  outputName: string,
+  options: TranscodeOptions,
+  failure: AudioErrorCode
+): Promise<Uint8Array> {
+  const { onLoadProgress, signal } = options;
+
+  // Replaced before it can run short of stack. The replacement comes from the
+  // HTTP cache, so it is not announced as loading the converter. An ArrayBuffer
+  // can be handed to the worker only once, so it cannot have the retry below;
+  // it gets a fresh instance up front instead.
+  const worn = runs >= RUNS_PER_INSTANCE || (input instanceof ArrayBuffer && runs > 0);
+  if (worn) releaseFFmpeg();
+
+  let ff = await loadFFmpeg(worn ? undefined : onLoadProgress);
   if (signal?.aborted) throw audioError('cancelled');
+  const used = runs > 0;
+  let result = await runOnce(ff, input, inputName, outputName, options, failure);
+
+  // A trap on an instance that had already run may be the stack it lost, which
+  // a fresh one has back. A trap on a fresh instance is the encode itself.
+  if (result === TRAPPED && used && !signal?.aborted) {
+    ff = await loadFFmpeg();
+    if (signal?.aborted) throw audioError('cancelled');
+    result = await runOnce(ff, input, inputName, outputName, options, failure);
+  }
+  if (result === TRAPPED) throw audioError(failure);
+  return result;
+}
+
+async function runOnce(
+  ff: FFmpegInstance,
+  input: Blob | ArrayBuffer,
+  inputName: string,
+  outputName: string,
+  options: TranscodeOptions,
+  failure: AudioErrorCode
+): Promise<Uint8Array | typeof TRAPPED> {
+  const { args = [], onProgress, signal } = options;
+  runs += 1;
 
   const handler = (e: { progress: number }): void => {
     // ffmpeg reports >1 near the end on some builds; clamp so bars behave.
@@ -187,6 +262,7 @@ async function run(
   ff.on('progress', handler);
 
   try {
+    // A Blob is read again for every run: writeFile transfers the buffer to the worker.
     const bytes = new Uint8Array(input instanceof ArrayBuffer ? input : await input.arrayBuffer());
     await ff.writeFile(inputName, bytes);
     if (signal?.aborted) throw audioError('cancelled');
@@ -196,17 +272,23 @@ async function run(
       code = await ff.exec(['-i', inputName, ...args, outputName]);
     } catch {
       /*
-       * A throw here is the wasm itself trapping (libopus overflowing the
-       * core's stack was the case that surfaced it), not ffmpeg reporting an
-       * error. The trap leaves the core's memory in whatever state it died in,
+       * A throw here is the wasm itself trapping, not ffmpeg reporting an
+       * error: the encode ran out of stack (stereo Opus at 20 ms frames did on
+       * every instance; see RUNS_PER_INSTANCE for the runs that did on a used
+       * one). The trap leaves the core's memory in whatever state it died in,
        * and every later exec on it failed the same way, whatever the format,
        * until the page was reloaded. Dropping the instance means the next
-       * export loads a clean one, from the HTTP cache rather than the network.
+       * run loads a clean one, from the HTTP cache rather than the network.
        */
+      releaseFFmpeg();
+      return TRAPPED;
+    }
+    if (code !== 0) {
+      // An error exit unwinds from deeper than a clean one and takes 4.7 KB of
+      // stack with it, more than some encoders can spare.
       releaseFFmpeg();
       throw audioError(failure);
     }
-    if (code !== 0) throw audioError(failure);
 
     const data = await ff.readFile(outputName);
     if (typeof data === 'string' || data.length === 0) throw audioError(failure);
