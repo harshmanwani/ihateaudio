@@ -6,6 +6,7 @@
  * useful if the number matches what Spotify, YouTube and Auphonic measure.
  */
 import { createBuffer, gainFactor, applyGain } from './dsp';
+import { runAll, runSliced, type SliceOptions, type Steps } from './slices';
 
 interface Biquad {
   b0: number;
@@ -55,23 +56,46 @@ function highpassFilter(sampleRate: number): Biquad {
   };
 }
 
-function runBiquad(input: Float32Array, f: Biquad): Float32Array {
-  const out = new Float32Array(input.length);
-  let x1 = 0;
-  let x2 = 0;
-  let y1 = 0;
-  let y2 = 0;
+/** A biquad's last two inputs and outputs, carried from one stretch to the next. */
+interface BiquadState {
+  x1: number;
+  x2: number;
+  y1: number;
+  y2: number;
+}
 
-  for (let i = 0; i < input.length; i += 1) {
+const biquadState = (): BiquadState => ({ x1: 0, x2: 0, y1: 0, y2: 0 });
+
+/**
+ * Filters input[from, to) into output from `at` onwards. The state goes on
+ * where the last stretch stopped, so a signal filtered in pieces comes out
+ * exactly as it does filtered whole.
+ */
+function runBiquad(
+  input: Float32Array,
+  from: number,
+  to: number,
+  output: Float32Array,
+  at: number,
+  f: Biquad,
+  state: BiquadState
+): void {
+  let { x1, x2, y1, y2 } = state;
+
+  for (let i = from, o = at; i < to; i += 1, o += 1) {
     const x0 = input[i];
     const y0 = f.b0 * x0 + f.b1 * x1 + f.b2 * x2 - f.a1 * y1 - f.a2 * y2;
-    out[i] = y0;
+    output[o] = y0;
     x2 = x1;
     x1 = x0;
     y2 = y1;
     y1 = y0;
   }
-  return out;
+
+  state.x1 = x1;
+  state.x2 = x2;
+  state.y1 = y1;
+  state.y2 = y2;
 }
 
 /** BS.1770 channel weights. Surround channels count for more; LFE is excluded. */
@@ -107,24 +131,114 @@ export interface LoudnessResult {
 }
 
 /**
+ * Samples between the points where a sliced measurement may pause. The
+ * heaviest loop here, the true-peak oversampler, gets through this many in a
+ * few milliseconds.
+ */
+const CHUNK = 1 << 15;
+
+/**
+ * Relative cost of each stage per sample and channel, from timing them on a
+ * 10-minute song in Chromium (weighting 360 ms, blocks 210, range 150, true
+ * peak 2790, sample peak 90). Only the progress figure uses these, so that it
+ * moves at an even pace.
+ */
+const COST = { weighting: 3.4, blocks: 2, range: 1.4, truePeak: 26, peak: 0.8 };
+
+/** Work done so far, as a share of the whole. */
+class Progress {
+  private done = 0;
+
+  constructor(private readonly total: number) {}
+
+  /** Counts `units` more as done and returns the share done, 0..1. */
+  add(units: number): number {
+    this.done += units;
+    return this.total > 0 ? Math.min(1, this.done / this.total) : 1;
+  }
+}
+
+/**
  * Measures integrated loudness, loudness range and true peak in one pass.
  */
 export function measureLoudness(buffer: AudioBuffer): LoudnessResult {
+  return runAll(loudnessSteps(buffer));
+}
+
+/**
+ * measureLoudness a slice at a time, so the page keeps painting and taking
+ * input while a long file is measured. The result is identical.
+ */
+export function measureLoudnessSliced(
+  buffer: AudioBuffer,
+  options?: SliceOptions
+): Promise<LoudnessResult> {
+  return runSliced(loudnessSteps(buffer), options);
+}
+
+/** Weighted mean square of one block, summed across channels. */
+function blockPowerAt(
+  weighted: Float32Array[],
+  channels: number,
+  start: number,
+  blockSamples: number
+): number {
+  let total = 0;
+  for (let c = 0; c < channels; c += 1) {
+    const w = channelWeight(c, channels);
+    if (w === 0) continue;
+    const data = weighted[c];
+    let sum = 0;
+    for (let i = start; i < start + blockSamples; i += 1) sum += data[i] * data[i];
+    total += w * (sum / blockSamples);
+  }
+  return total;
+}
+
+/**
+ * The loudness measurement as steps that may pause every `chunk` samples.
+ *
+ * `chunk` only decides where the pauses fall. Every stage keeps its running
+ * state across a pause (the filters their last samples, the sums their
+ * position), so any chunk gives the same numbers as one unbroken pass.
+ */
+export function* loudnessSteps(
+  buffer: AudioBuffer,
+  chunk = CHUNK
+): Steps<LoudnessResult> {
   const rate = buffer.sampleRate;
   const channels = buffer.numberOfChannels;
+  const length = buffer.length;
+  const whole = channels * length;
+  const progress = new Progress(
+    whole * (COST.weighting + COST.blocks + COST.range + COST.truePeak + COST.peak)
+  );
 
   const shelf = shelvingFilter(rate);
   const hp = highpassFilter(rate);
 
+  // K-weighting, the shelf and then the high-pass, a stretch at a time. The
+  // shelf's output is only kept for the stretch the high-pass is reading.
   const weighted: Float32Array[] = [];
+  const shelved = new Float32Array(Math.min(chunk, length));
   for (let c = 0; c < channels; c += 1) {
-    weighted.push(runBiquad(runBiquad(buffer.getChannelData(c), shelf), hp));
+    const input = buffer.getChannelData(c);
+    const out = new Float32Array(length);
+    const shelfState = biquadState();
+    const hpState = biquadState();
+    for (let from = 0; from < length; from += chunk) {
+      const to = Math.min(length, from + chunk);
+      runBiquad(input, from, to, shelved, 0, shelf, shelfState);
+      runBiquad(shelved, 0, to - from, out, from, hp, hpState);
+      yield progress.add(COST.weighting * (to - from));
+    }
+    weighted.push(out);
   }
 
   const blockSamples = Math.round(rate * 0.4);
   const stepSamples = Math.round(rate * 0.1);
 
-  if (buffer.length < blockSamples) {
+  if (length < blockSamples) {
     // Too short for a single gating block; fall back to plain mean square so
     // the number is still indicative rather than -Infinity.
     let sum = 0;
@@ -136,11 +250,12 @@ export function measureLoudness(buffer: AudioBuffer): LoudnessResult {
       count += data.length;
     }
     const ms = count === 0 ? 0 : sum / (count / channels);
+    progress.add(whole * (COST.blocks + COST.range));
     return {
       integrated: ms > 0 ? -0.691 + 10 * Math.log10(ms) : -Infinity,
       range: 0,
-      truePeak: truePeakDb(buffer),
-      peak: peakDb(buffer),
+      truePeak: yield* truePeakSteps(buffer, chunk, progress),
+      peak: yield* peakSteps(buffer, chunk, progress),
       momentary: [],
       momentaryStep: 0.1,
     };
@@ -148,17 +263,14 @@ export function measureLoudness(buffer: AudioBuffer): LoudnessResult {
 
   // Weighted mean square per block, summed across channels.
   const blockPower: number[] = [];
-  for (let start = 0; start + blockSamples <= buffer.length; start += stepSamples) {
-    let total = 0;
-    for (let c = 0; c < channels; c += 1) {
-      const w = channelWeight(c, channels);
-      if (w === 0) continue;
-      const data = weighted[c];
-      let sum = 0;
-      for (let i = start; i < start + blockSamples; i += 1) sum += data[i] * data[i];
-      total += w * (sum / blockSamples);
+  let sincePause = 0;
+  for (let start = 0; start + blockSamples <= length; start += stepSamples) {
+    blockPower.push(blockPowerAt(weighted, channels, start, blockSamples));
+    sincePause += stepSamples;
+    if (sincePause >= chunk) {
+      yield progress.add(COST.blocks * channels * sincePause);
+      sincePause = 0;
     }
-    blockPower.push(total);
   }
 
   const loudnessOf = (power: number): number =>
@@ -167,11 +279,12 @@ export function measureLoudness(buffer: AudioBuffer): LoudnessResult {
   // Stage 1: absolute gate at -70 LUFS drops true silence.
   const aboveAbsolute = blockPower.filter((p) => loudnessOf(p) > -70);
   if (aboveAbsolute.length === 0) {
+    progress.add(whole * COST.range);
     return {
       integrated: -Infinity,
       range: 0,
-      truePeak: truePeakDb(buffer),
-      peak: peakDb(buffer),
+      truePeak: yield* truePeakSteps(buffer, chunk, progress),
+      peak: yield* peakSteps(buffer, chunk, progress),
       momentary: [],
       momentaryStep: 0.1,
     };
@@ -186,39 +299,46 @@ export function measureLoudness(buffer: AudioBuffer): LoudnessResult {
   const gated = aboveAbsolute.filter((p) => loudnessOf(p) > relativeThreshold);
   const integrated = loudnessOf(mean(gated.length > 0 ? gated : aboveAbsolute));
 
+  const range = yield* loudnessRangeSteps(weighted, channels, rate, length, chunk, progress);
+  // The weighted copy is as big as the file, and true peak reads the original.
+  weighted.length = 0;
+
   return {
     integrated,
     momentary: blockPower.map(loudnessOf),
     momentaryStep: stepSamples / rate,
-    range: loudnessRange(weighted, channels, rate, buffer.length),
-    truePeak: truePeakDb(buffer),
-    peak: peakDb(buffer),
+    range,
+    truePeak: yield* truePeakSteps(buffer, chunk, progress),
+    peak: yield* peakSteps(buffer, chunk, progress),
   };
 }
 
 /** EBU R128 loudness range: the 10th-to-95th percentile spread of 3s blocks. */
-function loudnessRange(
+function* loudnessRangeSteps(
   weighted: Float32Array[],
   channels: number,
   rate: number,
-  length: number
-): number {
+  length: number,
+  chunk: number,
+  progress: Progress
+): Steps<number> {
   const blockSamples = Math.round(rate * 3);
   const stepSamples = Math.round(rate * 1);
-  if (length < blockSamples) return 0;
+  if (length < blockSamples) {
+    progress.add(COST.range * channels * length);
+    return 0;
+  }
 
   const levels: number[] = [];
+  let sincePause = 0;
   for (let start = 0; start + blockSamples <= length; start += stepSamples) {
-    let total = 0;
-    for (let c = 0; c < channels; c += 1) {
-      const w = channelWeight(c, channels);
-      if (w === 0) continue;
-      const data = weighted[c];
-      let sum = 0;
-      for (let i = start; i < start + blockSamples; i += 1) sum += data[i] * data[i];
-      total += w * (sum / blockSamples);
-    }
+    const total = blockPowerAt(weighted, channels, start, blockSamples);
     if (total > 0) levels.push(-0.691 + 10 * Math.log10(total));
+    sincePause += stepSamples;
+    if (sincePause >= chunk) {
+      yield progress.add(COST.range * channels * sincePause);
+      sincePause = 0;
+    }
   }
 
   const above = levels.filter((l) => l > -70);
@@ -236,13 +356,32 @@ function loudnessRange(
   return at(0.95) - at(0.1);
 }
 
+/** The largest absolute sample in data[from, to), or `peak` if none is larger. */
+function samplePeak(data: Float32Array, from: number, to: number, peak: number): number {
+  for (let i = from; i < to; i += 1) {
+    const v = Math.abs(data[i]);
+    if (v > peak) peak = v;
+  }
+  return peak;
+}
+
 export function peakDb(buffer: AudioBuffer): number {
   let peak = 0;
   for (let c = 0; c < buffer.numberOfChannels; c += 1) {
     const data = buffer.getChannelData(c);
-    for (let i = 0; i < data.length; i += 1) {
-      const v = Math.abs(data[i]);
-      if (v > peak) peak = v;
+    peak = samplePeak(data, 0, data.length, peak);
+  }
+  return peak > 0 ? 20 * Math.log10(peak) : -Infinity;
+}
+
+function* peakSteps(buffer: AudioBuffer, chunk: number, progress: Progress): Steps<number> {
+  let peak = 0;
+  for (let c = 0; c < buffer.numberOfChannels; c += 1) {
+    const data = buffer.getChannelData(c);
+    for (let from = 0; from < data.length; from += chunk) {
+      const to = Math.min(data.length, from + chunk);
+      peak = samplePeak(data, from, to, peak);
+      yield progress.add(COST.peak * (to - from));
     }
   }
   return peak > 0 ? 20 * Math.log10(peak) : -Infinity;
@@ -279,35 +418,59 @@ const TRUE_PEAK_PHASES: Float64Array[] = [1, 2, 3].map((step) => {
  */
 export function truePeakDb(buffer: AudioBuffer): number {
   let peak = 0;
-  const reach = TRUE_PEAK_REACH;
-
   for (let c = 0; c < buffer.numberOfChannels; c += 1) {
     const data = buffer.getChannelData(c);
-    const n = data.length;
-    for (let i = 0; i < n; i += 1) {
-      const sample = Math.abs(data[i]);
-      if (sample > peak) peak = sample;
-      if (i + 1 >= n) break;
+    peak = truePeakOf(data, 0, data.length, peak);
+  }
+  return peak > 0 ? 20 * Math.log10(peak) : -Infinity;
+}
 
-      // Only the edges need the bounds check; the middle of the file is the
-      // tight loop.
-      const inside = i - reach + 1 >= 0 && i + reach < n;
-      for (const taps of TRUE_PEAK_PHASES) {
-        let v = 0;
-        if (inside) {
-          for (let k = 0; k < taps.length; k += 1) v += data[i - reach + 1 + k] * taps[k];
-        } else {
-          for (let k = 0; k < taps.length; k += 1) {
-            const j = i - reach + 1 + k;
-            if (j >= 0 && j < n) v += data[j] * taps[k];
-          }
+/**
+ * The largest absolute value in data[from, to), samples and the three points
+ * reconstructed after each, or `peak` if none is larger. The filter reads up to
+ * TRUE_PEAK_REACH samples either side of the range, so ranges can be done in
+ * any order and pieces.
+ */
+function truePeakOf(data: Float32Array, from: number, to: number, peak: number): number {
+  const reach = TRUE_PEAK_REACH;
+  const n = data.length;
+
+  for (let i = from; i < to; i += 1) {
+    const sample = Math.abs(data[i]);
+    if (sample > peak) peak = sample;
+    if (i + 1 >= n) break;
+
+    // Only the edges need the bounds check; the middle of the file is the
+    // tight loop.
+    const inside = i - reach + 1 >= 0 && i + reach < n;
+    for (const taps of TRUE_PEAK_PHASES) {
+      let v = 0;
+      if (inside) {
+        for (let k = 0; k < taps.length; k += 1) v += data[i - reach + 1 + k] * taps[k];
+      } else {
+        for (let k = 0; k < taps.length; k += 1) {
+          const j = i - reach + 1 + k;
+          if (j >= 0 && j < n) v += data[j] * taps[k];
         }
-        const abs = Math.abs(v);
-        if (abs > peak) peak = abs;
       }
+      const abs = Math.abs(v);
+      if (abs > peak) peak = abs;
     }
   }
 
+  return peak;
+}
+
+function* truePeakSteps(buffer: AudioBuffer, chunk: number, progress: Progress): Steps<number> {
+  let peak = 0;
+  for (let c = 0; c < buffer.numberOfChannels; c += 1) {
+    const data = buffer.getChannelData(c);
+    for (let from = 0; from < data.length; from += chunk) {
+      const to = Math.min(data.length, from + chunk);
+      peak = truePeakOf(data, from, to, peak);
+      yield progress.add(COST.truePeak * (to - from));
+    }
+  }
   return peak > 0 ? 20 * Math.log10(peak) : -Infinity;
 }
 

@@ -85,7 +85,7 @@ const faq = [
           <p class="wheel__caption" data-wheel-caption></p>
         </div>
 
-        <div class="keyout__chart">
+        <div class="keyout__chart" data-key-chart>
           <span class="keyout__label">Notes in this track</span>
           <div class="chroma" data-chroma></div>
         </div>
@@ -281,7 +281,7 @@ const faq = [
 <script>
   import { createTool } from '../lib/tool';
   import type { KeyCandidate } from '../lib/audio/key';
-  import { camelot, detectKey, NOTE_NAMES, rankKeys } from '../lib/audio/key';
+  import { camelot, detectKeySliced, NOTE_NAMES, rankKeys, type KeyResult } from '../lib/audio/key';
   import { panelColors, panelContext } from '../lib/canvas';
 
   /** Semitone offsets of the notes in a major and a natural minor scale. */
@@ -450,73 +450,94 @@ const faq = [
       const wheelPanel = root.querySelector<HTMLElement>('[data-wheel-panel]');
       const wheelCanvas = root.querySelector<HTMLCanvasElement>('[data-wheel]');
       const wheelCaption = root.querySelector<HTMLElement>('[data-wheel-caption]');
+      const chartEl = root.querySelector<HTMLElement>('[data-key-chart]');
 
-      const result = detectKey(ctx.buffer);
-      const { best, runnerUp, confidence, chroma } = result;
-
-      if (nameEl) nameEl.textContent = best.name;
-      if (camelotEl) camelotEl.textContent = camelot(best.tonic, best.mode);
-      if (confidenceEl) confidenceEl.textContent = `${Math.round(confidence * 100)}%`;
-
-      if (secondEl) {
-        // Below about a third, the two candidates are close enough that naming the
-        // runner-up is the useful thing to do rather than a footnote.
-        secondEl.textContent =
-          confidence < 0.34
-            ? `This one is close. ${runnerUp.name} scored almost as well, and if the two are a ` +
-              'relative pair they share every note, and only where the music comes to rest tells them apart.'
-            : `Next closest was ${runnerUp.name}.`;
-      }
-
-      if (chromaEl) {
-        const scale = best.mode === 'major' ? MAJOR_SCALE : MINOR_SCALE;
-        const inKey = new Set(scale.map((step) => (best.tonic + step) % 12));
-        const peak = Math.max(...Array.from(chroma));
-
-        chromaEl.innerHTML = '';
-        for (let note = 0; note < 12; note += 1) {
-          const bar = document.createElement('div');
-          bar.className = 'chroma__bar';
-          bar.dataset.inKey = String(inKey.has(note));
-          bar.dataset.tonic = String(note === best.tonic);
-
-          const fill = document.createElement('div');
-          fill.className = 'chroma__fill';
-          // Scaled to the loudest note rather than to 1, or every bar is a stub.
-          const share = peak > 0 ? (chroma[note] ?? 0) / peak : 0;
-          fill.style.height = `${Math.max(2, share * 100)}%`;
-
-          const label = document.createElement('span');
-          label.className = 'chroma__name';
-          label.textContent = NOTE_NAMES[note]!;
-
-          bar.append(fill, label);
-          bar.title = `${NOTE_NAMES[note]}: ${Math.round(share * 100)}% of the loudest note`;
-          chromaEl.append(bar);
-        }
-      }
-
+      // Placeholders while this file is read, and nothing left from the last one.
+      if (nameEl) nameEl.textContent = '···';
+      if (camelotEl) camelotEl.textContent = '···';
+      if (confidenceEl) confidenceEl.textContent = '···';
+      if (secondEl) secondEl.textContent = 'Listening for which notes the track spends its time on.';
+      if (wheelPanel) wheelPanel.hidden = true;
+      if (chartEl) chartEl.hidden = true;
       if (out) out.hidden = false;
 
-      if (wheelPanel && wheelCanvas) {
-        // rankKeys only re-runs the correlation against the twelve-number profile
-        // that detectKey already computed. The expensive part, the chromagram, is
-        // not repeated.
-        const ranked = rankKeys(chroma);
-        const bestCode = camelot(best.tonic, best.mode);
-        const [relative, down, up] = neighbours(bestCode);
+      // The chromagram is an 8192-point FFT every 93 ms of audio, over a second
+      // on a long file, so it runs a slice at a time.
+      runtime
+        .measure('Finding the key', (options) => detectKeySliced(ctx.buffer, options))
+        .then(show)
+        .catch(() => {
+          // A newer file stopped it, or the runtime has already shown the error.
+        });
 
-        if (wheelCaption) {
-          wheelCaption.textContent =
-            `${bestCode} mixes with ${relative}, ${down} and ${up}. ` +
-            'Outer ring is major, inner ring is minor, and the dashed cell is the ' +
-            'runner-up.';
+      function show(result: KeyResult): void {
+        const { best, runnerUp, confidence, chroma } = result;
+
+        if (nameEl) nameEl.textContent = best.name;
+        if (camelotEl) camelotEl.textContent = camelot(best.tonic, best.mode);
+        if (confidenceEl) confidenceEl.textContent = `${Math.round(confidence * 100)}%`;
+
+        if (secondEl) {
+          // Below about a third, the two candidates are close enough that naming the
+          // runner-up is the useful thing to do rather than a footnote.
+          secondEl.textContent =
+            confidence < 0.34
+              ? `This one is close. ${runnerUp.name} scored almost as well, and if the two are a ` +
+                'relative pair they share every note, and only where the music comes to rest tells them apart.'
+              : `Next closest was ${runnerUp.name}.`;
         }
 
-        const paint = (): void => drawWheel(wheelPanel, wheelCanvas, ranked, best, runnerUp);
-        // The panel was hidden until a moment ago, so the canvas has no width yet.
-        requestAnimationFrame(paint);
-        new ResizeObserver(paint).observe(wheelPanel);
+        if (chromaEl) {
+          const scale = best.mode === 'major' ? MAJOR_SCALE : MINOR_SCALE;
+          const inKey = new Set(scale.map((step) => (best.tonic + step) % 12));
+          const peak = Math.max(...Array.from(chroma));
+
+          chromaEl.innerHTML = '';
+          for (let note = 0; note < 12; note += 1) {
+            const bar = document.createElement('div');
+            bar.className = 'chroma__bar';
+            bar.dataset.inKey = String(inKey.has(note));
+            bar.dataset.tonic = String(note === best.tonic);
+
+            const fill = document.createElement('div');
+            fill.className = 'chroma__fill';
+            // Scaled to the loudest note rather than to 1, or every bar is a stub.
+            const share = peak > 0 ? (chroma[note] ?? 0) / peak : 0;
+            fill.style.height = `${Math.max(2, share * 100)}%`;
+
+            const label = document.createElement('span');
+            label.className = 'chroma__name';
+            label.textContent = NOTE_NAMES[note]!;
+
+            bar.append(fill, label);
+            bar.title = `${NOTE_NAMES[note]}: ${Math.round(share * 100)}% of the loudest note`;
+            chromaEl.append(bar);
+          }
+        }
+
+        if (chartEl) chartEl.hidden = false;
+
+        if (wheelPanel && wheelCanvas) {
+          wheelPanel.hidden = false;
+          // rankKeys only re-runs the correlation against the twelve-number profile
+          // that detectKey already computed. The expensive part, the chromagram, is
+          // not repeated.
+          const ranked = rankKeys(chroma);
+          const bestCode = camelot(best.tonic, best.mode);
+          const [relative, down, up] = neighbours(bestCode);
+
+          if (wheelCaption) {
+            wheelCaption.textContent =
+              `${bestCode} mixes with ${relative}, ${down} and ${up}. ` +
+              'Outer ring is major, inner ring is minor, and the dashed cell is the ' +
+              'runner-up.';
+          }
+
+          const paint = (): void => drawWheel(wheelPanel, wheelCanvas, ranked, best, runnerUp);
+          // The panel was hidden until a moment ago, so the canvas has no width yet.
+          requestAnimationFrame(paint);
+          new ResizeObserver(paint).observe(wheelPanel);
+        }
       }
     },
 

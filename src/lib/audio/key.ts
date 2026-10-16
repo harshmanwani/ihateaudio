@@ -18,6 +18,7 @@
  */
 import { fft } from './fft';
 import { hannPeriodic } from './stft';
+import { runAll, runSliced, type SliceOptions, type Steps } from './slices';
 
 export const NOTE_NAMES = [
   'C',
@@ -165,6 +166,20 @@ function correlate(a: ArrayLike<number>, b: ArrayLike<number>): number {
  * from frequency to pitch class stops meaning much.
  */
 export function chromagram(buffer: AudioBuffer): Float64Array {
+  return runAll(chromagramSteps(buffer));
+}
+
+/** Analysis frames between the points where a sliced chromagram may pause. */
+const FRAMES_PER_PAUSE = 16;
+
+/**
+ * The chromagram as steps that may pause every `framesPerPause` frames. Frames
+ * are added in the same order whatever the pauses, so the sums are identical.
+ */
+export function* chromagramSteps(
+  buffer: AudioBuffer,
+  framesPerPause = FRAMES_PER_PAUSE
+): Steps<Float64Array> {
   const rate = buffer.sampleRate;
   const size = 8192;
   const hop = size >> 1;
@@ -178,42 +193,69 @@ export function chromagram(buffer: AudioBuffer): Float64Array {
   const channels = buffer.numberOfChannels;
   const length = buffer.length;
   const mono = new Float32Array(length);
+  // The mix is about a twentieth of the work; the frames are the rest.
+  const frames = length >= size ? Math.floor((length - size) / hop) + 1 : 0;
+  const mixShare = frames > 0 ? 0.05 : 1;
+  const stretch = hop * framesPerPause;
   for (let c = 0; c < channels; c += 1) {
     const data = buffer.getChannelData(c);
-    for (let i = 0; i < length; i += 1) mono[i] = mono[i]! + data[i]! / channels;
+    for (let from = 0; from < length; from += stretch) {
+      const to = Math.min(length, from + stretch);
+      for (let i = from; i < to; i += 1) mono[i] = mono[i]! + data[i]! / channels;
+      yield mixShare * ((c * length + to) / (channels * length));
+    }
   }
 
   const lowBin = Math.max(1, Math.floor((65 * size) / rate));
   const highBin = Math.min(size >> 1, Math.ceil((2000 * size) / rate));
 
+  let done = 0;
   for (let start = 0; start + size <= length; start += hop) {
-    for (let i = 0; i < size; i += 1) {
-      frame[2 * i] = mono[start + i]! * window[i]!;
-      frame[2 * i + 1] = 0;
-    }
-    fft(frame, spec, size);
-
-    for (let bin = lowBin; bin < highBin; bin += 1) {
-      const real = spec[2 * bin]!;
-      const imag = spec[2 * bin + 1]!;
-      const magnitude = Math.sqrt(real * real + imag * imag);
-      if (magnitude <= 0) continue;
-
-      const frequency = (bin * rate) / size;
-      // MIDI note number, then fold to a pitch class. 69 is A4 at 440 Hz.
-      const midi = 69 + 12 * Math.log2(frequency / 440);
-      const pitchClass = ((Math.round(midi) % 12) + 12) % 12;
-      // Magnitude rather than power: power lets one loud bass note dominate the
-      // whole profile, which biases every result toward the root of the loudest
-      // moment rather than the key of the piece.
-      chroma[pitchClass] = chroma[pitchClass]! + magnitude;
-    }
+    foldFrame(mono, start, size, window, frame, spec, lowBin, highBin, rate, chroma);
+    done += 1;
+    if (done % framesPerPause === 0) yield mixShare + (1 - mixShare) * (done / frames);
   }
 
   let total = 0;
   for (let i = 0; i < 12; i += 1) total += chroma[i]!;
   if (total > 0) for (let i = 0; i < 12; i += 1) chroma[i] = chroma[i]! / total;
   return chroma;
+}
+
+/** Adds one windowed frame's spectrum, folded onto pitch classes, to `chroma`. */
+function foldFrame(
+  mono: Float32Array,
+  start: number,
+  size: number,
+  window: Float64Array,
+  frame: Float64Array,
+  spec: Float64Array,
+  lowBin: number,
+  highBin: number,
+  rate: number,
+  chroma: Float64Array
+): void {
+  for (let i = 0; i < size; i += 1) {
+    frame[2 * i] = mono[start + i]! * window[i]!;
+    frame[2 * i + 1] = 0;
+  }
+  fft(frame, spec, size);
+
+  for (let bin = lowBin; bin < highBin; bin += 1) {
+    const real = spec[2 * bin]!;
+    const imag = spec[2 * bin + 1]!;
+    const magnitude = Math.sqrt(real * real + imag * imag);
+    if (magnitude <= 0) continue;
+
+    const frequency = (bin * rate) / size;
+    // MIDI note number, then fold to a pitch class. 69 is A4 at 440 Hz.
+    const midi = 69 + 12 * Math.log2(frequency / 440);
+    const pitchClass = ((Math.round(midi) % 12) + 12) % 12;
+    // Magnitude rather than power: power lets one loud bass note dominate the
+    // whole profile, which biases every result toward the root of the loudest
+    // moment rather than the key of the piece.
+    chroma[pitchClass] = chroma[pitchClass]! + magnitude;
+  }
 }
 
 /** Correlates a chromagram against all twenty-four keys, best first. */
@@ -239,7 +281,21 @@ export function rankKeys(chroma: ArrayLike<number>): KeyCandidate[] {
 }
 
 export function detectKey(buffer: AudioBuffer): KeyResult {
-  const chroma = chromagram(buffer);
+  return keyFrom(chromagram(buffer));
+}
+
+/**
+ * detectKey a slice at a time, so the page keeps painting and taking input
+ * while a long file is analysed. The result is identical.
+ */
+export async function detectKeySliced(
+  buffer: AudioBuffer,
+  options?: SliceOptions
+): Promise<KeyResult> {
+  return keyFrom(await runSliced(chromagramSteps(buffer), options));
+}
+
+function keyFrom(chroma: Float64Array): KeyResult {
   const ranked = rankKeys(chroma);
   const best = ranked[0]!;
   const runnerUp = ranked[1]!;

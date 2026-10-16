@@ -6,6 +6,7 @@
  * Everything here is Tier 0 — plain Web Audio and typed arrays, no downloads.
  */
 import { resampleChannel } from './resample';
+import { runSliced, type SliceOptions, type Steps } from './slices';
 
 export type FadeCurve = 'linear' | 'exponential' | 'logarithmic' | 'scurve';
 
@@ -107,13 +108,64 @@ export function applyGain(
   const out = createBuffer(buffer.numberOfChannels, buffer.length, buffer.sampleRate);
   for (let c = 0; c < buffer.numberOfChannels; c += 1) {
     const src = buffer.getChannelData(c);
+    gainRange(src, out.getChannelData(c), 0, src.length, factor, clip);
+  }
+  return out;
+}
+
+function gainRange(
+  src: Float32Array,
+  dst: Float32Array,
+  from: number,
+  to: number,
+  factor: number,
+  clip: boolean
+): void {
+  for (let i = from; i < to; i += 1) {
+    const v = src[i] * factor;
+    dst[i] = clip ? (v > 1 ? 1 : v < -1 ? -1 : v) : v;
+  }
+}
+
+/** Samples between the points where a sliced gain may pause. */
+const GAIN_CHUNK = 1 << 18;
+
+/**
+ * applyGain as steps that may pause every `chunk` samples. Each sample is
+ * scaled on its own, so the output is the same wherever the pauses fall.
+ */
+export function* gainSteps(
+  buffer: AudioBuffer,
+  decibels: number,
+  clip = true,
+  chunk = GAIN_CHUNK
+): Steps<AudioBuffer> {
+  const factor = gainFactor(decibels);
+  const channels = buffer.numberOfChannels;
+  const length = buffer.length;
+  const out = createBuffer(channels, length, buffer.sampleRate);
+  for (let c = 0; c < channels; c += 1) {
+    const src = buffer.getChannelData(c);
     const dst = out.getChannelData(c);
-    for (let i = 0; i < src.length; i += 1) {
-      const v = src[i] * factor;
-      dst[i] = clip ? (v > 1 ? 1 : v < -1 ? -1 : v) : v;
+    for (let from = 0; from < length; from += chunk) {
+      const to = Math.min(length, from + chunk);
+      gainRange(src, dst, from, to, factor, clip);
+      yield (c * length + to) / (channels * length);
     }
   }
   return out;
+}
+
+/**
+ * applyGain a slice at a time. An hour of stereo is about half a second of
+ * multiplying, which is long enough to drop frames when a preview re-renders.
+ */
+export function applyGainSliced(
+  buffer: AudioBuffer,
+  decibels: number,
+  options?: SliceOptions & { clip?: boolean }
+): Promise<AudioBuffer> {
+  return runSliced(gainSteps(buffer, decibels, options?.clip ?? true), options);
 }
 
 /**
