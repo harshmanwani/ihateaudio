@@ -254,7 +254,7 @@ const faq = [
 
       <div class="field">
         <label class="label" for="dc-makeup">
-          Makeup gain <span class="label__value" data-out="makeup">+4.0 dB</span>
+          Makeup gain <span class="label__value" data-out="makeup">+5.5 dB</span>
         </label>
         <div class="slider-row">
           <input
@@ -265,7 +265,7 @@ const faq = [
             min="0"
             max="24"
             step="0.5"
-            value="4"
+            value="5.5"
           />
           <input
             class="num"
@@ -274,13 +274,13 @@ const faq = [
             min="0"
             max="24"
             step="0.5"
-            value="4"
+            value="5.5"
             aria-label="Makeup gain in decibels"
           />
         </div>
         <span class="hint">
-          Compression lowers the peaks, so this puts the level back. Roughly match how much
-          gain reduction you are asking for.
+          Compression lowers the peaks, so this puts the level back. About two thirds of the
+          gain reduction keeps the file as loud as it was; all of it can clip a loud file.
         </span>
       </div>
     </div>
@@ -444,22 +444,36 @@ const faq = [
   }
 
   /**
-   * Where this recording actually sits, as a dB level.
+   * Where this recording actually sits, as a dB level on the curve's own scale.
    *
-   * The 95th percentile of 50 ms RMS windows rather than the peak: a compressor
-   * responds to the body of the sound, and one stray transient would put the
-   * marker somewhere the material almost never reaches. Silence is excluded so a
-   * long fade-in does not drag the answer down.
+   * The node's detector follows the largest absolute sample across all
+   * channels, so this is a sample peak too: the 95th percentile of the peaks of
+   * 50 ms windows. It was the RMS of the first channel, which sits 3 dB under
+   * the peak of a sine and 6–12 dB under it on a mastered song, so the dot
+   * landed low on the curve and the readout understated the reduction: 3.3 dB
+   * for a -10 dBFS sine at the voice settings, where the node takes 5.4. On
+   * songs and speech this now reads a median 1–3 dB more than the node takes on
+   * average, since the attack lets the start of each peak through; the RMS
+   * figure read 1–4 dB less. The 95th percentile rather than the loudest
+   * window, because one stray transient would put the marker somewhere the
+   * material almost never reaches. Silence is excluded so a long fade-in does
+   * not drag the answer down.
    */
   function typicalLevel(buffer: AudioBuffer): number {
     const window = Math.max(1, Math.floor(buffer.sampleRate * 0.05));
-    const channel = buffer.getChannelData(0);
+    const channels = Array.from({ length: buffer.numberOfChannels }, (_, c) =>
+      buffer.getChannelData(c)
+    );
     const levels: number[] = [];
-    for (let start = 0; start + window <= channel.length; start += window) {
-      let sum = 0;
-      for (let i = 0; i < window; i += 1) sum += channel[start + i]! * channel[start + i]!;
-      const rms = Math.sqrt(sum / window);
-      if (rms > 1e-5) levels.push(20 * Math.log10(rms));
+    for (let start = 0; start + window <= buffer.length; start += window) {
+      let peak = 0;
+      for (const channel of channels) {
+        for (let i = start; i < start + window; i += 1) {
+          const sample = Math.abs(channel[i]!);
+          if (sample > peak) peak = sample;
+        }
+      }
+      if (peak > 1e-5) levels.push(20 * Math.log10(peak));
     }
     if (levels.length === 0) return FLOOR;
     levels.sort((a, b) => a - b);
@@ -560,12 +574,35 @@ const faq = [
     }
   }
 
-  /** Attack and release are in milliseconds here; the node wants seconds. */
+  /**
+   * Attack and release are in milliseconds here; the node wants seconds.
+   *
+   * The makeup is measured, not guessed. Each preset gets the makeup that puts
+   * its own material back at the integrated loudness it came in at (the median
+   * over 7 speech recordings for voice, 14 mastered songs for the rest), unless
+   * that would take one of those songs above -1 dBFS sample peak or 0 dBTP, in
+   * which case it stops at the last half decibel that does not. Rendered in
+   * Chromium:
+   *
+   *   voice   5.5   speech lands at its own loudness (median +0.2 LU); no
+   *                 song peaks above -3.0 dBFS
+   *   music   3     loudness wants 4.6, but one song already peaks at
+   *                 -1.2 dBFS here
+   *   gentle  0     it takes so little off that a song's peaks come down only
+   *                 to -0.8 dBFS, so there is no room for any makeup
+   *   heavy   14.5  loudness wants 17.4; one song peaks at -1.6 dBFS and
+   *                 -0.2 dBTP here
+   *
+   * These were 4, 3, 1.5 and 8 while the node still added its own 8–15 dB on
+   * top. Once that was cancelled, voice left speech 1.3 LU quieter and songs
+   * 4 LU quieter, heavy took 9 LU off a song, and gentle put 11 of the 14
+   * songs over 0 dBFS.
+   */
   const PRESETS: Record<string, Params> = {
-    voice: { threshold: -20, ratio: 4, attack: 5, release: 120, knee: 6, makeup: 4 },
+    voice: { threshold: -20, ratio: 4, attack: 5, release: 120, knee: 6, makeup: 5.5 },
     music: { threshold: -18, ratio: 3, attack: 15, release: 250, knee: 10, makeup: 3 },
-    gentle: { threshold: -12, ratio: 2, attack: 20, release: 300, knee: 12, makeup: 1.5 },
-    heavy: { threshold: -28, ratio: 10, attack: 2, release: 80, knee: 3, makeup: 8 },
+    gentle: { threshold: -12, ratio: 2, attack: 20, release: 300, knee: 12, makeup: 0 },
+    heavy: { threshold: -28, ratio: 10, attack: 2, release: 80, knee: 3, makeup: 14.5 },
   };
 
   const tool = createTool({
@@ -634,7 +671,7 @@ const faq = [
           key: 'makeupDb',
           control: 'makeup',
           description:
-            'Gain added after compression to put the level back, in dB, 0 to 24 in steps of 0.5. Roughly match the gain reduction.',
+            'Gain added after compression to put the level back, in dB, 0 to 24 in steps of 0.5. About two thirds of the gain reduction keeps the loudness where it was; all of it can clip a file that already peaks near 0 dB.',
           type: 'number',
           min: 0,
           max: 24,
@@ -662,7 +699,7 @@ const faq = [
         attack: runtime.value('attack', 5),
         release: runtime.value('release', 120),
         knee: runtime.value('knee', 6),
-        makeup: runtime.value('makeup', 4),
+        makeup: runtime.value('makeup', 5.5),
       });
 
       const dbText = (value: number): string =>
@@ -781,7 +818,7 @@ const faq = [
       attack: (tool?.value('attack', 5) ?? 5) / 1000,
       release: (tool?.value('release', 120) ?? 120) / 1000,
       knee: tool?.value('knee', 6) ?? 6,
-      makeup: tool?.value('makeup', 4) ?? 4,
+      makeup: tool?.value('makeup', 5.5) ?? 5.5,
     });
   }
 </script>
