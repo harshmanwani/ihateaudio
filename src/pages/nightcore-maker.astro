@@ -178,11 +178,18 @@ const faq = [
 
 <script>
   import { createTool } from '../lib/tool';
-  import { changeSpeed } from '../lib/audio/dsp';
+  import { changeSpeedSliced } from '../lib/audio/dsp';
+  import { audioError } from '../lib/audio/errors';
   import { clamp, duration, pct } from '../lib/format';
 
   let sourceDuration = 0;
   let wired = false;
+
+  /**
+   * Stops the preview being rendered. Each one makes a copy as big as the file,
+   * so a slider moved twice must not leave two of them half done.
+   */
+  let previewStop: AbortController | null = null;
 
   function rateOf(): number {
     return clamp(tool?.value('rate', 1.25) ?? 1.25, 1.15, 1.45);
@@ -292,13 +299,32 @@ const faq = [
       paint();
     },
 
-    // Resampling is one cheap pass, so the transport plays the real output.
-    preview(ctx) {
-      return changeSpeed(ctx.buffer, rateOf());
+    // The strip plays the real output. On a long song the resample is seconds
+    // of arithmetic, so it runs a slice at a time, and a newer preview stops an
+    // older one.
+    async preview(ctx) {
+      previewStop?.abort();
+      const stop = new AbortController();
+      previewStop = stop;
+      // Clear or a new file leaves this preview nothing to land on. The context's
+      // own signal is no help here: pressing Download fires it too.
+      const gone = (): boolean => tool?.getBuffer() !== ctx.buffer;
+      const out = await changeSpeedSliced(ctx.buffer, rateOf(), {
+        signal: stop.signal,
+        onProgress: () => {
+          if (gone()) stop.abort();
+        },
+      });
+      if (gone()) throw audioError('cancelled');
+      return out;
     },
 
-    process(ctx) {
-      return changeSpeed(ctx.buffer, rateOf());
+    async process(ctx) {
+      try {
+        return await changeSpeedSliced(ctx.buffer, rateOf(), { signal: ctx.signal });
+      } catch (err) {
+        throw ctx.signal.aborted ? audioError('cancelled') : err;
+      }
     },
   });
 </script>

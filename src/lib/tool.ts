@@ -214,6 +214,8 @@ export class ToolRuntime {
    * matches the controls on screen is worse than asking for another run.
    */
   private analyzed: ProcessResult | null = null;
+  /** Counts runs of the run panel, so only the latest one reports back. */
+  private analyzeTurn = 0;
 
   constructor(root: HTMLElement, config: ToolConfig) {
     this.root = root;
@@ -1920,6 +1922,7 @@ export class ToolRuntime {
 
     this.controller?.abort();
     this.controller = new AbortController();
+    const turn = ++this.analyzeTurn;
 
     this.analyzed = null;
     this.setRunner('busy');
@@ -1928,6 +1931,8 @@ export class ToolRuntime {
 
     try {
       const result = await this.config.process(this.context());
+      // A newer run, or Clear, has taken the panel over meanwhile.
+      if (turn !== this.analyzeTurn) return;
       this.analyzed = result;
 
       /**
@@ -1948,6 +1953,7 @@ export class ToolRuntime {
 
       this.setRunner('done');
     } catch (err) {
+      if (turn !== this.analyzeTurn) return;
       const audioErr = toAudioError(err);
       // Back to idle either way: a cancelled or failed run leaves nothing to
       // download, and the button that starts it again is the honest next step.
@@ -2268,6 +2274,8 @@ export class ToolRuntime {
     this.markers = [];
     this.lastOutput = null;
     this.analyzed = null;
+    // A run still going is for the file being cleared.
+    this.analyzeTurn += 1;
     this.hideResult();
     if (this.twoPhase()) this.setRunner('idle');
 

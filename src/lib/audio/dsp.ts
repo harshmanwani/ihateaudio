@@ -5,8 +5,8 @@
  *
  * Everything here is Tier 0 — plain Web Audio and typed arrays, no downloads.
  */
-import { resampleChannel } from './resample';
-import { runSliced, type SliceOptions, type Steps } from './slices';
+import { resampleChannel, resampleChannelSteps } from './resample';
+import { runAll, runSliced, type SliceOptions, type Steps } from './slices';
 
 export type FadeCurve = 'linear' | 'exponential' | 'logarithmic' | 'scurve';
 
@@ -390,16 +390,49 @@ export function resample(
  * what people mean by "speed up audio" unless they ask to keep the pitch.
  */
 export function changeSpeed(buffer: AudioBuffer, rate: number): AudioBuffer {
+  return runAll(changeSpeedSteps(buffer, rate));
+}
+
+/**
+ * changeSpeed as steps that may pause. The share it yields counts every
+ * channel.
+ */
+export function* changeSpeedSteps(buffer: AudioBuffer, rate: number): Steps<AudioBuffer> {
   const safe = Math.min(4, Math.max(0.25, rate));
   if (safe === 1) return cloneBuffer(buffer);
-  const resampled = resample(buffer, buffer.sampleRate / safe);
-  // The data is now the right length; relabel it at the original rate so it
-  // plays back faster rather than simply being a lower-rate file.
-  const out = createBuffer(resampled.numberOfChannels, resampled.length, buffer.sampleRate);
-  for (let c = 0; c < resampled.numberOfChannels; c += 1) {
-    out.copyToChannel(resampled.getChannelData(c).slice(), c);
+  const from = buffer.sampleRate;
+  const to = from / safe;
+  const channels = buffer.numberOfChannels;
+  // The length resample() gives the new rate. Resampled to it, the data is the
+  // right length; labelled with the original rate, it plays back faster rather
+  // than simply being a lower-rate file.
+  const length = Math.max(1, Math.round((buffer.length * to) / from));
+  const out = createBuffer(channels, length, from);
+  for (let c = 0; c < channels; c += 1) {
+    const steps = resampleChannelSteps(buffer.getChannelData(c), from, to, length);
+    for (;;) {
+      const next = steps.next();
+      if (next.done) {
+        out.copyToChannel(next.value, c);
+        break;
+      }
+      yield (c + next.value) / channels;
+    }
   }
   return out;
+}
+
+/**
+ * changeSpeed a slice at a time. On a 10-minute song the resample is three to
+ * four seconds of arithmetic, which froze the page when a preview ran it in
+ * one go.
+ */
+export function changeSpeedSliced(
+  buffer: AudioBuffer,
+  rate: number,
+  options?: SliceOptions
+): Promise<AudioBuffer> {
+  return runSliced(changeSpeedSteps(buffer, rate), options);
 }
 
 export function padSilence(

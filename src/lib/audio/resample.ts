@@ -13,6 +13,7 @@
  * in Chrome, which is a gentle low-pass in the audible band: 3.4 dB down at
  * 15 kHz for one pass from 44.1 to 48 kHz, and the AI tools make two passes.
  */
+import { runAll, type Steps } from './slices';
 
 /** Sinc zero crossings each side of the centre, at the lower of the two rates. */
 const ZERO_CROSSINGS = 16;
@@ -56,6 +57,13 @@ function kernelTable(): Float64Array {
 }
 
 /**
+ * Multiply-adds between the points where a sliced resample may pause, about a
+ * millisecond of work. The kernel is wider the further the rate falls, so the
+ * number of output samples per pause follows from the ratio.
+ */
+const TAPS_PER_STEP = 1 << 19;
+
+/**
  * One channel from `from` Hz to `to` Hz.
  *
  * `length` defaults to the input's duration at the new rate; callers that must
@@ -67,6 +75,22 @@ export function resampleChannel(
   to: number,
   length = Math.max(1, Math.round((input.length * to) / from))
 ): Float32Array<ArrayBuffer> {
+  return runAll(resampleChannelSteps(input, from, to, length));
+}
+
+/**
+ * resampleChannel as steps that may pause every `chunk` output samples, so a
+ * whole song can be resampled without holding the main thread. Each output
+ * sample is a sum over the input alone, with nothing carried over from the one
+ * before, so the result is the same wherever the pauses fall.
+ */
+export function* resampleChannelSteps(
+  input: Float32Array,
+  from: number,
+  to: number,
+  length = Math.max(1, Math.round((input.length * to) / from)),
+  chunk?: number
+): Steps<Float32Array<ArrayBuffer>> {
   const out = new Float32Array(length);
   if (from === to) {
     out.set(input.subarray(0, Math.min(length, input.length)));
@@ -79,10 +103,31 @@ export function resampleChannel(
   const scale = Math.min(1, to / from) * ROLLOFF;
   const reach = ZERO_CROSSINGS / scale;
   const step = from / to;
+  const every = chunk ?? Math.max(1, Math.floor(TAPS_PER_STEP / (2 * reach)));
+
+  for (let start = 0; start < length; start += every) {
+    const end = Math.min(length, start + every);
+    resampleRange(input, out, start, end, table, scale, reach, step);
+    yield end / length;
+  }
+  return out;
+}
+
+/** Output samples `start` to `end` (exclusive), each a windowed-sinc sum. */
+function resampleRange(
+  input: Float32Array,
+  out: Float32Array,
+  start: number,
+  end: number,
+  table: Float64Array,
+  scale: number,
+  reach: number,
+  step: number
+): void {
   const perSample = scale * STEPS;
   const last = input.length - 1;
 
-  for (let n = 0; n < length; n += 1) {
+  for (let n = start; n < end; n += 1) {
     const x = n * step;
     const lo = Math.max(0, Math.ceil(x - reach));
     const hi = Math.min(last, Math.floor(x + reach));
@@ -95,6 +140,4 @@ export function resampleChannel(
     }
     out[n] = sum * scale;
   }
-  return out;
 }
-

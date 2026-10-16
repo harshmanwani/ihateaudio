@@ -278,9 +278,10 @@ const faq = [
 </ToolPage>
 
 <script>
-  import { createTool } from '../lib/tool';
-  import { changeSpeed } from '../lib/audio/dsp';
+  import { createTool, type ToolContext } from '../lib/tool';
+  import { changeSpeedSliced } from '../lib/audio/dsp';
   import { applyReverb } from '../lib/audio/effects';
+  import { audioError } from '../lib/audio/errors';
   import { clamp, duration, pct } from '../lib/format';
 
   const PRE_DELAY = 0.03;
@@ -300,14 +301,28 @@ const faq = [
     return clamp(tool?.value('decay', 2.9) ?? 2.9, 0.5, 6);
   }
 
-  /** Slow first, then put the slowed track in the room. */
-  function render(buffer: AudioBuffer): Promise<AudioBuffer> {
-    const slowed = changeSpeed(buffer, speedOf());
-    return applyReverb(slowed, {
+  /**
+   * Slow first, then put the slowed track in the room.
+   *
+   * On a long song the slowdown is seconds of arithmetic, so it runs a slice at
+   * a time and the page keeps painting. Cancel, Download, a new file or Clear
+   * stops it at the next pause, and lets go of the copy it was building.
+   */
+  async function render(ctx: ToolContext): Promise<AudioBuffer> {
+    const { signal } = ctx;
+    const slowed = await changeSpeedSliced(ctx.buffer, speedOf(), {
+      signal,
+      onProgress: (ratio) => ctx.progress(0.1 + 0.6 * ratio),
+    }).catch((err: unknown) => {
+      throw signal.aborted ? audioError('cancelled') : err;
+    });
+    const out = await applyReverb(slowed, {
       mix: mixOf(),
       decay: decayOf(),
       preDelay: PRE_DELAY,
     });
+    if (signal.aborted) throw audioError('cancelled');
+    return out;
   }
 
   const tool = createTool({
@@ -505,8 +520,7 @@ const faq = [
 
     async process(ctx) {
       ctx.progress(0.1);
-      await new Promise((resolve) => setTimeout(resolve, 0));
-      const out = await render(ctx.buffer);
+      const out = await render(ctx);
       ctx.progress(0.9);
       return out;
     },
