@@ -23,7 +23,14 @@
  *    with a dot on each, which is what makes a click or a DC offset visible.
  */
 import { colorToken } from '../canvas';
-import { SCAN_SLICE_MS, WaveformScan, computeWaveform, type WaveformData } from './analysis';
+import {
+  SCAN_SLICE_MS,
+  WaveformScan,
+  computeWaveform,
+  standInWaveform,
+  type WaveformData,
+  type WaveformRun,
+} from './analysis';
 
 export interface WaveformStyle {
   wave: string;
@@ -116,6 +123,16 @@ function chooseStep(pixelsPerSecond: number, minPx: number): number {
   return TICK_STEPS[TICK_STEPS.length - 1];
 }
 
+/** `scratch` if it already has `columns` columns, else a new one that does. */
+function scratchFor(scratch: WaveformData | null, columns: number): WaveformData {
+  if (scratch && scratch.columns === columns) return scratch;
+  return {
+    columns,
+    peaks: new Float32Array(columns * 2),
+    rms: new Float32Array(columns),
+  };
+}
+
 export class Waveform {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -127,11 +144,20 @@ export class Waveform {
   /** The scan behind the visible range. It may still be filling in. */
   private scan: WaveformScan | null = null;
   private dataKey = '';
-  /** Whether the current buffer has been drawn whole at least once. */
-  private drawn = false;
-  /** Whole-file scan, cached separately so the minimap never rescans. */
-  private overview: WaveformData | null = null;
+  /**
+   * Older scans of the current buffer, kept so a newer one can borrow their
+   * columns until it has its own: the last view to finish, the last pass over
+   * the whole file to finish, and a view that was left before it finished.
+   */
+  private settled: WaveformScan | null = null;
+  private whole: WaveformScan | null = null;
+  private spare: WaveformScan | null = null;
+  /** Whole-file scan for the minimap. Often `whole` itself. */
+  private overview: WaveformScan | null = null;
   private overviewKey = '';
+  /** Reused arrays for a view, or an overview, that is still filling in. */
+  private viewScratch: WaveformData | null = null;
+  private mapScratch: WaveformData | null = null;
 
   private style: WaveformStyle;
   private region: WaveformRegion | null = null;
@@ -198,7 +224,9 @@ export class Waveform {
     this.buffer = buffer;
     this.scan = null;
     this.dataKey = '';
-    this.drawn = false;
+    this.settled = null;
+    this.whole = null;
+    this.spare = null;
     this.overview = null;
     this.overviewKey = '';
 
@@ -395,13 +423,10 @@ export class Waveform {
     const w = Math.max(1, Math.round(boxW * dpr));
     const h = Math.max(1, Math.round(boxH * dpr));
 
+    // The scans are keyed on width, so a new size rescans without being told.
     if (canvas.width !== w || canvas.height !== h) {
       canvas.width = w;
       canvas.height = h;
-      if (canvas === this.canvas) {
-        this.scan = null;
-        this.dataKey = '';
-      }
     }
 
     const cssW = `${w / dpr}px`;
@@ -417,13 +442,15 @@ export class Waveform {
     if (!size) return;
     const { w: width, h: height } = size;
     const { ctx } = this;
+    // One slice of scanning per frame, shared by the view and the overview.
+    const deadline = performance.now() + SCAN_SLICE_MS;
 
     ctx.fillStyle = this.style.background;
     ctx.fillRect(0, 0, width, height);
 
     if (!this.buffer) {
       this.renderRuler();
-      this.renderMinimap();
+      this.renderMinimap(deadline);
       return;
     }
 
@@ -437,18 +464,20 @@ export class Waveform {
 
     const key = `${width}|${from.toFixed(3)}|${to.toFixed(3)}`;
     if (!this.scan || this.dataKey !== key) {
-      this.scan = new WaveformScan(this.buffer, width, from, to);
+      if (this.scan && !this.scan.done) this.spare = this.scan;
+      this.scan = this.reuse(new WaveformScan(this.buffer, width, from, to));
       this.dataKey = key;
     }
-    if (!this.scan.done) {
-      // A new file fills in a slice per frame, so a long one never holds the
-      // main thread for the whole pass. Once it has been drawn whole, a zoom,
-      // pan or resize scans in one go as it always has: the view under the
-      // gesture has to be complete, and a half-drawn one would flicker.
-      if (this.drawn) this.scan.step();
-      else if (!this.scan.step(SCAN_SLICE_MS)) this.scheduleRender();
-      if (this.scan.done) this.drawn = true;
-    }
+    // A slice per frame, so a long file never holds the main thread for the
+    // whole pass: not on the first draw, and not on a zoom, pan or resize.
+    // Until the scan is done, the columns it has not reached borrow from the
+    // older scans (see standIn), so a gesture never shows a half-drawn view.
+    const scan = this.scan;
+    if (!scan.done && !scan.step(deadline - performance.now())) this.scheduleRender();
+    if (scan.done) this.keep(scan, true);
+    const shown = scan.done
+      ? { data: scan.data, runs: [[0, width]] as WaveformRun[] }
+      : this.standIn(scan, (this.viewScratch = scratchFor(this.viewScratch, width)));
 
     const mid = height / 2;
     const scale = mid * VERTICAL_FIT;
@@ -475,21 +504,58 @@ export class Waveform {
 
       // Everything dim first, then the active span repainted bright through a
       // clip — cheaper and crisper than deciding a colour per column.
-      this.paintWave(height, mid, scale, false);
+      this.paintWave(shown, height, mid, scale, false);
 
       if (active.to > active.from) {
         ctx.save();
         ctx.beginPath();
         ctx.rect(active.from, 0, active.to - active.from, height);
         ctx.clip();
-        this.paintWave(height, mid, scale, true);
+        this.paintWave(shown, height, mid, scale, true);
         ctx.restore();
       }
     }
 
     this.paintMarkers(height, toX);
     this.renderRuler();
-    this.renderMinimap();
+    this.renderMinimap(deadline);
+  }
+
+  /** A known scan with the same columns as `next`, finished or not, else `next`. */
+  private reuse(next: WaveformScan): WaveformScan {
+    for (const known of [this.settled, this.whole, this.overview, this.spare, this.scan]) {
+      if (known && known.sameColumns(next)) return known;
+    }
+    return next;
+  }
+
+  /**
+   * Files a finished scan where later ones can find it. A whole-file pass at
+   * the waveform's width wins over the overview's, so a zoom back out to the
+   * full view can reuse it whatever width the overview has.
+   */
+  private keep(scan: WaveformScan, isView: boolean): void {
+    if (isView) this.settled = scan;
+    const isWhole = scan.first === 0 && scan.last === scan.buffer.length;
+    if (isWhole && (isView || !this.whole)) this.whole = scan;
+    if (this.spare === scan) this.spare = null;
+  }
+
+  /**
+   * What to draw for a scan that has not finished: its own columns, and past
+   * them the same stretch of time read off the other scans still held (see
+   * standInWaveform). A zoom shows the old picture moved to where it now
+   * belongs, a little coarse, and it sharpens from the left as slices land.
+   */
+  private standIn(
+    target: WaveformScan,
+    out: WaveformData
+  ): { data: WaveformData; runs: WaveformRun[] } {
+    const sources: WaveformScan[] = [];
+    for (const known of [this.settled, this.whole, this.overview, this.spare, this.scan]) {
+      if (known && known !== target && !sources.includes(known)) sources.push(known);
+    }
+    return { data: out, runs: standInWaveform(target, sources, out) };
   }
 
   /** Alternating tint per segment, so split parts are countable at a glance. */
@@ -618,19 +684,19 @@ export class Waveform {
    * continuous path, which is what stops a per-pixel waveform reading as noise.
    */
   private paintWave(
+    shown: { data: WaveformData; runs: WaveformRun[] },
     height: number,
     mid: number,
     scale: number,
     active: boolean
   ): void {
-    const scan = this.scan;
-    // Only the columns scanned so far. The rest stay on the bare centreline
-    // rather than drawing as silence they have not been measured to be.
-    const width = scan?.filled ?? 0;
-    if (!scan || width === 0) return;
+    // Only the columns with data. The rest stay on the bare centreline rather
+    // than drawing as silence they have not been measured to be.
+    const { data, runs } = shown;
+    if (runs.length === 0) return;
 
     const { ctx } = this;
-    const { peaks, rms } = scan.data;
+    const { peaks, rms } = data;
     const paint = this.fill(height, active);
 
     ctx.fillStyle = paint;
@@ -638,20 +704,24 @@ export class Waveform {
     // Outer hull, as hard-edged columns.
     ctx.globalAlpha = active ? 0.5 : 0.75;
     ctx.beginPath();
-    for (let x = 0; x < width; x += 1) {
-      const top = Math.round(mid - peaks[x * 2 + 1] * scale);
-      const bottom = Math.round(mid - peaks[x * 2] * scale);
-      ctx.rect(x, top, 1, Math.max(1, bottom - top));
+    for (const [start, end] of runs) {
+      for (let x = start; x < end; x += 1) {
+        const top = Math.round(mid - peaks[x * 2 + 1] * scale);
+        const bottom = Math.round(mid - peaks[x * 2] * scale);
+        ctx.rect(x, top, 1, Math.max(1, bottom - top));
+      }
     }
     ctx.fill();
 
-    // RMS body, as one continuous shape.
+    // RMS body, as one continuous shape per run.
     ctx.globalAlpha = 1;
     ctx.beginPath();
-    ctx.moveTo(0, mid - rms[0] * scale);
-    for (let x = 0; x < width; x += 1) ctx.lineTo(x, mid - rms[x] * scale);
-    for (let x = width - 1; x >= 0; x -= 1) ctx.lineTo(x, mid + rms[x] * scale);
-    ctx.closePath();
+    for (const [start, end] of runs) {
+      ctx.moveTo(start, mid - rms[start] * scale);
+      for (let x = start; x < end; x += 1) ctx.lineTo(x, mid - rms[x] * scale);
+      for (let x = end - 1; x >= start; x -= 1) ctx.lineTo(x, mid + rms[x] * scale);
+      ctx.closePath();
+    }
     ctx.fill();
 
     ctx.globalAlpha = 1;
@@ -784,7 +854,8 @@ export class Waveform {
 
   // ---------- minimap ----------
 
-  private renderMinimap(): void {
+  /** `deadline` is when this frame's slice of scanning runs out. */
+  private renderMinimap(deadline: number): void {
     const canvas = this.minimap;
     if (!canvas) return;
     const size = this.sync(canvas);
@@ -801,22 +872,37 @@ export class Waveform {
     const buffer = this.buffer;
     if (!buffer) return;
 
+    // At the waveform's width this is the full view the file opened on, so
+    // the first zoom has nothing to scan for the overview. At any other width
+    // it fills in with whatever the view's slice leaves of the frame.
     const key = `${width}|${buffer.length}`;
     if (!this.overview || this.overviewKey !== key) {
-      this.overview = computeWaveform(buffer, width);
+      this.overview = this.reuse(new WaveformScan(buffer, width));
       this.overviewKey = key;
     }
+    const overview = this.overview;
+    if (!overview.done) {
+      const left = deadline - performance.now();
+      if (left > 0) overview.step(left);
+      if (!overview.done) this.scheduleRender();
+    }
+    if (overview.done) this.keep(overview, false);
+    const { data, runs } = overview.done
+      ? { data: overview.data, runs: [[0, width]] as WaveformRun[] }
+      : this.standIn(overview, (this.mapScratch = scratchFor(this.mapScratch, width)));
 
     const mid = height / 2;
     const scale = mid * 0.86;
-    const { peaks } = this.overview;
+    const { peaks } = data;
 
     ctx.fillStyle = this.style.waveDim;
     ctx.beginPath();
-    for (let x = 0; x < width; x += 1) {
-      const top = Math.round(mid - peaks[x * 2 + 1] * scale);
-      const bottom = Math.round(mid - peaks[x * 2] * scale);
-      ctx.rect(x, top, 1, Math.max(1, bottom - top));
+    for (const [start, end] of runs) {
+      for (let x = start; x < end; x += 1) {
+        const top = Math.round(mid - peaks[x * 2 + 1] * scale);
+        const bottom = Math.round(mid - peaks[x * 2] * scale);
+        ctx.rect(x, top, 1, Math.max(1, bottom - top));
+      }
     }
     ctx.fill();
 
@@ -844,11 +930,12 @@ export class Waveform {
     ctx.clip();
     ctx.fillStyle = this.style.wave;
     ctx.beginPath();
-    for (let x = from; x < from + wide; x += 1) {
-      if (x < 0 || x >= width) continue;
-      const top = Math.round(mid - peaks[x * 2 + 1] * scale);
-      const bottom = Math.round(mid - peaks[x * 2] * scale);
-      ctx.rect(x, top, 1, Math.max(1, bottom - top));
+    for (const [start, end] of runs) {
+      for (let x = Math.max(start, from); x < Math.min(end, from + wide); x += 1) {
+        const top = Math.round(mid - peaks[x * 2 + 1] * scale);
+        const bottom = Math.round(mid - peaks[x * 2] * scale);
+        ctx.rect(x, top, 1, Math.max(1, bottom - top));
+      }
     }
     ctx.fill();
     ctx.restore();
