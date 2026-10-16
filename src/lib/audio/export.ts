@@ -211,8 +211,17 @@ function ffmpegArgsFor(
     case 'aac':
       return ['-c:a', 'aac', '-b:a', `${bitrate}k`];
     case 'ogg': {
-      // libvorbis refuses a bitrate outside its range for the rate and width,
-      // and has no bitrate mode at all past 50 kHz; see vorbisRange.
+      /*
+       * libvorbis refuses a bitrate outside its range for the rate and width,
+       * and has no bitrate mode at all past 50 kHz; see vorbisRange.
+       *
+       * No -maxrate. It switches on libvorbis's rate management, which holds
+       * the bitrate to within 1-7%, but it encoded 3 to 8 times slower:
+       * 7.3-8 s a minute of 64 kbps stereo, against about 1. The send
+       * tools encode long files at low rates, so that cost more time than
+       * the extra passes it would save. The overshoot is costed instead; see
+       * vorbisOvershoot.
+       */
       const rate = vorbisRate(sampleRate);
       return [
         '-c:a',
@@ -348,17 +357,22 @@ export function vorbisRate(sampleRate: number): number {
 }
 
 /**
- * [lowest rate, kbps per channel low and high, stereo kbps low and high],
- * highest band first.
+ * [lowest rate, kbps per channel low and high, stereo kbps low and high,
+ * overshoot above 24 kbps a channel and at or below it], highest band first.
  */
-const VORBIS_BANDS: [number, number, number, number, number][] = [
-  [40000, 32, 240, 45, 500],
-  [26000, 30, 190, 36, 380],
-  [19000, 16, 90, 30, 180],
-  [15000, 16, 100, 24, 200],
-  [9000, 12, 50, 16, 100],
-  [8000, 8, 42, 12, 84],
+const VORBIS_BANDS: [number, number, number, number, number, number, number][] = [
+  [40000, 32, 240, 45, 500, 1.28, 1.28],
+  [26000, 30, 190, 36, 380, 1.31, 1.47],
+  [19000, 16, 90, 30, 180, 1.32, 1.64],
+  [15000, 16, 100, 24, 200, 1.06, 1.28],
+  [9000, 12, 50, 16, 100, 1.12, 1.45],
+  [8000, 8, 42, 12, 84, 1.11, 1.42],
 ];
+
+function vorbisBand(sampleRate: number): (typeof VORBIS_BANDS)[number] {
+  const rate = vorbisRate(sampleRate);
+  return VORBIS_BANDS.find(([from]) => rate >= from) ?? VORBIS_BANDS[VORBIS_BANDS.length - 1]!;
+}
 
 /**
  * The bitrates, in kbps, libvorbis will open at for this rate and width.
@@ -371,11 +385,9 @@ const VORBIS_BANDS: [number, number, number, number, number][] = [
  * @ffmpeg/core 0.12.10 build the site ships.
  */
 export function vorbisRange(sampleRate: number, channels: number): [number, number] {
-  const rate = vorbisRate(sampleRate);
-  const band = VORBIS_BANDS.find(([from]) => rate >= from) ?? VORBIS_BANDS[VORBIS_BANDS.length - 1]!;
-  const [, low, high, stereoLow, stereoHigh] = band;
+  const [from, low, high, stereoLow, stereoHigh] = vorbisBand(sampleRate);
   if (channels === 2) return [stereoLow, stereoHigh];
-  if (channels === 6 && rate >= 40000) return [14 * 6, high * 6];
+  if (channels === 6 && from === 40000) return [14 * 6, high * 6];
   return [low * channels, high * channels];
 }
 
@@ -383,6 +395,24 @@ export function vorbisRange(sampleRate: number, channels: number): [number, numb
 export function vorbisKbps(bitrate: number, sampleRate: number, channels: number): number {
   const [low, high] = vorbisRange(sampleRate, channels);
   return Math.min(high, Math.max(low, bitrate));
+}
+
+/**
+ * The most libvorbis writes over the bitrate it is asked for, as a factor.
+ *
+ * ffmpeg runs libvorbis without rate management when it is given only -b:a,
+ * so the bitrate picks a quality and the material decides the rest. Dense
+ * music runs over and speech mostly under, though mono speech ran 28% over
+ * at 32 kHz and 128 kbps. The lowest setups of each band run over the most,
+ * up to 64% at 24 kHz mono and 16 kbps. Each factor is the worst case of
+ * ten songs and five voices, 30 s from the middle of each, at every band,
+ * mono and stereo, and every bitrate the range allows, with the
+ * @ffmpeg/core 0.12.10 build the site ships. They cover a 30 s file with
+ * its 3-5 kB header; a longer file needs less.
+ */
+export function vorbisOvershoot(bitrate: number, sampleRate: number, channels: number): number {
+  const [, , , , , above, atOrBelow] = vorbisBand(sampleRate);
+  return vorbisKbps(bitrate, sampleRate, channels) / channels > 24 ? above : atOrBelow;
 }
 
 /**
@@ -407,9 +437,8 @@ function aacCeiling(sampleRate: number, channels: number): number {
  * The factors are the worst cases measured with the shipped core: constrained
  * Opus 1-3% over (the Ogg pages and 10 ms stereo frames are most of it), AAC
  * up to 8% over at 32 kHz and above and up to 15% below that, WMA 8% (ASF
- * framing). Vorbis is costed at the bitrate it is asked for once that is
- * moved into its range, though on dense music it runs over that too: up to
- * 15% at 64 kbps and above, more at the lowest rates.
+ * framing), Vorbis up to 28% at 40 to 50 kHz and up to 64% at the lowest
+ * setups below that (see vorbisOvershoot).
  */
 export function effectiveKbps(
   formatId: string,
@@ -430,7 +459,10 @@ export function effectiveKbps(
     case 'opus':
       return bitrate * 1.03;
     case 'ogg':
-      return vorbisKbps(bitrate, sampleRate, channels);
+      return (
+        vorbisKbps(bitrate, sampleRate, channels) *
+        vorbisOvershoot(bitrate, sampleRate, channels)
+      );
     case 'wma':
       return bitrate * 1.08;
     default:

@@ -211,8 +211,8 @@ export interface Plan {
  * Mirrors `estimateSize` but takes a duration rather than a buffer, so a part
  * can be costed before the audio is sliced. A lossy format is costed at what
  * its encoder really averages (`effectiveKbps`), not at the number asked
- * for: libopus and ffmpeg's AAC both overshoot, and a plan built on the
- * nominal rate handed back Discord files 8% over the limit. The header
+ * for: libopus, libvorbis and ffmpeg's AAC all overshoot, and a plan built
+ * on the nominal rate handed back Discord files 8% over the limit. The header
  * constant is the larger of the two the encoders use (2048 rather than MP3's
  * 512), because every rounding decision in this file should err towards the
  * file being smaller than predicted rather than larger.
