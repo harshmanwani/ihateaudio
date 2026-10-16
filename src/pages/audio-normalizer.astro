@@ -274,12 +274,8 @@ const faq = [
 
 <script>
   import { createTool } from '../lib/tool';
-  import {
-    measureLoudness,
-    normalizeLoudness,
-    type LoudnessResult,
-  } from '../lib/audio/analysis';
-  import { applyGain } from '../lib/audio/dsp';
+  import { measureLoudnessSliced, type LoudnessResult } from '../lib/audio/analysis';
+  import { applyGain, applyGainSliced } from '../lib/audio/dsp';
   import { db } from '../lib/format';
   import { panelColors, panelContext } from '../lib/canvas';
 
@@ -306,8 +302,30 @@ const faq = [
     ebu: { lufs: -23, ceiling: -1 },
   };
 
-  /** Measured once per file — measuring is O(n) and the preview reuses it. */
+  /**
+   * Measured once per file. The preview and the export reuse it, so moving a
+   * slider never re-analyses. Null while the measurement is still running.
+   */
   let measured: LoudnessResult | null = null;
+
+  /**
+   * The measurement in progress or done, and the buffer it is of. On a long file
+   * it takes seconds, so it runs a slice at a time and the preview and the
+   * export wait for it.
+   */
+  let measuring: { buffer: AudioBuffer; result: Promise<LoudnessResult> } | null = null;
+
+  /**
+   * Stops the preview being rendered. Each one makes a copy as big as the file,
+   * so a slider moved twice must not leave two of them half done.
+   */
+  let previewStop: AbortController | null = null;
+
+  /** The loudness of `buffer`: the page's own measurement, or a new one. */
+  function measurementOf(buffer: AudioBuffer): Promise<LoudnessResult> {
+    if (measuring?.buffer === buffer) return measuring.result;
+    return measureLoudnessSliced(buffer);
+  }
 
   function signed(value: number, unit: string, digits = 1): string {
     if (!Number.isFinite(value)) return ', ';
@@ -317,15 +335,18 @@ const faq = [
     return `${sign}${Math.abs(value).toFixed(digits)} ${unit}`;
   }
 
-  /** What normalizeLoudness will do, worked out ahead of time. */
-  function plan(): { wanted: number; applied: number; limited: boolean } {
+  /**
+   * The gain for the current target and ceiling: what normalizeLoudness does,
+   * worked out from a measurement already made.
+   */
+  function plan(result = measured): { wanted: number; applied: number; limited: boolean } {
     const target = tool?.value('target', -14) ?? -14;
     const ceiling = tool?.value('ceiling', -1) ?? -1;
-    if (!measured || !Number.isFinite(measured.integrated)) {
+    if (!result || !Number.isFinite(result.integrated)) {
       return { wanted: 0, applied: 0, limited: false };
     }
-    const wanted = target - measured.integrated;
-    const headroom = ceiling - measured.truePeak;
+    const wanted = target - result.integrated;
+    const headroom = ceiling - result.truePeak;
     const limited = Number.isFinite(headroom) && wanted > headroom;
     return { wanted, applied: limited ? headroom : wanted, limited };
   }
@@ -547,6 +568,32 @@ const faq = [
     context.fillText('ceiling', px(ceiling), peakTrackY - 19 * dpr);
   }
 
+  /** The travel panel while the file is still being measured. */
+  function drawWaiting(panel: HTMLElement, canvas: HTMLCanvasElement): void {
+    const cssWidth = canvas.clientWidth;
+    const cssHeight = canvas.clientHeight;
+    if (cssWidth < 1 || cssHeight < 1) return;
+
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const width = Math.round(cssWidth * dpr);
+    const height = Math.round(cssHeight * dpr);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
+
+    const context = panelContext(canvas);
+    if (!context) return;
+    context.clearRect(0, 0, width, height);
+
+    const { ink } = panelColors(panel);
+    context.font = `600 ${11 * dpr}px system-ui, sans-serif`;
+    context.textAlign = 'center';
+    context.textBaseline = 'middle';
+    context.fillStyle = `color-mix(in oklch, ${ink} 52%, transparent)`;
+    context.fillText('Measuring loudness', width / 2, height / 2);
+  }
+
   const tool = createTool({
     suffix: 'normalized',
     defaultFormat: 'mp3',
@@ -585,17 +632,19 @@ const faq = [
 
     onReady(ctx, runtime) {
       const root = runtime.root;
-      measured = measureLoudness(ctx.buffer);
+      const buffer = ctx.buffer;
+      measured = null;
+      const result = runtime.measure('Measuring loudness', (options) =>
+        measureLoudnessSliced(buffer, options)
+      );
+      measuring = { buffer, result };
 
       const cell = (key: string, text: string): void => {
         const el = root.querySelector<HTMLElement>(`[data-m="${key}"]`);
         if (el) el.textContent = text;
       };
 
-      cell('lufs', signed(measured.integrated, 'LUFS'));
-      cell('range', Number.isFinite(measured.range) ? `${measured.range.toFixed(1)} LU` : ', ');
-      cell('truepeak', signed(measured.truePeak, 'dBTP'));
-      cell('peak', signed(measured.peak, 'dBFS'));
+      for (const key of ['lufs', 'range', 'truepeak', 'peak']) cell(key, '···');
 
       const planEl = root.querySelector<HTMLElement>('[data-plan]');
       const limitedEl = root.querySelector<HTMLElement>('[data-limited]');
@@ -607,7 +656,15 @@ const faq = [
         const target = runtime.value('target', -14);
         const { wanted, applied, limited } = plan();
 
-        if (travelPanel && travelCanvas && measured) {
+        if (!measured) {
+          // Still measuring: nothing below can be worked out yet.
+          if (limitedEl) limitedEl.hidden = true;
+          if (planEl) planEl.textContent = 'Measuring the file. The gain is worked out from that.';
+          if (travelPanel && travelCanvas) drawWaiting(travelPanel, travelCanvas);
+          return;
+        }
+
+        if (travelPanel && travelCanvas) {
           drawTravel(
             travelPanel,
             travelCanvas,
@@ -703,19 +760,37 @@ const faq = [
       if (travelPanel) new ResizeObserver(refresh).observe(travelPanel);
 
       refresh();
+
+      result
+        .then((done) => {
+          // A newer file may have taken over while this one was measured.
+          if (measuring?.buffer !== buffer) return;
+          measured = done;
+          cell('lufs', signed(done.integrated, 'LUFS'));
+          cell('range', Number.isFinite(done.range) ? `${done.range.toFixed(1)} LU` : ', ');
+          cell('truepeak', signed(done.truePeak, 'dBTP'));
+          cell('peak', signed(done.peak, 'dBFS'));
+          refresh();
+        })
+        .catch(() => {
+          // A newer file stopped it, or the runtime has already shown the error.
+        });
     },
 
-    preview(ctx) {
-      // Reuses the cached measurement, so dragging a slider does not re-analyse.
-      return applyGain(ctx.buffer, plan().applied);
+    async preview(ctx) {
+      previewStop?.abort();
+      const stop = new AbortController();
+      previewStop = stop;
+      // Reuses the measurement, so dragging a slider does not re-analyse.
+      const result = await measurementOf(ctx.buffer);
+      return applyGainSliced(ctx.buffer, plan(result).applied, { signal: stop.signal });
     },
 
-    process(ctx) {
-      return normalizeLoudness(
-        ctx.buffer,
-        tool?.value('target', -14) ?? -14,
-        tool?.value('ceiling', -1) ?? -1
-      ).buffer;
+    async process(ctx) {
+      const result = await measurementOf(ctx.buffer);
+      // Silence has no loudness to move; it goes out as it came in.
+      if (!Number.isFinite(result.integrated)) return ctx.buffer;
+      return applyGain(ctx.buffer, plan(result).applied);
     },
   });
 </script>

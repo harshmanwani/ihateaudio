@@ -316,7 +316,7 @@ const stats = [
 
 <script>
   import { createTool } from '../lib/tool';
-  import { measureLoudness } from '../lib/audio/analysis';
+  import { measureLoudnessSliced } from '../lib/audio/analysis';
   import { panelColors, panelContext } from '../lib/canvas';
 
   interface Target {
@@ -501,18 +501,28 @@ const stats = [
         if (el) el.textContent = '···';
       }
 
-      // measureLoudness runs two biquads over every sample and blocks the main
-      // thread, so let the "measuring" state paint before it starts.
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          const result = measureLoudness(ctx.buffer);
+      // Whatever the last file showed stays out of sight until this one is measured.
+      const panel = root.querySelector<HTMLElement>('[data-meter-panel]');
+      const peakNote = root.querySelector<HTMLElement>('[data-peak-note]');
+      if (panel) panel.hidden = true;
+      if (peakNote) peakNote.hidden = true;
+      for (const target of TARGETS) {
+        const deltaCell = root.querySelector<HTMLElement>(`[data-delta="${target.id}"]`);
+        const verdictCell = root.querySelector<HTMLElement>(`[data-verdict="${target.id}"]`);
+        if (deltaCell) deltaCell.textContent = '···';
+        if (verdictCell) verdictCell.textContent = '';
+      }
 
+      // measureLoudness runs two biquads and a 4x oversampler over every sample,
+      // seconds on a long file, so it runs a slice at a time.
+      runtime
+        .measure('Measuring loudness', (options) => measureLoudnessSliced(ctx.buffer, options))
+        .then((result) => {
           setStat('integrated', result.integrated);
           setStat('range', result.range);
           setStat('truepeak', result.truePeak);
           setStat('peak', result.peak);
 
-          const peakNote = root.querySelector<HTMLElement>('[data-peak-note]');
           const peakBody = root.querySelector<HTMLElement>('[data-peak-body]');
           const overCeiling = Number.isFinite(result.truePeak) && result.truePeak > -1;
           if (peakNote) peakNote.hidden = !overCeiling;
@@ -524,7 +534,6 @@ const stats = [
               'Normalizing with a peak ceiling fixes it.';
           }
 
-          const panel = root.querySelector<HTMLElement>('[data-meter-panel]');
           const canvas = root.querySelector<HTMLCanvasElement>('[data-meter]');
           const caption = root.querySelector<HTMLElement>('[data-meter-caption]');
           if (panel && canvas && result.momentary.length > 1) {
@@ -557,8 +566,10 @@ const stats = [
             }
             if (verdictCell) verdictCell.textContent = verdictFor(delta);
           }
+        })
+        .catch(() => {
+          // A newer file stopped it, or the runtime has already shown the error.
         });
-      });
     },
 
     // No export button on this page; the runtime still requires a process.

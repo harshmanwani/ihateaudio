@@ -12,6 +12,7 @@ import { decodeFile } from './audio/decode';
 import { AudioError, toAudioError } from './audio/errors';
 import { Player } from './audio/player';
 import { Waveform } from './audio/waveform';
+import type { SliceOptions } from './audio/slices';
 import {
   exportAudio,
   estimateSize,
@@ -134,6 +135,13 @@ export class ToolRuntime {
 
   /** Pending removal of the error card, so a fast second failure can cancel it. */
   private alertTimer: number | null = null;
+
+  /** Stops the whole-file analysis running for the loaded file, if one is. */
+  private analysis: AbortController | null = null;
+  /** Loads in flight. While any is, the status slot shows its reading bar. */
+  private loading = 0;
+  /** Counts preview requests, so only the latest one reaches the result strip. */
+  private previewTurn = 0;
 
   // Cached elements — every tool page renders the same skeleton.
   private el: {
@@ -414,6 +422,7 @@ export class ToolRuntime {
     const { signal } = this.controller;
 
     this.clearStatus();
+    this.loading += 1;
     this.setBusy(true, 'Reading file');
 
     try {
@@ -430,6 +439,9 @@ export class ToolRuntime {
       }
 
       if (signal.aborted) return;
+
+      // The analysis of the file being replaced is of no use any more.
+      this.stopMeasuring();
 
       this.files = append ? [...this.files, ...files] : files;
       this.buffers = append ? [...this.buffers, ...decoded] : decoded;
@@ -467,6 +479,8 @@ export class ToolRuntime {
       this.clearProgress();
       const audioErr = toAudioError(err);
       if (audioErr.code !== 'cancelled') this.showError(audioErr);
+    } finally {
+      this.loading -= 1;
     }
   }
 
@@ -1268,6 +1282,76 @@ export class ToolRuntime {
     });
   }
 
+  /**
+   * Runs a whole-file analysis for the loaded file, for pages whose readings
+   * need every sample.
+   *
+   * `work` gets the slice options to pass on (measureLoudnessSliced and the
+   * like), so the page keeps painting and taking input while it runs. Until it
+   * is done, the root carries data-measuring and the download button waits,
+   * because what it would save depends on the reading. A new file stops it, and
+   * the promise then rejects with an AbortError. Any other failure is shown like
+   * a failed load, so callers can ignore the rejection.
+   *
+   * When the work will take more than two seconds in all, the status slot above
+   * the workspace also shows `label` and how far it has got. That is judged
+   * from the pace of the first 300 ms. A shorter job (a three-minute song is
+   * about a second) would only flash the bar, and shift the page twice, so it
+   * is left to the page's own placeholders.
+   */
+  async measure<T>(label: string, work: (options: SliceOptions) => Promise<T>): Promise<T> {
+    this.stopMeasuring();
+    const controller = new AbortController();
+    this.analysis = controller;
+    this.root.dataset.measuring = '';
+    const button = this.el.download;
+    if (button) button.disabled = true;
+
+    const current = (): boolean => this.analysis === controller;
+    const started = performance.now();
+    let showBar: boolean | null = null;
+    try {
+      return await work({
+        signal: controller.signal,
+        onProgress: (ratio) => {
+          if (!current() || this.loading > 0) return;
+          if (showBar === null) {
+            const elapsed = performance.now() - started;
+            if (elapsed < 300 || ratio <= 0) return;
+            showBar = elapsed / ratio > 2000;
+          }
+          if (showBar) this.showProgress(ratio, label);
+        },
+      });
+    } catch (err) {
+      const stopped = err instanceof DOMException && err.name === 'AbortError';
+      if (current() && !stopped) {
+        const audioErr = toAudioError(err);
+        if (audioErr.code !== 'cancelled') this.showError(audioErr);
+      }
+      throw err;
+    } finally {
+      if (current()) {
+        this.stopMeasuring();
+        if (this.loading === 0) this.clearProgress();
+      }
+    }
+  }
+
+  /** Stops the running analysis, if any, and lets go of what it was holding. */
+  private stopMeasuring(): void {
+    if (!this.analysis) return;
+    this.analysis.abort();
+    this.analysis = null;
+    delete this.root.dataset.measuring;
+    const button = this.el.download;
+    if (button) {
+      // Where a model has to run first, the run panel still decides.
+      button.disabled =
+        this.twoPhase() && this.gates() && this.el.runner?.dataset.state !== 'done';
+    }
+  }
+
   /** Unmounts the strip, for when the result no longer matches the controls. */
   hideResult(): void {
     if (!this.el.resultPanel) return;
@@ -1277,11 +1361,19 @@ export class ToolRuntime {
     });
   }
 
-  /** Re-renders the result strip when controls change. */
+  /**
+   * Re-renders the result strip when controls change.
+   *
+   * A preview can take a while (a render, or a wait for the page's measurement),
+   * and a later one can finish first. Only the latest request mounts, so the
+   * strip never ends on settings, or a file, that are no longer current.
+   */
   refreshPreview(): void {
     if (!this.config.preview || this.buffers.length === 0) return;
+    const turn = ++this.previewTurn;
     void Promise.resolve(this.config.preview(this.context()))
       .then((buffer) => {
+        if (turn !== this.previewTurn) return;
         this.showResult(buffer, this.config.previewLabel ?? 'Preview');
       })
       .catch(() => {
@@ -2136,6 +2228,9 @@ export class ToolRuntime {
 
   reset(): void {
     this.controller?.abort();
+    this.stopMeasuring();
+    // A preview still rendering is for the file being cleared.
+    this.previewTurn += 1;
     this.player?.destroy();
     this.player = null;
     this.waveform?.destroy();
