@@ -23,7 +23,7 @@
  *    with a dot on each, which is what makes a click or a DC offset visible.
  */
 import { colorToken } from '../canvas';
-import { computeWaveform, type WaveformData } from './analysis';
+import { SCAN_SLICE_MS, WaveformScan, computeWaveform, type WaveformData } from './analysis';
 
 export interface WaveformStyle {
   wave: string;
@@ -124,8 +124,11 @@ export class Waveform {
   private onViewChange: ((view: WaveformView) => void) | undefined;
 
   private buffer: AudioBuffer | null = null;
-  private data: WaveformData | null = null;
+  /** The scan behind the visible range. It may still be filling in. */
+  private scan: WaveformScan | null = null;
   private dataKey = '';
+  /** Whether the current buffer has been drawn whole at least once. */
+  private drawn = false;
   /** Whole-file scan, cached separately so the minimap never rescans. */
   private overview: WaveformData | null = null;
   private overviewKey = '';
@@ -193,8 +196,9 @@ export class Waveform {
   setBuffer(buffer: AudioBuffer | null, keepView = false): void {
     const previous = this.buffer;
     this.buffer = buffer;
-    this.data = null;
+    this.scan = null;
     this.dataKey = '';
+    this.drawn = false;
     this.overview = null;
     this.overviewKey = '';
 
@@ -395,7 +399,7 @@ export class Waveform {
       canvas.width = w;
       canvas.height = h;
       if (canvas === this.canvas) {
-        this.data = null;
+        this.scan = null;
         this.dataKey = '';
       }
     }
@@ -432,9 +436,18 @@ export class Waveform {
     const to = this.view.end * rate;
 
     const key = `${width}|${from.toFixed(3)}|${to.toFixed(3)}`;
-    if (!this.data || this.dataKey !== key) {
-      this.data = computeWaveform(this.buffer, width, from, to);
+    if (!this.scan || this.dataKey !== key) {
+      this.scan = new WaveformScan(this.buffer, width, from, to);
       this.dataKey = key;
+    }
+    if (!this.scan.done) {
+      // A new file fills in a slice per frame, so a long one never holds the
+      // main thread for the whole pass. Once it has been drawn whole, a zoom,
+      // pan or resize scans in one go as it always has: the view under the
+      // gesture has to be complete, and a half-drawn one would flicker.
+      if (this.drawn) this.scan.step();
+      else if (!this.scan.step(SCAN_SLICE_MS)) this.scheduleRender();
+      if (this.scan.done) this.drawn = true;
     }
 
     const mid = height / 2;
@@ -462,14 +475,14 @@ export class Waveform {
 
       // Everything dim first, then the active span repainted bright through a
       // clip — cheaper and crisper than deciding a colour per column.
-      this.paintWave(width, height, mid, scale, false);
+      this.paintWave(height, mid, scale, false);
 
       if (active.to > active.from) {
         ctx.save();
         ctx.beginPath();
         ctx.rect(active.from, 0, active.to - active.from, height);
         ctx.clip();
-        this.paintWave(width, height, mid, scale, true);
+        this.paintWave(height, mid, scale, true);
         ctx.restore();
       }
     }
@@ -605,17 +618,19 @@ export class Waveform {
    * continuous path, which is what stops a per-pixel waveform reading as noise.
    */
   private paintWave(
-    width: number,
     height: number,
     mid: number,
     scale: number,
     active: boolean
   ): void {
-    const data = this.data;
-    if (!data) return;
+    const scan = this.scan;
+    // Only the columns scanned so far. The rest stay on the bare centreline
+    // rather than drawing as silence they have not been measured to be.
+    const width = scan?.filled ?? 0;
+    if (!scan || width === 0) return;
 
     const { ctx } = this;
-    const { peaks, rms } = data;
+    const { peaks, rms } = scan.data;
     const paint = this.fill(height, active);
 
     ctx.fillStyle = paint;

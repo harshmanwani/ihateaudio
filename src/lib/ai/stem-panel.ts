@@ -5,7 +5,7 @@
  * exists, which is what makes it testable. This one is all DOM and holds no audio
  * state of its own — everything it renders it reads back from the player.
  */
-import { computeWaveform } from '../audio/analysis';
+import { SCAN_SLICE_MS, WaveformScan } from '../audio/analysis';
 import { drawableColor, panelContext } from '../canvas';
 import { exportAudio } from '../audio/export';
 import { saveBlob } from '../files';
@@ -37,6 +37,10 @@ interface Row {
   canvas: HTMLCanvasElement;
   mute: HTMLButtonElement | null;
   solo: HTMLButtonElement | null;
+  /** The strip's waveform at its current width. It may still be filling in. */
+  scan: WaveformScan | null;
+  /** Whether the strip has been drawn whole at least once. */
+  drawn: boolean;
 }
 
 /**
@@ -66,11 +70,17 @@ const TRACK_HUES = [
  * is to show the shape of the part — where the vocal enters, whether the bass is
  * playing — at a glance, not to be scrubbed or measured. So it is a filled envelope
  * with no ruler, no playhead and no zoom.
+ *
+ * A new strip fills in a slice per frame, scanning until `deadline`, so a long
+ * result never holds the main thread for the whole pass; a resize of a strip
+ * already drawn whole scans in one go. Returns false while the scan is still
+ * filling in.
  */
-function paintWave(canvas: HTMLCanvasElement, stem: Stem, colour: string): void {
+function paintWave(row: Row, colour: string, deadline: number): boolean {
+  const { canvas } = row;
   const cssWidth = canvas.clientWidth;
   const cssHeight = canvas.clientHeight;
-  if (cssWidth < 1 || cssHeight < 1) return;
+  if (cssWidth < 1 || cssHeight < 1) return true;
 
   // clientWidth rather than getBoundingClientRect: the panel animates in, and a
   // transform-affected measurement would size the backing store to a sliver and
@@ -84,15 +94,24 @@ function paintWave(canvas: HTMLCanvasElement, stem: Stem, colour: string): void 
   }
 
   const context = panelContext(canvas);
-  if (!context) return;
+  if (!context) return true;
   context.clearRect(0, 0, width, height);
 
   const columns = Math.max(1, Math.floor(width));
-  const data = computeWaveform(stem.buffer, columns);
+  if (!row.scan || row.scan.data.columns !== columns) {
+    row.scan = new WaveformScan(row.stem.buffer, columns);
+  }
+  const scan = row.scan;
+  if (!scan.done) {
+    if (row.drawn) scan.step();
+    else scan.step(Math.max(0, deadline - performance.now()));
+    if (scan.done) row.drawn = true;
+  }
+  const { data } = scan;
   const middle = height / 2;
 
   context.fillStyle = colour;
-  for (let x = 0; x < columns; x += 1) {
+  for (let x = 0; x < scan.filled; x += 1) {
     const low = data.peaks[2 * x] ?? 0;
     const high = data.peaks[2 * x + 1] ?? 0;
     const top = middle - high * middle;
@@ -101,6 +120,7 @@ function paintWave(canvas: HTMLCanvasElement, stem: Stem, colour: string): void 
     // gap that looks like missing data.
     context.fillRect(x, top, 1, Math.max(1, bottom - top));
   }
+  return scan.done;
 }
 
 /** Timecode with tenths, for the bubble that rides on the playhead. */
@@ -118,6 +138,8 @@ export class StemPanel {
   private options: StemPanelOptions;
   private unsubscribe: (() => void) | null = null;
   private scrubbing = false;
+  /** The next frame of a waveform still filling in, or 0. */
+  private frame = 0;
 
   /**
    * Where the pointer has dragged to, or null when nothing is being dragged.
@@ -207,7 +229,7 @@ export class StemPanel {
         element.append(name, canvas);
         element.classList.add('stem--listen');
         this.list.append(element);
-        this.rows.push({ stem, element, canvas, mute: null, solo: null });
+        this.rows.push({ stem, element, canvas, mute: null, solo: null, scan: null, drawn: false });
         continue;
       }
 
@@ -266,7 +288,7 @@ export class StemPanel {
 
       element.append(name, controls, canvas);
       this.list.append(element);
-      this.rows.push({ stem, element, canvas, mute, solo });
+      this.rows.push({ stem, element, canvas, mute, solo, scan: null, drawn: false });
     }
   }
 
@@ -474,14 +496,24 @@ export class StemPanel {
   }
 
   private repaint(): void {
+    // One slice shared by every strip, so four stems cost a frame what one does.
+    const deadline = performance.now() + SCAN_SLICE_MS;
+    let filling = false;
     for (let i = 0; i < this.rows.length; i += 1) {
       const row = this.rows[i]!;
       const [authored, srgb] = TRACK_HUES[i % TRACK_HUES.length]!;
-      paintWave(row.canvas, row.stem, drawableColor(authored, srgb));
+      if (!paintWave(row, drawableColor(authored, srgb), deadline)) filling = true;
     }
     // Same trigger as the waveforms, because anything that changes their width
     // changes where the playhead has to sit.
     this.measure();
+
+    if (filling && !this.frame) {
+      this.frame = requestAnimationFrame(() => {
+        this.frame = 0;
+        this.repaint();
+      });
+    }
   }
 
   /** The panel's own picker first, the page's function as a fallback, WAV last. */
@@ -523,6 +555,8 @@ export class StemPanel {
   }
 
   destroy(): void {
+    if (this.frame) cancelAnimationFrame(this.frame);
+    this.frame = 0;
     this.unsubscribe?.();
     this.player.destroy();
     this.rows = [];

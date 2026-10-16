@@ -612,67 +612,127 @@ export function computeWaveform(
   fromSample = 0,
   toSample = buffer.length
 ): WaveformData {
-  const width = Math.max(1, Math.floor(columns));
-  const peaks = new Float32Array(width * 2);
-  const rms = new Float32Array(width);
-  const channels = buffer.numberOfChannels;
+  const scan = new WaveformScan(buffer, columns, fromSample, toSample);
+  scan.step();
+  return scan.data;
+}
 
-  const first = Math.max(0, Math.min(buffer.length - 1, Math.floor(fromSample)));
-  const last = Math.max(first + 1, Math.min(buffer.length, Math.ceil(toSample)));
-  const span = last - first;
+/**
+ * How long one slice of a WaveformScan may hold the main thread when it is
+ * drawn a frame at a time. Short enough that the frame, paint included, stays
+ * well under the 50 ms the browser counts as a long animation frame.
+ */
+export const SCAN_SLICE_MS = 12;
 
-  // Hoist channel references: getChannelData is a getter, and calling it
-  // inside the sample loop dominates the profile on long files.
-  const data: Float32Array[] = [];
-  for (let c = 0; c < channels; c += 1) data.push(buffer.getChannelData(c));
+/**
+ * computeWaveform a slice of columns at a time.
+ *
+ * One pass over a 54-minute stereo file is about 290 million sample reads, and
+ * done in one go it held the main thread for about 400 ms in the frame that
+ * first drew the file. Columns do not depend on each other, so the pass can stop
+ * after any column and carry on later: the caller draws the columns that are
+ * done, lets the browser take input and paint, and asks for more. Every column
+ * is computed by the same code as before, so the finished data is identical,
+ * value for value, to a single computeWaveform call.
+ */
+export class WaveformScan {
+  readonly data: WaveformData;
+  private readonly channels: Float32Array[];
+  private readonly first: number;
+  private readonly last: number;
+  private readonly perColumn: number;
+  private next = 0;
 
-  const perColumn = span / width;
+  constructor(buffer: AudioBuffer, columns: number, fromSample = 0, toSample = buffer.length) {
+    const width = Math.max(1, Math.floor(columns));
+    this.data = {
+      columns: width,
+      peaks: new Float32Array(width * 2),
+      rms: new Float32Array(width),
+    };
 
-  for (let x = 0; x < width; x += 1) {
-    const start = first + Math.floor(x * perColumn);
-    // The last column absorbs any rounding remainder so no sample is skipped.
-    const end =
-      x === width - 1 ? last : Math.min(last, first + Math.floor((x + 1) * perColumn));
+    this.first = Math.max(0, Math.min(buffer.length - 1, Math.floor(fromSample)));
+    this.last = Math.max(this.first + 1, Math.min(buffer.length, Math.ceil(toSample)));
+    this.perColumn = (this.last - this.first) / width;
 
-    let min = 0;
-    let max = 0;
-    let sumSquares = 0;
-    let count = 0;
-
-    // Zoomed in far enough that a column covers less than one sample, every
-    // column still has to report something: read the sample it lands on rather
-    // than leaving a gap where an empty range would.
-    if (end <= start) {
-      const i = Math.min(last - 1, start);
-      for (let c = 0; c < channels; c += 1) {
-        const v = data[c][i];
-        if (v < min) min = v;
-        if (v > max) max = v;
-        sumSquares += v * v;
-      }
-      peaks[x * 2] = min;
-      peaks[x * 2 + 1] = max;
-      rms[x] = Math.sqrt(sumSquares / channels);
-      continue;
+    // Hoist channel references: getChannelData is a getter, and calling it
+    // inside the sample loop dominates the profile on long files.
+    this.channels = [];
+    for (let c = 0; c < buffer.numberOfChannels; c += 1) {
+      this.channels.push(buffer.getChannelData(c));
     }
-
-    for (let c = 0; c < channels; c += 1) {
-      const channel = data[c];
-      for (let i = start; i < end; i += 1) {
-        const v = channel[i];
-        if (v < min) min = v;
-        if (v > max) max = v;
-        sumSquares += v * v;
-      }
-      count += end - start;
-    }
-
-    peaks[x * 2] = min;
-    peaks[x * 2 + 1] = max;
-    rms[x] = count > 0 ? Math.sqrt(sumSquares / count) : 0;
   }
 
-  return { columns: width, peaks, rms };
+  /** Columns finished so far, counted from the left. */
+  get filled(): number {
+    return this.next;
+  }
+
+  get done(): boolean {
+    return this.next >= this.data.columns;
+  }
+
+  /**
+   * Scans columns until `budgetMs` has passed, or to the end without a budget.
+   * The clock is read once per column, which on a file long enough to need a
+   * budget is a few hundred thousand samples apart. Returns whether the scan is
+   * complete.
+   */
+  step(budgetMs = Infinity): boolean {
+    const { peaks, rms, columns: width } = this.data;
+    const { channels: data, first, last, perColumn } = this;
+    const channels = data.length;
+    const timed = Number.isFinite(budgetMs);
+    const deadline = timed ? performance.now() + budgetMs : 0;
+
+    for (let x = this.next; x < width; x += 1) {
+      const start = first + Math.floor(x * perColumn);
+      // The last column absorbs any rounding remainder so no sample is skipped.
+      const end =
+        x === width - 1 ? last : Math.min(last, first + Math.floor((x + 1) * perColumn));
+
+      let min = 0;
+      let max = 0;
+      let sumSquares = 0;
+      let count = 0;
+
+      // Zoomed in far enough that a column covers less than one sample, every
+      // column still has to report something: read the sample it lands on
+      // rather than leaving a gap where an empty range would.
+      if (end <= start) {
+        const i = Math.min(last - 1, start);
+        for (let c = 0; c < channels; c += 1) {
+          const v = data[c][i];
+          if (v < min) min = v;
+          if (v > max) max = v;
+          sumSquares += v * v;
+        }
+        peaks[x * 2] = min;
+        peaks[x * 2 + 1] = max;
+        rms[x] = Math.sqrt(sumSquares / channels);
+      } else {
+        for (let c = 0; c < channels; c += 1) {
+          const channel = data[c];
+          for (let i = start; i < end; i += 1) {
+            const v = channel[i];
+            if (v < min) min = v;
+            if (v > max) max = v;
+            sumSquares += v * v;
+          }
+          count += end - start;
+        }
+
+        peaks[x * 2] = min;
+        peaks[x * 2 + 1] = max;
+        rms[x] = count > 0 ? Math.sqrt(sumSquares / count) : 0;
+      }
+
+      this.next = x + 1;
+      if (timed && performance.now() >= deadline) break;
+    }
+
+    return this.done;
+  }
 }
 
 /**
