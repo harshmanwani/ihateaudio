@@ -95,6 +95,42 @@ describe('detectTempo', () => {
     expect(onBeat).toBeGreaterThan(offBeat * 10);
   });
 
+  it('reads a syncopated 3+3+2 groove at the beat, not the dotted eighth', () => {
+    // Kick and bass on sixteenths 0, 3, 6, 8, 11, 14 of each bar, snare on 2
+    // and 4, soft sixteenth hats. The three-sixteenth spacing gets the most
+    // coincidences, so picking the single strongest lag read 92 BPM as 122.
+    const bpm = 92;
+    const seconds = 16;
+    const length = RATE * seconds;
+    const buffer = new AudioBuffer({ numberOfChannels: 1, length, sampleRate: RATE });
+    const data = buffer.getChannelData(0);
+    const sixteenth = 60 / bpm / 4;
+    let seed = 1;
+    const noise = (): number => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 2 ** 31 - 1;
+    };
+    const add = (at: number, seconds: number, voice: (t: number) => number): void => {
+      const start = Math.round(at * RATE);
+      for (let i = 0; i < seconds * RATE && start + i < length; i += 1) data[start + i] += voice(i / RATE);
+    };
+
+    for (let step = 0; step * sixteenth < seconds; step += 1) {
+      const at = 0.11 + step * sixteenth;
+      const inBar = step % 16;
+      if ([0, 3, 6, 8, 11, 14].includes(inBar)) {
+        add(at, 0.25, (t) => Math.sin(2 * Math.PI * (50 + 70 * Math.exp(-30 * t)) * t) * Math.exp(-12 * t) * 0.5);
+        add(at, sixteenth * 2, (t) => Math.sin(2 * Math.PI * 55 * t) * Math.min(1, t / 0.01) * 0.3);
+      }
+      if (inBar === 4 || inBar === 12) add(at, 0.2, (t) => noise() * Math.exp(-22 * t) * 0.3);
+      add(at, 0.05, (t) => noise() * Math.exp(-90 * t) * (inBar % 4 === 0 ? 0.1 : 0.06));
+    }
+
+    const result = detectTempo(buffer);
+    expect(result.bpm).toBeGreaterThan(90);
+    expect(result.bpm).toBeLessThan(94);
+  });
+
   it('returns no grid for material with no beat in it', () => {
     const length = RATE * 6;
     const buffer = new AudioBuffer({ numberOfChannels: 1, length, sampleRate: RATE });

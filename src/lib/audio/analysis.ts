@@ -383,15 +383,58 @@ export function detectTempo(buffer: AudioBuffer, minBpm = 60, maxBpm = 200): Tem
   const maxLag = Math.ceil((60 / minBpm) * framesPerSecond);
   if (maxLag >= frames) return { bpm: 0, confidence: 0, beatPeriod: 0, beatOffset: 0 };
 
+  /**
+   * A [1 2 1] blur before correlating.
+   *
+   * A click's onset is a single frame wide, so a beat period that falls between
+   * two whole frames (90 BPM is 66.7) splits its correlation across both lags,
+   * while some multiple of it that happens to land on a whole frame (3 beats =
+   * 200) keeps all of it. Without the blur, that rounding alone is enough to
+   * pick the wrong lag.
+   */
+  const smooth = new Float32Array(frames);
+  for (let f = 0; f < frames; f += 1) {
+    const left = onset[f - 1] ?? onset[f];
+    const right = onset[f + 1] ?? onset[f];
+    smooth[f] = (left + 2 * onset[f] + right) / 4;
+  }
+
+  const harmonics = [1, 2, 4];
+  const longest = Math.min(frames - 1, maxLag * 4 + 2);
+  const acf = new Float64Array(longest + 1);
+  for (let lag = minLag; lag <= longest; lag += 1) {
+    let sum = 0;
+    for (let f = 0; f + lag < frames; f += 1) sum += smooth[f] * smooth[f + lag];
+    acf[lag] = sum / (frames - lag);
+  }
+
   let bestLag = 0;
   let bestScore = 0;
   let total = 0;
   let count = 0;
 
+  /**
+   * Each candidate beat is scored by its own lag plus the half-bar and bar lags
+   * it implies (Percival & Tzanetakis' harmonic enhancement).
+   *
+   * Picking the single strongest lag fails on syncopated music. Anything on a
+   * sixteenth-note grid correlates at every multiple of the sixteenth, and a
+   * 3+3+2 figure, the commonest syncopation in pop, puts the most coincidences
+   * at three sixteenths: a 92 BPM acoustic song read as 120. The real beat is
+   * the lag whose doubles also line up: the 3-sixteenth lag doubles to a beat
+   * and a half and quadruples to three beats, neither of which repeats. Each
+   * multiple k is allowed k/2 frames of slack for the rounding of the lag.
+   */
   for (let lag = minLag; lag <= maxLag; lag += 1) {
-    let sum = 0;
-    for (let f = 0; f + lag < frames; f += 1) sum += onset[f] * onset[f + lag];
-    const score = sum / (frames - lag);
+    let score = 0;
+    for (const k of harmonics) {
+      const slack = k >> 1;
+      let peak = 0;
+      for (let l = lag * k - slack; l <= lag * k + slack && l <= longest; l += 1) {
+        if (acf[l] > peak) peak = acf[l];
+      }
+      score += peak;
+    }
     total += score;
     count += 1;
     if (score > bestScore) {
