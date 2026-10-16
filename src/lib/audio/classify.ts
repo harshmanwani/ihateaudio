@@ -8,8 +8,7 @@
  * and its confidence rather than just its answer — a guess you can see the
  * reasoning for is one you can correct in a second.
  *
- * Four cheap features, one vote each. No FFT: a first-difference filter is a
- * perfectly good brightness measure, and it cannot be wrong about a convention.
+ * Three cheap features, one vote each.
  */
 import { findSilence } from './dsp';
 
@@ -36,33 +35,6 @@ function probeRanges(buffer: AudioBuffer): { start: number; end: number }[] {
     const start = Math.max(0, Math.min(length - window, centre - Math.floor(window / 2)));
     return { start, end: start + window };
   });
-}
-
-/**
- * Ratio of high-frequency energy to total.
- *
- * A first difference is a 6 dB/octave high-pass, so this rises with brightness.
- * Speech puts almost everything below 4 kHz and lands near 0.3–0.6; music with
- * cymbals, strings or synths carries far higher and lands near 0.8 and up.
- */
-function brightness(buffer: AudioBuffer, ranges: { start: number; end: number }[]): number {
-  const data = buffer.getChannelData(0);
-  let signal = 0;
-  let edges = 0;
-  let count = 0;
-
-  for (const range of ranges) {
-    for (let i = range.start + 1; i < range.end; i += 1) {
-      const sample = data[i]!;
-      const delta = sample - data[i - 1]!;
-      signal += sample * sample;
-      edges += delta * delta;
-      count += 1;
-    }
-  }
-
-  if (count === 0 || signal === 0) return 0;
-  return Math.sqrt(edges / count) / Math.sqrt(signal / count);
 }
 
 /** How alike the two channels are. Near-identical means nothing stereo is happening. */
@@ -142,17 +114,16 @@ export function classify(buffer: AudioBuffer): Classification {
     }
   }
 
-  // 2. Brightness.
-  const bright = brightness(buffer, ranges);
-  if (bright < 0.55) {
-    votes += 1;
-    speechReasons.push('little energy up high');
-  } else if (bright > 0.8) {
-    votes -= 1;
-    musicReasons.push('bright, lots of treble');
-  }
+  /**
+   * There was a brightness vote here, the ratio of first-difference energy to
+   * signal energy, on the belief that speech scores 0.3–0.6 and music 0.8 and
+   * up. Measured, every song scored 0.08–0.36 and real speech 0.14–0.15, so
+   * it voted speech on everything, and two stereo songs whose other votes
+   * cancelled out were planned as mono speech. It did not separate the two at
+   * all, so it is gone rather than re-tuned.
+   */
 
-  // 3. Pauses. Reuses the splitter's silence finder rather than a second
+  // 2. Pauses. Reuses the splitter's silence finder rather than a second
   //    definition of quiet.
   const silences = findSilence(buffer, -45, 0.25);
   const quiet = silences.reduce((total, r) => total + (r.end - r.start), 0);
@@ -165,7 +136,7 @@ export function classify(buffer: AudioBuffer): Classification {
     musicReasons.push('almost no silence');
   }
 
-  // 4. Dynamics.
+  // 3. Dynamics.
   const spread = dynamics(buffer, ranges);
   if (spread > 8) {
     votes += 1;

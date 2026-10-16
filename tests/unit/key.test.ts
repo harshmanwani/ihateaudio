@@ -105,12 +105,16 @@ describe('keyName', () => {
     // Nobody writes "A♯ minor" — it has ten sharps. B♭ minor has five flats.
     expect(keyName(10, 'minor')).toBe('B♭ minor');
     expect(keyName(3, 'major')).toBe('E♭ major');
-    expect(keyName(6, 'minor')).toBe('G♭ minor');
+    expect(keyName(3, 'minor')).toBe('E♭ minor');
   });
 
   it('uses sharps where that is the conventional spelling', () => {
     expect(keyName(6, 'major')).toBe('F♯ major');
     expect(keyName(9, 'minor')).toBe('A minor');
+    // Sharp minors: the flat spellings would need seven to nine flats.
+    expect(keyName(1, 'minor')).toBe('C♯ minor');
+    expect(keyName(6, 'minor')).toBe('F♯ minor');
+    expect(keyName(8, 'minor')).toBe('G♯ minor');
     expect(keyName(0, 'major')).toBe('C major');
   });
 });

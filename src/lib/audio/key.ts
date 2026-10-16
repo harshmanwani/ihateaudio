@@ -58,7 +58,10 @@ const FLAT_NAMES = [
  * with five flats instead of ten sharps.
  */
 const FLAT_MAJOR = new Set([1, 3, 5, 8, 10]);
-const FLAT_MINOR = new Set([1, 3, 6, 8, 10]);
+// Minor keys take the relative major's signature, so only E♭ and B♭ minor are
+// flat keys. D♭, G♭ and A♭ minor would need eight, nine and seven flats; they
+// are C♯, F♯ and G♯ minor.
+const FLAT_MINOR = new Set([3, 10]);
 
 export type Mode = 'major' | 'minor';
 
