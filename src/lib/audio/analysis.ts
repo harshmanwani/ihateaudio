@@ -637,10 +637,13 @@ export const SCAN_SLICE_MS = 12;
  */
 export class WaveformScan {
   readonly data: WaveformData;
+  readonly buffer: AudioBuffer;
+  /** The samples read, [first, last). */
+  readonly first: number;
+  readonly last: number;
+  /** Samples per column. Below 1 when there are more columns than samples. */
+  readonly perColumn: number;
   private readonly channels: Float32Array[];
-  private readonly first: number;
-  private readonly last: number;
-  private readonly perColumn: number;
   private next = 0;
 
   constructor(buffer: AudioBuffer, columns: number, fromSample = 0, toSample = buffer.length) {
@@ -651,6 +654,7 @@ export class WaveformScan {
       rms: new Float32Array(width),
     };
 
+    this.buffer = buffer;
     this.first = Math.max(0, Math.min(buffer.length - 1, Math.floor(fromSample)));
     this.last = Math.max(this.first + 1, Math.min(buffer.length, Math.ceil(toSample)));
     this.perColumn = (this.last - this.first) / width;
@@ -670,6 +674,42 @@ export class WaveformScan {
 
   get done(): boolean {
     return this.next >= this.data.columns;
+  }
+
+  /**
+   * Whether `other` reads the same samples into the same columns. The data
+   * depends on nothing else, so a scan that matches can stand in for this one
+   * whole: the overview reuses the full view this way.
+   */
+  sameColumns(other: WaveformScan): boolean {
+    return (
+      other.buffer === this.buffer &&
+      other.data.columns === this.data.columns &&
+      other.first === this.first &&
+      other.last === this.last
+    );
+  }
+
+  /** First sample of column `x`, as step() reads it. */
+  columnStart(x: number): number {
+    return this.first + Math.floor(x * this.perColumn);
+  }
+
+  /** One past the last sample of column `x`, as step() reads it. */
+  columnEnd(x: number): number {
+    return x === this.data.columns - 1
+      ? this.last
+      : Math.min(this.last, this.first + Math.floor((x + 1) * this.perColumn));
+  }
+
+  /** The column that reads sample `i`, clamped to the scan. */
+  columnAt(i: number): number {
+    const lastColumn = this.data.columns - 1;
+    let x = Math.min(lastColumn, Math.max(0, Math.floor((i - this.first) / this.perColumn)));
+    // The floors in columnStart can put a boundary one column either side.
+    while (x < lastColumn && this.columnStart(x + 1) <= i) x += 1;
+    while (x > 0 && this.columnStart(x) > i) x -= 1;
+    return x;
   }
 
   /**
@@ -733,6 +773,74 @@ export class WaveformScan {
 
     return this.done;
   }
+}
+
+/** Columns [start, end) that have data to draw. */
+export type WaveformRun = [number, number];
+
+/**
+ * Fills `out` with what to draw for a scan that has not finished: its own
+ * columns as far as it has got, and past that the same stretch of time read off
+ * the finest of `sources` (other scans of the same buffer, at any width or
+ * range) that has read all of it. This is what a DAW does while it redraws: the
+ * old picture moved to where it now belongs, coarser where the source is, and
+ * never blank where something has been measured.
+ *
+ * A borrowed column takes the extremes of every source column that overlaps it,
+ * so its hull is never smaller than the true one, only wider at the edges.
+ * Returns the runs of columns that have data; the rest nothing has read yet.
+ */
+export function standInWaveform(
+  target: WaveformScan,
+  sources: WaveformScan[],
+  out: WaveformData
+): WaveformRun[] {
+  const { columns, peaks: ownPeaks, rms: ownRms } = target.data;
+  const { peaks, rms } = out;
+  const filled = target.filled;
+  peaks.set(ownPeaks.subarray(0, filled * 2));
+  rms.set(ownRms.subarray(0, filled));
+  const runs: WaveformRun[] = filled > 0 ? [[0, filled]] : [];
+
+  const usable = sources.filter(
+    (source) => source !== target && source.buffer === target.buffer && source.filled > 0
+  );
+  if (usable.length === 0) return runs;
+
+  for (let x = filled; x < columns; x += 1) {
+    const start = target.columnStart(x);
+    // A column narrower than a sample reads the one it lands on, as step() does.
+    const end = Math.max(start + 1, target.columnEnd(x));
+
+    let best: WaveformScan | null = null;
+    for (const source of usable) {
+      if (start < source.first || end > source.last) continue;
+      if (source.columnAt(end - 1) >= source.filled) continue;
+      if (!best || source.perColumn < best.perColumn) best = source;
+    }
+    if (!best) continue;
+
+    const { peaks: hull, rms: body } = best.data;
+    const first = best.columnAt(start);
+    const last = best.columnAt(end - 1);
+    let min = 0;
+    let max = 0;
+    let squares = 0;
+    for (let c = first; c <= last; c += 1) {
+      if (hull[c * 2] < min) min = hull[c * 2];
+      if (hull[c * 2 + 1] > max) max = hull[c * 2 + 1];
+      squares += body[c] * body[c];
+    }
+    peaks[x * 2] = min;
+    peaks[x * 2 + 1] = max;
+    rms[x] = Math.sqrt(squares / (last - first + 1));
+
+    const run = runs[runs.length - 1];
+    if (run && run[1] === x) run[1] = x + 1;
+    else runs.push([x, x + 1]);
+  }
+
+  return runs;
 }
 
 /**

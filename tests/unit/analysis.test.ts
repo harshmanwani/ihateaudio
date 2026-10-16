@@ -8,6 +8,7 @@ import {
   peakDb,
   truePeakDb,
   computePeaks,
+  standInWaveform,
   toneBuffer,
   silentBuffer,
 } from '../../src/lib/audio/analysis';
@@ -328,6 +329,113 @@ describe('WaveformScan', () => {
     expect(scan.done).toBe(false);
     expect(scan.step()).toBe(true);
     expect(scan.filled).toBe(64);
+  });
+
+  it('maps every sample to the column that reads it', () => {
+    const buffer = createBuffer(1, 70000, RATE);
+    const cases: [number, number?, number?][] = [[97], [300, 1234.5, 60321.7], [500, 10, 40]];
+    for (const [columns, from, to] of cases) {
+      const scan = new WaveformScan(buffer, columns, from, to);
+      expect(scan.columnStart(0)).toBe(scan.first);
+      expect(scan.columnEnd(columns - 1)).toBe(scan.last);
+      for (let x = 0; x < columns - 1; x += 1) {
+        expect(scan.columnEnd(x)).toBe(scan.columnStart(x + 1));
+      }
+      for (let i = scan.first; i < scan.last; i += 1) {
+        const x = scan.columnAt(i);
+        // A column narrower than a sample reads the one it starts on.
+        const end = Math.max(scan.columnStart(x) + 1, scan.columnEnd(x));
+        expect(i).toBeGreaterThanOrEqual(scan.columnStart(x));
+        expect(i).toBeLessThan(end);
+      }
+    }
+  });
+
+  it('knows the full view and the whole-file overview are the same scan', () => {
+    const buffer = toneBuffer(3, 440, RATE, 2, -6);
+    const overview = new WaveformScan(buffer, 400);
+    const fullView = new WaveformScan(buffer, 400, 0, buffer.duration * RATE);
+    expect(overview.sameColumns(fullView)).toBe(true);
+    overview.step();
+    fullView.step();
+    expect(Array.from(fullView.data.peaks)).toEqual(Array.from(overview.data.peaks));
+    expect(Array.from(fullView.data.rms)).toEqual(Array.from(overview.data.rms));
+
+    expect(overview.sameColumns(new WaveformScan(buffer, 401))).toBe(false);
+    expect(overview.sameColumns(new WaveformScan(buffer, 400, 1))).toBe(false);
+    const copy = toneBuffer(3, 440, RATE, 2, -6);
+    expect(overview.sameColumns(new WaveformScan(copy, 400))).toBe(false);
+  });
+});
+
+describe('standInWaveform', () => {
+  const buffer = createBuffer(2, RATE * 4, RATE);
+  for (let c = 0; c < 2; c += 1) {
+    const data = buffer.getChannelData(c);
+    for (let i = 0; i < data.length; i += 1) {
+      data[i] = Math.sin(i * (0.003 + c * 0.001)) * Math.sin(i * 0.00007) * 0.9;
+    }
+  }
+  const finished = (...args: ConstructorParameters<typeof WaveformScan>): WaveformScan => {
+    const scan = new WaveformScan(...args);
+    scan.step();
+    return scan;
+  };
+  const scratch = (columns: number) => ({
+    columns,
+    peaks: new Float32Array(columns * 2),
+    rms: new Float32Array(columns),
+  });
+
+  it('keeps the columns already scanned and borrows the rest', () => {
+    const target = new WaveformScan(buffer, 300, 20000, 90000);
+    target.step(0);
+    target.step(0);
+    const out = scratch(300);
+    const runs = standInWaveform(target, [finished(buffer, 300, 20000, 90000)], out);
+    expect(runs).toEqual([[0, 300]]);
+
+    // A source with the same columns stands in exactly.
+    const truth = computeWaveform(buffer, 300, 20000, 90000);
+    expect(Array.from(out.peaks)).toEqual(Array.from(truth.peaks));
+    expect(Array.from(out.rms)).toEqual(Array.from(truth.rms));
+  });
+
+  it('never draws a borrowed hull smaller than the true one', () => {
+    // Zoomed in from the whole file, which is far coarser than the view.
+    const target = new WaveformScan(buffer, 400, 31000.4, 77000.9);
+    const out = scratch(400);
+    const runs = standInWaveform(target, [finished(buffer, 90)], out);
+    expect(runs).toEqual([[0, 400]]);
+
+    const truth = computeWaveform(buffer, 400, 31000.4, 77000.9);
+    for (let x = 0; x < 400; x += 1) {
+      expect(out.peaks[x * 2]).toBeLessThanOrEqual(truth.peaks[x * 2]);
+      expect(out.peaks[x * 2 + 1]).toBeGreaterThanOrEqual(truth.peaks[x * 2 + 1]);
+    }
+  });
+
+  it('takes the finest source that covers a column, and skips what none has read', () => {
+    const target = new WaveformScan(buffer, 200, 0, 100000);
+    const out = scratch(200);
+    // The first half of the range, finely, and nothing past it.
+    const fine = finished(buffer, 500, 0, 50000);
+    const half = new WaveformScan(buffer, 50, 0, 100000);
+    half.step(0);
+    const runs = standInWaveform(target, [half, fine], out);
+    expect(runs).toEqual([[0, 100]]);
+
+    const truth = computeWaveform(buffer, 200, 0, 100000);
+    for (let x = 0; x < 100; x += 1) {
+      expect(out.peaks[x * 2 + 1]).toBeCloseTo(truth.peaks[x * 2 + 1], 6);
+      expect(out.peaks[x * 2]).toBeCloseTo(truth.peaks[x * 2], 6);
+    }
+  });
+
+  it('ignores scans of another buffer', () => {
+    const target = new WaveformScan(buffer, 100);
+    const other = finished(toneBuffer(4, 440, RATE, 2, -6), 100);
+    expect(standInWaveform(target, [other], scratch(100))).toEqual([]);
   });
 });
 
