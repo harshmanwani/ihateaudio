@@ -54,8 +54,13 @@ export function createSendTool(destinationId: string): ToolRuntime | null {
   let kind: ContentKind = 'music';
   let kindReasons: string[] = [];
   let kindConfident = false;
-  /** Set once the user overrides the guess, which then stops being re-guessed. */
-  let kindPinned = false;
+  /**
+   * onReady runs again for every file loaded into the same panel. Its
+   * listeners close over that file, so each load drops the last load's: left
+   * in place, two flip handlers undid each other's click, and "Hear it first"
+   * encoded the file before this one.
+   */
+  let wiring: AbortController | null = null;
   /** The route the user actually clicked, so a re-render does not yank it away. */
   let chosen: string | null = null;
   let plan: Plan | null = null;
@@ -88,13 +93,16 @@ export function createSendTool(destinationId: string): ToolRuntime | null {
       const root = runtime.root;
       chosen = null;
       silences = null;
+      wiring?.abort();
+      wiring = new AbortController();
+      const { signal } = wiring;
 
-      if (!kindPinned) {
-        const guess = classify(ctx.buffer);
-        kind = guess.kind;
-        kindReasons = guess.reasons;
-        kindConfident = guess.confident;
-      }
+      // A new file gets a new guess. A correction was about the last file,
+      // and carrying it over showed "you said so" for one never judged.
+      const guess = classify(ctx.buffer);
+      kind = guess.kind;
+      kindReasons = guess.reasons;
+      kindConfident = guess.confident;
 
       const ceilingNote = root.querySelector<HTMLElement>('[data-ceiling-note]');
       const verdict = root.querySelector<HTMLElement>('[data-verdict]');
@@ -429,40 +437,63 @@ export function createSendTool(destinationId: string): ToolRuntime | null {
         describe();
       };
 
-      flip?.addEventListener('click', () => {
-        kind = kind === 'speech' ? 'music' : 'speech';
-        kindPinned = true;
-        kindConfident = true;
-        kindReasons = ['you said so'];
-        chosen = null;
-        render();
-      });
+      flip?.addEventListener(
+        'click',
+        () => {
+          kind = kind === 'speech' ? 'music' : 'speech';
+          kindConfident = true;
+          kindReasons = ['you said so'];
+          chosen = null;
+          render();
+        },
+        { signal }
+      );
 
       root
         .querySelector<HTMLSelectElement>('[data-control="ceiling"]')
-        ?.addEventListener('change', () => {
-          chosen = null;
-          render();
-        });
+        ?.addEventListener(
+          'change',
+          () => {
+            chosen = null;
+            render();
+          },
+          { signal }
+        );
 
       // A manual format or quality change is an override, not a mistake: the
       // part count is recomputed around it so the two never disagree.
-      root.addEventListener('formatchange', () => {
-        paint();
-        describe();
-      });
-      root.querySelector('[data-quality]')?.addEventListener('change', () => {
-        paint();
-        describe();
-      });
+      root.addEventListener(
+        'formatchange',
+        () => {
+          paint();
+          describe();
+        },
+        { signal }
+      );
+      root.querySelector('[data-quality]')?.addEventListener(
+        'change',
+        () => {
+          paint();
+          describe();
+        },
+        { signal }
+      );
 
-      audition?.addEventListener('click', () => {
-        void runAudition(ctx, runtime, root);
-      });
+      audition?.addEventListener(
+        'click',
+        () => {
+          void runAudition(ctx, runtime, root);
+        },
+        { signal }
+      );
 
       // The canvas has no width until the workspace stops being hidden.
       requestAnimationFrame(paint);
-      if (panel) new ResizeObserver(() => paint()).observe(panel);
+      if (panel) {
+        const observer = new ResizeObserver(() => paint());
+        observer.observe(panel);
+        signal.addEventListener('abort', () => observer.disconnect());
+      }
 
       render();
     },
