@@ -114,6 +114,19 @@ const $ = <T extends HTMLElement>(root: ParentNode, selector: string): T | null 
 /** Three decimals is a millisecond, which is as fine as any control here goes. */
 const round = (value: number): number => Math.round(value * 1000) / 1000;
 
+/**
+ * Ends the current task, so the browser can take input and paint before the
+ * next piece of work. scheduler.yield resumes ahead of other queued tasks where
+ * it exists; a zero timeout is the fallback everywhere else.
+ */
+const yieldToMain = (): Promise<void> => {
+  const { scheduler } = globalThis as unknown as {
+    scheduler?: { yield?: () => Promise<void> };
+  };
+  if (typeof scheduler?.yield === 'function') return scheduler.yield();
+  return new Promise((resolve) => setTimeout(resolve, 0));
+};
+
 export class ToolRuntime {
   readonly root: HTMLElement;
   private config: ToolConfig;
@@ -429,6 +442,19 @@ export class ToolRuntime {
         decoded.push(buffer);
       }
 
+      /*
+       * The work after the decode is split into tasks. On a 10-minute file it
+       * was one task of about 120 ms, and it grows with the file: the browser's
+       * own hand-over of the decoded buffer, then the stage, then onReady (the
+       * send tools classify the whole file there), then the preview. A yield
+       * between each lets input and paint through.
+       *
+       * Only the first yield can give up on a load that was superseded. Once
+       * the file is committed below, the rest always runs, as it did when it
+       * was one task: an export or a run replaces the controller too, and must
+       * not leave a loaded file without its onReady.
+       */
+      await yieldToMain();
       if (signal.aborted) return;
 
       this.files = append ? [...this.files, ...files] : files;
@@ -451,7 +477,9 @@ export class ToolRuntime {
       this.el.chain?.setAttribute('hidden', '');
       if (this.el.results) this.el.results.innerHTML = '';
 
+      await yieldToMain();
       this.config.onReady?.(this.context(), this);
+      await yieldToMain();
       this.refreshPreview();
 
       track('file_loaded', {

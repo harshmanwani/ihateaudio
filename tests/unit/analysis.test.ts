@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   computeWaveform,
+  WaveformScan,
   measureLoudness,
   normalizeLoudness,
   detectTempo,
@@ -281,6 +282,52 @@ describe('computeWaveform', () => {
     const wave = computeWaveform(buffer, 1);
     expect(wave.peaks[0]).toBeCloseTo(-0.9, 5);
     expect(wave.peaks[1]).toBeCloseTo(0.3, 5);
+  });
+});
+
+describe('WaveformScan', () => {
+  /** A scan stepped with no time to spare, which is one column per step. */
+  function sliced(...args: ConstructorParameters<typeof WaveformScan>) {
+    const scan = new WaveformScan(...args);
+    let steps = 0;
+    while (!scan.step(0)) {
+      steps += 1;
+      expect(scan.filled).toBe(steps);
+    }
+    return { data: scan.data, steps: steps + 1 };
+  }
+
+  it('gives the same data a slice at a time as in one pass', () => {
+    // Stereo, with a different signal in each channel, so the hull and the
+    // body both depend on reading every channel in every slice.
+    const buffer = createBuffer(2, RATE * 2, RATE);
+    const left = buffer.getChannelData(0);
+    const right = buffer.getChannelData(1);
+    for (let i = 0; i < left.length; i += 1) {
+      left[i] = Math.sin(i * 0.05) * (i / left.length);
+      right[i] = Math.cos(i * 0.011) * 0.4;
+    }
+
+    const cases: [number, number?, number?][] = [
+      [97],
+      [300, 1234.5, 60321.7],
+      // More columns than samples, so every column takes the one-sample path.
+      [500, 10, 40],
+    ];
+    for (const [columns, from, to] of cases) {
+      const whole = computeWaveform(buffer, columns, from, to);
+      const { data, steps } = sliced(buffer, columns, from, to);
+      expect(steps).toBe(columns);
+      expect(Array.from(data.peaks)).toEqual(Array.from(whole.peaks));
+      expect(Array.from(data.rms)).toEqual(Array.from(whole.rms));
+    }
+  });
+
+  it('finishes in one step without a budget', () => {
+    const scan = new WaveformScan(toneBuffer(1, 440, RATE, 1, -6), 64);
+    expect(scan.done).toBe(false);
+    expect(scan.step()).toBe(true);
+    expect(scan.filled).toBe(64);
   });
 });
 
