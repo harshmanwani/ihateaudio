@@ -119,6 +119,14 @@ const faq = [
       <p class="hint controls__full" data-headroom aria-live="polite">
         Flat. The export will be identical to the source apart from the format change.
       </p>
+
+      <div class="field controls__full">
+        <span class="label">Level</span>
+        <label class="switch">
+          <input type="checkbox" data-control="fit" checked />
+          <span>Pull peaks back to −1 dBFS if a boost would clip</span>
+        </label>
+      </div>
     </div>
   </ToolShell>
 
@@ -325,6 +333,7 @@ const faq = [
   import { createTool } from '../lib/tool';
   import type { AgentParam } from '../lib/agent';
   import { applyEq, type EqBand } from '../lib/audio/effects';
+  import { applyGain, gainFactor, peakOf, toDecibels } from '../lib/audio/dsp';
   import { clamp, db } from '../lib/format';
   import { panelColors, panelContext } from '../lib/canvas';
 
@@ -600,7 +609,23 @@ const faq = [
     context.stroke();
   }
 
-  createTool({
+  /**
+   * Turns the result down if the boost lifted its peak above the source's own
+   * peak or -1 dBFS, whichever is higher. Never up, so cuts and a flat curve
+   * leave the level alone.
+   *
+   * The page used to say "normalize the result afterwards", which cannot work:
+   * the export and the hand-off to the next tool both clamp to full scale
+   * first, so by then the peaks are already flat.
+   */
+  function holdPeak(out: AudioBuffer, source: AudioBuffer): AudioBuffer {
+    if (!eqTool?.flag('fit')) return out;
+    const ceiling = Math.max(peakOf(source), gainFactor(-1));
+    const peak = peakOf(out);
+    return peak > ceiling ? applyGain(out, toDecibels(ceiling / peak)) : out;
+  }
+
+  const eqTool = createTool({
     suffix: 'eq',
     defaultFormat: 'mp3',
     previewLabel: 'Equalised',
@@ -617,6 +642,13 @@ const faq = [
             'A curve that sets every band: flat (no change), voice, music, bass, treble, podcast or radio. custom leaves the faders as they are.',
           type: 'string',
           enum: ['flat', 'voice', 'music', 'bass', 'treble', 'podcast', 'radio', 'custom'],
+        },
+        {
+          key: 'keepLevel',
+          control: 'fit',
+          description:
+            'Turn the result down if a boost would push its peak above -1 dBFS (or above the source peak, if that is higher). Never turns it up. Leave on unless the level is managed elsewhere.',
+          type: 'boolean',
         },
         ...BANDS.map((band): AgentParam => {
           const label = band.hz >= 1000 ? `${band.hz / 1000} kHz` : `${band.hz} Hz`;
@@ -667,6 +699,10 @@ const faq = [
         timer = window.setTimeout(() => runtime.refreshPreview(), 120);
       };
 
+      root
+        .querySelector<HTMLInputElement>('[data-control="fit"]')
+        ?.addEventListener('change', () => runtime.refreshPreview());
+
       const describe = (): void => {
         if (!headroom) return;
         const bands = curve();
@@ -689,7 +725,7 @@ const faq = [
           : `${boost.frequency} Hz`;
         headroom.textContent =
           `Largest boost is ${db(boost.gain)} at ${label}. If the source was already ` +
-          'close to full scale, normalize the result afterwards to avoid clipping.';
+          'close to full scale, keep the switch below on so the boost cannot clip.';
       };
 
       const goCustom = (): void => {
@@ -719,12 +755,12 @@ const faq = [
       describe();
     },
 
-    preview(ctx) {
-      return applyEq(ctx.buffer, curve());
+    async preview(ctx) {
+      return holdPeak(await applyEq(ctx.buffer, curve()), ctx.buffer);
     },
 
-    process(ctx) {
-      return applyEq(ctx.buffer, curve());
+    async process(ctx) {
+      return holdPeak(await applyEq(ctx.buffer, curve()), ctx.buffer);
     },
   });
 </script>
