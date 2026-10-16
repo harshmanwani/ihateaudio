@@ -133,6 +133,30 @@ describe('detectSampleRate', () => {
     expect(detectSampleRate(new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8]).buffer)).toBeNull();
   });
 
+  it('reads MPEG audio only when a second frame follows the first', () => {
+    // MPEG-1 Layer III, 128 kbps, 44.1 kHz: 417-byte frames.
+    const header = [0xff, 0xfb, 0x90, 0x00];
+    const two = new Uint8Array(1024);
+    two.set(header, 0);
+    two.set(header, 417);
+    expect(detectSampleRate(two.buffer)).toBe(44100);
+
+    // The same header alone could be any two bytes of compressed data.
+    const one = new Uint8Array(1024);
+    one.set(header, 0);
+    expect(detectSampleRate(one.buffer)).toBeNull();
+  });
+
+  it('does not read an AAC stream as MPEG audio', () => {
+    // ADTS headers at 44.1 kHz pass a bare frame-sync check and used to read
+    // as 22.05 kHz, so the file was decoded at half its rate.
+    const bytes = new Uint8Array(4096);
+    for (let at = 0; at + 7 < bytes.length; at += 371) {
+      bytes.set([0xff, 0xf1, 0x50, 0x80, 0x2e, 0x7f, 0xfc], at);
+    }
+    expect(detectSampleRate(bytes.buffer)).toBeNull();
+  });
+
   it('reads a FLAC STREAMINFO rate', () => {
     // fLaC + metadata block header + STREAMINFO with 44100 at bit offset 80.
     const bytes = new Uint8Array(64);

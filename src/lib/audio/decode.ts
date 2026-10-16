@@ -115,7 +115,7 @@ export function detectSampleRate(bytes: ArrayBuffer): number | null {
     return rate >= 3000 && rate <= 768000 ? rate : null;
   }
 
-  // MPEG audio: skip an ID3v2 tag, then read the first frame header.
+  // MPEG audio: skip an ID3v2 tag, then find two frame headers in a row.
   let start = 0;
   if (ascii(0, 3) === 'ID3' && len > 10) {
     const size =
@@ -126,20 +126,71 @@ export function detectSampleRate(bytes: ArrayBuffer): number | null {
     start = 10 + size;
   }
   for (let i = start; i < Math.min(len - 4, start + 8192); i += 1) {
-    if (view.getUint8(i) !== 0xff) continue;
-    const b1 = view.getUint8(i + 1);
-    if ((b1 & 0xe0) !== 0xe0) continue;
-    const versionBits = (b1 >> 3) & 0x03;
-    if (versionBits === 1) continue; // reserved
-    const rateBits = (view.getUint8(i + 2) >> 2) & 0x03;
-    if (rateBits === 3) continue; // reserved
-    const base = [44100, 48000, 32000][rateBits];
-    if (versionBits === 3) return base; // MPEG-1
-    if (versionBits === 2) return base / 2; // MPEG-2
-    return base / 4; // MPEG-2.5
+    const frame = mpegFrame(view, i);
+    if (!frame) continue;
+    /**
+     * A single header proves nothing. This scan used to accept the first 0xFFE
+     * sync it met in any file, and AAC, MP4, Ogg, WebM and AIFF data all have
+     * them: an ADTS AAC header passes outright and reads as 22.05 kHz. The
+     * file was then decoded at that rate, so a 44.1 kHz AAC lost everything
+     * above 11 kHz in every tool. A real MP3 has another header exactly one
+     * frame on, with the same version, layer and rate.
+     */
+    const next = mpegFrame(view, i + frame.bytes);
+    if (next && next.key === frame.key) return frame.rate;
   }
 
   return null;
+}
+
+const MPEG_KBPS = {
+  // [version 1 | 2][layer I, II, III]
+  v1: [
+    [0, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448],
+    [0, 32, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 384],
+    [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320],
+  ],
+  v2: [
+    [0, 32, 48, 56, 64, 80, 96, 112, 128, 144, 160, 176, 192, 224, 256],
+    [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160],
+    [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160],
+  ],
+};
+
+/**
+ * The MPEG audio frame header at `at`, if there is a valid one: its sample
+ * rate, its length in bytes, and the fields the next frame must repeat.
+ *
+ * Rejects the reserved layer (which is what ADTS AAC carries), the free and
+ * bad bitrate indices, and the reserved version and rate.
+ */
+function mpegFrame(
+  view: DataView,
+  at: number
+): { rate: number; bytes: number; key: number } | null {
+  if (at + 4 > view.byteLength || view.getUint8(at) !== 0xff) return null;
+  const b1 = view.getUint8(at + 1);
+  const b2 = view.getUint8(at + 2);
+  if ((b1 & 0xe0) !== 0xe0) return null;
+  const versionBits = (b1 >> 3) & 0x03;
+  const layerBits = (b1 >> 1) & 0x03;
+  const bitrateIndex = b2 >> 4;
+  const rateBits = (b2 >> 2) & 0x03;
+  if (versionBits === 1 || layerBits === 0 || rateBits === 3) return null;
+  if (bitrateIndex === 0 || bitrateIndex === 15) return null;
+
+  const base = [44100, 48000, 32000][rateBits]!;
+  const rate = versionBits === 3 ? base : versionBits === 2 ? base / 2 : base / 4;
+  const layer = 4 - layerBits; // 1, 2 or 3
+  const kbps = (versionBits === 3 ? MPEG_KBPS.v1 : MPEG_KBPS.v2)[layer - 1]![bitrateIndex]!;
+  const padding = (b2 >> 1) & 0x01;
+
+  let bytes: number;
+  if (layer === 1) bytes = (Math.floor((12 * kbps * 1000) / rate) + padding) * 4;
+  else if (layer === 3 && versionBits !== 3) bytes = Math.floor((72 * kbps * 1000) / rate) + padding;
+  else bytes = Math.floor((144 * kbps * 1000) / rate) + padding;
+
+  return { rate, bytes, key: ((b1 & 0xfe) << 8) | (b2 & 0x0c) };
 }
 
 /**
