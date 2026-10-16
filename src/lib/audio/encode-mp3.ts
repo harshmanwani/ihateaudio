@@ -7,6 +7,8 @@
  */
 import { audioError } from './errors';
 import { resample, setChannels } from './dsp';
+import { MP3_PIECE } from './mp3-blocks';
+import type { Mp3Request, Mp3Response } from './encode-mp3.worker';
 
 /** Sample rates the MP3 format permits. Anything else must be resampled. */
 const MP3_RATES = [8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000];
@@ -26,68 +28,41 @@ export function nearestMp3Rate(rate: number): number {
   );
 }
 
-type LameModule = {
-  Mp3Encoder: new (
-    channels: number,
-    sampleRate: number,
-    kbps: number
-  ) => {
-    encodeBuffer(left: Int16Array, right?: Int16Array): Uint8Array;
-    flush(): Uint8Array;
-  };
-};
+/** A worker left from the last encode that finished, ready for the next. */
+let idle: Worker | null = null;
 
-let lamePromise: Promise<LameModule> | null = null;
+function spawn(): Worker {
+  const worker = new Worker(new URL('./encode-mp3.worker.ts', import.meta.url), {
+    type: 'module',
+  });
+  // A worker that fails to load while it waits must not be handed out: its
+  // error event has already fired, and the encode would wait for ever.
+  worker.addEventListener('error', () => {
+    if (idle === worker) idle = null;
+  });
+  return worker;
+}
 
-/** Loads the encoder once and shares it across tools and repeat exports. */
-async function loadLame(): Promise<LameModule> {
-  if (!lamePromise) {
-    lamePromise = import('@breezystack/lamejs')
-      .then((mod) => (mod.default ?? mod) as unknown as LameModule)
-      .catch((err) => {
-        lamePromise = null;
-        throw err;
-      });
-  }
-  return lamePromise;
+function release(worker: Worker): void {
+  if (idle) worker.terminate();
+  else idle = worker;
 }
 
 /** Warms the encoder while the user is still choosing settings. */
 export function preloadMp3Encoder(): void {
-  void loadLame().catch(() => {
-    /* Preload is best-effort; export will surface any real failure. */
-  });
+  if (!idle && typeof Worker !== 'undefined') idle = spawn();
 }
 
-function toInt16(input: Float32Array): Int16Array {
-  const out = new Int16Array(input.length);
-  for (let i = 0; i < input.length; i += 1) {
-    let s = input[i];
-    if (!Number.isFinite(s)) s = 0;
-    if (s > 1) s = 1;
-    else if (s < -1) s = -1;
-    // Rounded: assigning into an Int16Array truncates towards zero, which
-    // biases every sample half a step towards silence.
-    out[i] = Math.round(s < 0 ? s * 32768 : s * 32767);
-  }
-  return out;
-}
-
+/**
+ * Encodes in a worker (see encode-mp3.worker.ts). This side only copies the
+ * samples across, a piece at a time, as the worker asks for them.
+ */
 export async function encodeMp3(
   buffer: AudioBuffer,
   options: Mp3Options = {}
 ): Promise<Blob> {
   const { bitrate = 192, onProgress, signal } = options;
-
-  let lame: LameModule;
-  try {
-    lame = await loadLame();
-  } catch {
-    throw audioError(
-      'encode-failed',
-      'The MP3 encoder failed to load. Check your connection and reload, or export as WAV instead.'
-    );
-  }
+  if (signal?.aborted) throw audioError('cancelled');
 
   // MP3 only permits certain rates; resample rather than fail.
   const targetRate = nearestMp3Rate(buffer.sampleRate);
@@ -98,44 +73,80 @@ export async function encodeMp3(
   // centre, which is where the dialogue is.
   const source = resampled.numberOfChannels > 2 ? setChannels(resampled, 2) : resampled;
   const channels = source.numberOfChannels;
-  const encoder = new lame.Mp3Encoder(channels, targetRate, bitrate);
+  const total = source.length;
 
-  const left = toInt16(source.getChannelData(0));
-  const right = channels > 1 ? toInt16(source.getChannelData(1)) : undefined;
+  const worker = idle ?? spawn();
+  idle = null;
 
-  const chunks: Uint8Array[] = [];
-  // 1152 samples is one MPEG frame; multiples keep the encoder on frame
-  // boundaries and avoid an extra copy per block.
-  const block = 1152 * 16;
-  const total = left.length;
+  return new Promise<Blob>((resolve, reject) => {
+    let sent = 0;
 
-  try {
-    for (let offset = 0; offset < total; offset += block) {
-      if (signal?.aborted) throw audioError('cancelled');
+    const send = (): void => {
+      if (sent >= total) return;
+      const end = Math.min(sent + MP3_PIECE, total);
+      const left = source.getChannelData(0).slice(sent, end);
+      const right = channels > 1 ? source.getChannelData(1).slice(sent, end) : undefined;
+      const message: Mp3Request = { type: 'piece', left, right };
+      worker.postMessage(message, right ? [left.buffer, right.buffer] : [left.buffer]);
+      sent = end;
+      if (sent >= total) worker.postMessage({ type: 'end' } satisfies Mp3Request);
+    };
 
-      const end = Math.min(offset + block, total);
-      const chunk = encoder.encodeBuffer(
-        left.subarray(offset, end),
-        right ? right.subarray(offset, end) : undefined
+    const finish = (): void => {
+      worker.removeEventListener('message', receive);
+      worker.removeEventListener('error', failed);
+      signal?.removeEventListener('abort', abort);
+    };
+
+    const abort = (): void => {
+      finish();
+      worker.terminate();
+      reject(audioError('cancelled'));
+    };
+
+    const failed = (event: ErrorEvent): void => {
+      event.preventDefault();
+      finish();
+      worker.terminate();
+      reject(
+        audioError(
+          'encode-failed',
+          'The MP3 encoder failed to load. Check your connection and reload, or export as WAV instead.'
+        )
       );
-      if (chunk.length > 0) chunks.push(chunk);
+    };
 
-      onProgress?.(end / total);
+    const receive = (event: MessageEvent<Mp3Response>): void => {
+      const message = event.data;
+      if (message.type === 'progress') {
+        onProgress?.(message.samples / total);
+        send();
+      } else if (message.type === 'done') {
+        finish();
+        release(worker);
+        onProgress?.(1);
+        resolve(message.blob);
+      } else {
+        finish();
+        worker.terminate();
+        reject(audioError('encode-failed'));
+      }
+    };
 
-      // Yield so the progress bar actually paints. Without this the whole
-      // encode blocks the main thread and the UI looks frozen.
-      if (offset % (block * 8) === 0) await new Promise((r) => setTimeout(r, 0));
-    }
+    worker.addEventListener('message', receive);
+    worker.addEventListener('error', failed);
+    signal?.addEventListener('abort', abort, { once: true });
 
-    const tail = encoder.flush();
-    if (tail.length > 0) chunks.push(tail);
-  } catch (err) {
-    if (err instanceof Error && err.name === 'AudioError') throw err;
-    throw audioError('encode-failed');
-  }
-
-  onProgress?.(1);
-  return new Blob(chunks as BlobPart[], { type: 'audio/mpeg' });
+    worker.postMessage({
+      type: 'start',
+      channels,
+      sampleRate: targetRate,
+      bitrate,
+    } satisfies Mp3Request);
+    // Two pieces in flight, so the worker never waits for the next one.
+    send();
+    send();
+  });
 }
 
 /** Predicted MP3 size in bytes — constant bitrate plus a small tag allowance. */
