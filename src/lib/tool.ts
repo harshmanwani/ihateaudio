@@ -88,6 +88,14 @@ export interface ToolConfig {
   video?: boolean;
   /** Format id preselected in the export bar. */
   defaultFormat?: string;
+  /**
+   * What to tell a visitor whose device cannot run the ffmpeg core, after it has
+   * failed to load more than once. Replaces the shared advice for this tool only.
+   *
+   * Set it where the shared copy would mislead: it suggests WAV or MP3, which is
+   * no help to a tool that can only write one format.
+   */
+  noEngineFix?: string;
   /** Restrict the format list. Defaults to all formats. */
   formats?: string[];
   /** Called after decode. Wire up tool-specific controls here. */
@@ -2107,9 +2115,21 @@ export class ToolRuntime {
       this.alertTimer = null;
     }
 
-    const fix = error instanceof AudioError ? error.fix : 'Try reloading the page.';
-    // The error code, never the message: messages can contain a filename.
+    const detail = error instanceof AudioError ? error.detail : {};
+    // Once the converter has been tried and refused, a tool can say what else the
+    // visitor can do for *its* output, which the shared copy cannot know.
+    const gaveUp =
+      error instanceof AudioError && error.code === 'ffmpeg-load-failed' && detail.gave_up === true;
+    const fix =
+      error instanceof AudioError
+        ? (gaveUp && this.config.noEngineFix) || error.fix
+        : 'Try reloading the page.';
+    // The error code and coarse diagnostic tokens, never the message: messages can
+    // contain a filename. `detail` is built from stage names, allow-listed error
+    // names and flags (see AudioErrorDetail), and the code goes last so it cannot be
+    // overwritten.
     track('tool_error', {
+      ...detail,
       code: error instanceof AudioError ? error.code : 'unknown',
     });
 
