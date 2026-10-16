@@ -66,7 +66,17 @@ export function slice(
   return out;
 }
 
-/** Removes [startSec, endSec) and joins the remainder. */
+/** How long the join in `cutOut` crossfades: enough to hide the step, not to hear. */
+const CUT_CROSSFADE = 0.01;
+
+/**
+ * Removes [startSec, endSec) and joins the remainder.
+ *
+ * The join is crossfaded. Butting the two ends together left a step wherever
+ * the waveform did not happen to cross the same value on both sides, which is
+ * almost everywhere: half full scale on a 440 Hz tone, an audible click. The
+ * crossfade takes 10 ms off the length.
+ */
 export function cutOut(
   buffer: AudioBuffer,
   startSec: number,
@@ -76,7 +86,7 @@ export function cutOut(
   const tail = slice(buffer, endSec, buffer.duration);
   if (startSec <= 0) return tail;
   if (endSec >= buffer.duration) return head;
-  return concat([head, tail]);
+  return concat([head, tail], Math.min(CUT_CROSSFADE, head.duration, tail.duration));
 }
 
 export function gainFactor(decibels: number): number {

@@ -109,7 +109,21 @@ describe('slice', () => {
 describe('cutOut', () => {
   it('removes the middle and joins the remainder', () => {
     const out = cutOut(constantBuffer(10), 4, 6);
-    expect(out.duration).toBeCloseTo(8, 2);
+    // Less the 10 ms the join crossfades over.
+    expect(out.duration).toBeCloseTo(7.99, 2);
+  });
+
+  it('crossfades the join instead of leaving a step', () => {
+    // Cut half a cycle out of a 440 Hz tone at a crest, so the two sides meet
+    // at opposite peaks: a butt join steps by twice full scale.
+    const source = toneBuffer(2, 440, RATE, 1, 0);
+    const crest = 0.5 + 1 / 1760;
+    const out = cutOut(source, crest, crest + 1 / 880);
+    const data = out.getChannelData(0);
+    let largest = 0;
+    for (let i = 1; i < data.length; i += 1) largest = Math.max(largest, Math.abs(data[i]! - data[i - 1]!));
+    // A sine's own largest step between samples is 2*pi*440/44100 of full scale.
+    expect(largest).toBeLessThan(((2 * Math.PI * 440) / RATE) * 1.5);
   });
 
   it('degenerates to a plain slice at the edges', () => {

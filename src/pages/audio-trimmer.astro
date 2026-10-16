@@ -257,9 +257,20 @@ const faq = [
           ? cutOut(buffer, selection.start, selection.end)
           : slice(buffer, selection.start, selection.end);
 
-      // 20ms is below the threshold of hearing it as a fade, and above the
-      // threshold of hearing the click it prevents.
-      return tool?.flag('fade') ? applyFade(result, 0.02, 0.02, 'linear') : result;
+      if (!tool?.flag('fade')) return result;
+
+      /**
+       * 20ms is below the threshold of hearing it as a fade, and above the
+       * threshold of hearing the click it prevents.
+       *
+       * Only edges the cut made. Keeping a selection makes both ends new. Removing
+       * one makes a join, which cutOut crossfades, and leaves the file's own start
+       * and end alone, unless the removed part ran to one of them. Fading both
+       * ends regardless faded audio nobody cut and left the join a hard splice.
+       */
+      const fadeIn = mode === 'keep' || selection.start <= 0 ? 0.02 : 0;
+      const fadeOut = mode === 'keep' || selection.end >= buffer.duration ? 0.02 : 0;
+      return applyFade(result, fadeIn, fadeOut, 'linear');
     },
   });
 </script>
