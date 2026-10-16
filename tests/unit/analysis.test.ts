@@ -77,6 +77,26 @@ describe('peak measurement', () => {
     expect(truePeakDb(buffer)).toBeGreaterThan(peakDb(buffer));
   });
 
+  it('reads the EBU Tech 3341 12 kHz tones within the test tolerance', () => {
+    // 48 kHz, 12 kHz at half scale, so the true peak is -6.02 dBTP whatever
+    // the phase. At 45 and 60 degrees no sample lands on a crest; the old
+    // cubic interpolation read -7.09 and -6.75. The test allows +0.2/-0.4 dB.
+    // Faded in and out, because an abrupt start really does overshoot.
+    const rate = 48000;
+    for (const phase of [Math.PI / 4, Math.PI / 3]) {
+      const buffer = createBuffer(1, rate, rate);
+      const data = buffer.getChannelData(0);
+      const fade = rate / 100;
+      for (let i = 0; i < rate; i += 1) {
+        const ramp = Math.min(1, i / fade, (rate - 1 - i) / fade);
+        data[i] = 0.5 * ramp * Math.sin((2 * Math.PI * 12000 * i) / rate + phase);
+      }
+      const truePeak = truePeakDb(buffer);
+      expect(truePeak).toBeGreaterThan(-6.02 - 0.4);
+      expect(truePeak).toBeLessThan(-6.02 + 0.2);
+    }
+  });
+
   it('reports -Infinity for silence', () => {
     expect(truePeakDb(silentBuffer(1, RATE, 1))).toBe(-Infinity);
   });

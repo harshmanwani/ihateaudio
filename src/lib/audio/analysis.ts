@@ -248,35 +248,60 @@ export function peakDb(buffer: AudioBuffer): number {
   return peak > 0 ? 20 * Math.log10(peak) : -Infinity;
 }
 
+/** Taps each side of the point being reconstructed. */
+const TRUE_PEAK_REACH = 8;
+
+/**
+ * The three in-between phases of a 4x oversampler: a Hann-windowed sinc,
+ * centred at 1/4, 2/4 and 3/4 of a sample, taps from -REACH+1 to +REACH.
+ */
+const TRUE_PEAK_PHASES: Float64Array[] = [1, 2, 3].map((step) => {
+  const taps = new Float64Array(2 * TRUE_PEAK_REACH);
+  for (let k = -TRUE_PEAK_REACH + 1; k <= TRUE_PEAK_REACH; k += 1) {
+    const d = step / 4 - k;
+    const window = 0.5 + 0.5 * Math.cos((Math.PI * d) / TRUE_PEAK_REACH);
+    taps[k + TRUE_PEAK_REACH - 1] = (Math.sin(Math.PI * d) / (Math.PI * d)) * window;
+  }
+  return taps;
+});
+
 /**
  * True peak: the signal between samples can exceed the highest sample, which
- * is why a file that looks safe at 0 dBFS can still clip a converter. 4x
- * oversampling catches most of it.
+ * is why a file that looks safe at 0 dBFS can still clip a converter.
+ *
+ * 4x oversampling as BS.1770 describes, with a real reconstruction filter.
+ * This was a Catmull-Rom cubic through the neighbours, which is not one: it
+ * smooths away inter-sample peaks above about an eighth of the sample rate.
+ * The EBU Tech 3341 12 kHz tones (-6.02 dBTP) read -7.09 and -6.75, outside
+ * the +0.2/-0.4 dB the test allows, and a real master at +0.65 dBTP read
+ * +0.13. That is the difference between the meter warning about a -1 dBTP
+ * ceiling and staying quiet, and the normalizer's ceiling being kept.
  */
 export function truePeakDb(buffer: AudioBuffer): number {
   let peak = 0;
-  const factor = 4;
+  const reach = TRUE_PEAK_REACH;
 
   for (let c = 0; c < buffer.numberOfChannels; c += 1) {
     const data = buffer.getChannelData(c);
     const n = data.length;
-    for (let i = 0; i < n - 1; i += 1) {
-      const a = data[i];
-      const b = data[i + 1];
-      // Cubic-ish interpolation between neighbours approximates the
-      // reconstructed analogue waveform well enough for a warning.
-      const prev = i > 0 ? data[i - 1] : a;
-      const next = i < n - 2 ? data[i + 2] : b;
-      for (let s = 0; s < factor; s += 1) {
-        const t = s / factor;
-        const t2 = t * t;
-        const t3 = t2 * t;
-        const v =
-          0.5 *
-          (2 * a +
-            (-prev + b) * t +
-            (2 * prev - 5 * a + 4 * b - next) * t2 +
-            (-prev + 3 * a - 3 * b + next) * t3);
+    for (let i = 0; i < n; i += 1) {
+      const sample = Math.abs(data[i]);
+      if (sample > peak) peak = sample;
+      if (i + 1 >= n) break;
+
+      // Only the edges need the bounds check; the middle of the file is the
+      // tight loop.
+      const inside = i - reach + 1 >= 0 && i + reach < n;
+      for (const taps of TRUE_PEAK_PHASES) {
+        let v = 0;
+        if (inside) {
+          for (let k = 0; k < taps.length; k += 1) v += data[i - reach + 1 + k] * taps[k];
+        } else {
+          for (let k = 0; k < taps.length; k += 1) {
+            const j = i - reach + 1 + k;
+            if (j >= 0 && j < n) v += data[j] * taps[k];
+          }
+        }
         const abs = Math.abs(v);
         if (abs > peak) peak = abs;
       }
