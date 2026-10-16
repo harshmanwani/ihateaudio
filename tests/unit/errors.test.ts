@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { AudioError, audioError, toAudioError } from '../../src/lib/audio/errors';
+import { AudioError, audioError, causeOf, toAudioError } from '../../src/lib/audio/errors';
 
 describe('audioError', () => {
   it('attaches the standard copy for a code', () => {
@@ -123,5 +123,80 @@ describe('toAudioError', () => {
       expect(err.message, String(thrown)).toBeTruthy();
       expect(err.fix, String(thrown)).toBeTruthy();
     }
+  });
+});
+
+describe('diagnostic detail', () => {
+  it('is empty unless a throw site supplies some', () => {
+    expect(audioError('too-long').detail).toEqual({});
+    expect(audioError('encode-failed', undefined, { stage: 'exec' }).detail).toEqual({
+      stage: 'exec',
+    });
+  });
+
+  /**
+   * Fifteen tool_error events from four people, and the code on each said only
+   * 'unknown-error' or 'ffmpeg-load-failed'. The thrown name was discarded, so
+   * nothing could be diagnosed from analytics. It now rides along.
+   */
+  it('keeps the name of an unrecognised failure, and nothing else about it', () => {
+    const err = toAudioError(new RangeError('offset is out of bounds: holiday-recording.mp3'));
+    expect(err.code).toBe('unknown-error');
+    expect(err.detail).toEqual({ cause: 'RangeError' });
+    expect(JSON.stringify(err.detail)).not.toMatch(/holiday|mp3/);
+  });
+});
+
+describe('causeOf', () => {
+  it('reads the name off an Error', () => {
+    expect(causeOf(new TypeError('x'))).toBe('TypeError');
+    expect(causeOf(new RangeError('x'))).toBe('RangeError');
+    expect(causeOf(new DOMException('x', 'NetworkError'))).toBe('NetworkError');
+  });
+
+  /** ffmpeg.wasm rejects with the string its worker built from error.toString(). */
+  it('reads the name off the front of a string, which is how ffmpeg.wasm reports', () => {
+    expect(causeOf('RuntimeError: memory access out of bounds')).toBe('RuntimeError');
+    expect(causeOf('CompileError: WebAssembly.instantiate(): expected magic word')).toBe(
+      'CompileError'
+    );
+    expect(causeOf('Uncaught TypeError: x is not a function')).toBe('TypeError');
+  });
+
+  it('recognises the ffmpeg.wasm failures that carry no useful name', () => {
+    expect(causeOf(new Error('failed to import ffmpeg-core.js'))).toBe('import-failure');
+    expect(causeOf('Error: failed to import ffmpeg-core.js')).toBe('import-failure');
+    expect(causeOf(new Error('called FFmpeg.terminate()'))).toBe('terminated');
+    expect(causeOf(new Error('ffmpeg is not loaded, call `await ffmpeg.load()` first'))).toBe(
+      'not-loaded'
+    );
+    expect(causeOf('Aborted(both async and sync fetching of the wasm failed)')).toBe('wasm-abort');
+    expect(causeOf('RuntimeError: Aborted(NetworkError: Failed to fetch). Build with -sASSERTIONS')).toBe(
+      'wasm-abort:NetworkError'
+    );
+  });
+
+  it('never returns text from a message, only fixed tokens', () => {
+    const hostile = [
+      new Error('could not read Voice Memo 3.m4a'),
+      'Error: could not read Voice Memo 3.m4a',
+      Object.assign(new Error('x'), { name: 'holiday-recording.mp3' }),
+      'blob:https://ihateaudio.com/9f2c',
+      { name: 'SecretFileName', message: 'private.wav' },
+    ];
+    for (const thrown of hostile) {
+      const cause = causeOf(thrown);
+      expect(cause, String(thrown)).toMatch(/^[A-Za-z]+(?:-[a-z]+)?(?::[A-Za-z]+)?$/);
+      expect(cause, String(thrown)).not.toMatch(/Voice|holiday|private|Secret|blob/i);
+    }
+    expect(causeOf(Object.assign(new Error('x'), { name: 'holiday-recording.mp3' }))).toBe('other');
+  });
+
+  it('copes with anything it is handed', () => {
+    for (const thrown of [null, undefined, 0, {}, [], '', new Error('')]) {
+      expect(typeof causeOf(thrown), String(thrown)).toBe('string');
+    }
+    expect(causeOf(null)).toBe('other');
+    expect(causeOf(new Error(''))).toBe('Error');
   });
 });

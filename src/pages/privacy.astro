@@ -132,9 +132,14 @@ const schema = [
     <p>
       Page analytics, through Google Analytics and PostHog: which pages were
       viewed, roughly which country from, and which site sent you. On a tool
-      page we also record three things about what happened, and only these
-      three: that a file was accepted, which output format you chose, and the
-      error code if something failed. It exists so we know which tools are worth
+      page we also record what happened: that a file was accepted, which
+      output format you chose, and the error code if something failed. A
+      failure carries a few coarse technical facts too, so it can be fixed:
+      which step it failed at, which kind of error the browser reported (never
+      the wording of the message, which can contain a file name), how many
+      times the converter has failed to load, and whether the browser supports
+      WebAssembly and shared memory, plus roughly how much memory the device
+      has where the browser says. It exists so we know which tools are worth
       more work and which ones are quietly broken.
     </p>
     <p>
