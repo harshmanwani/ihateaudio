@@ -12,6 +12,7 @@ const {
   exportAudio,
   mp3Output,
   outputSampleRate,
+  vorbisRange,
   writtenKbps,
 } = await import('../../src/lib/audio/export');
 
@@ -108,6 +109,20 @@ describe('FLAC', () => {
     expect(options.args).toContain('s16');
   });
 
+  it('is estimated at 24 bits when the export will be 24-bit', () => {
+    // A 24-bit stereo recording at 48 kHz, 22 s: 6,336,102 bytes as WAV,
+    // 4,665,011 as the 24-bit FLAC the shipped core writes, 2,586,784 at 16.
+    const source = proxy(1056000 / 48000, 48000, 2);
+    for (const bitDepth of [24, 32] as const) {
+      const estimate = estimateSize(source, 'flac', { bitDepth });
+      expect(estimate / 4665011).toBeGreaterThan(0.8);
+      expect(estimate / 4665011).toBeLessThan(1.2);
+    }
+    const sixteen = estimateSize(source, 'flac', { bitDepth: 16 });
+    expect(sixteen / 2586784).toBeGreaterThan(0.8);
+    expect(sixteen / 2586784).toBeLessThan(1.2);
+  });
+
   it('goes to 24 bits only when 24 or 32 is asked for', async () => {
     await exportAudio(createBuffer(2, 4410, 44100), 'flac', { bitDepth: 32 });
     const [, , options] = encodeVia.mock.calls[0] as unknown as [
@@ -141,5 +156,96 @@ describe('Opus arguments', () => {
 
   it('leaves mono at the default 20 ms frame', async () => {
     expect(await argsFor(1)).not.toContain('-frame_duration');
+  });
+});
+
+describe('Vorbis', () => {
+  beforeEach(() => encodeVia.mockClear());
+
+  /*
+   * Each row is the lowest and highest whole kbps libvorbis opened at in the
+   * shipped core, with the next kbps out on either side refused: channels,
+   * rate, low, high.
+   */
+  const measured: [number, number, number, number][] = [
+    [1, 8000, 8, 42],
+    [2, 8000, 12, 84],
+    [1, 11025, 12, 50],
+    [2, 11025, 16, 100],
+    [1, 12000, 12, 50],
+    [2, 12000, 16, 100],
+    [1, 16000, 16, 100],
+    [2, 16000, 24, 200],
+    [1, 22050, 16, 90],
+    [2, 22050, 30, 180],
+    [1, 24000, 16, 90],
+    [2, 24000, 30, 180],
+    [1, 32000, 30, 190],
+    [2, 32000, 36, 380],
+    [1, 44100, 32, 240],
+    [2, 44100, 45, 500],
+    [1, 48000, 32, 240],
+    [2, 48000, 45, 500],
+    [3, 48000, 96, 720],
+    [6, 48000, 84, 1440],
+    [3, 8000, 24, 126],
+    [3, 16000, 48, 300],
+    [3, 22050, 48, 270],
+    [3, 32000, 90, 570],
+    [6, 8000, 48, 252],
+    [6, 16000, 96, 600],
+    [6, 22050, 96, 540],
+    [6, 32000, 180, 1140],
+  ];
+
+  it.each(measured)('%i ch at %i Hz opens from %i to %i kbps', (ch, rate, low, high) => {
+    expect(vorbisRange(rate, ch)).toEqual([low, high]);
+  });
+
+  it('asks for no more than libvorbis takes at 16 kHz mono', async () => {
+    // 128 kbps here made ffmpeg fail to open the encoder and write nothing.
+    await exportAudio(createBuffer(1, 1600, 16000), 'ogg', { bitrate: 128 });
+    const [, , options] = encodeVia.mock.calls[0] as unknown as [
+      AudioBuffer,
+      string,
+      { args: string[] },
+    ];
+    expect(options.args).toEqual(['-c:a', 'libvorbis', '-b:a', '100k']);
+    expect(writtenKbps('ogg', 128, 16000, 1)).toBe(100);
+    expect(effectiveKbps('ogg', 128, 16000, 1)).toBe(100);
+    expect(estimateSize(proxy(20, 16000, 1), 'ogg', { bitrate: 128 })).toBe(
+      estimateSize(proxy(20, 16000, 1), 'ogg', { bitrate: 100 })
+    );
+  });
+
+  it('raises a request below the floor', () => {
+    // 5.1 at 48 kHz will not go under 84 kbps.
+    expect(writtenKbps('ogg', 64, 48000, 6)).toBe(84);
+  });
+
+  it('leaves a request it can meet alone', async () => {
+    await exportAudio(createBuffer(2, 4410, 44100), 'ogg', { bitrate: 192 });
+    const [, , options] = encodeVia.mock.calls[0] as unknown as [
+      AudioBuffer,
+      string,
+      { args: string[] },
+    ];
+    expect(options.args).toEqual(['-c:a', 'libvorbis', '-b:a', '192k']);
+    expect(writtenKbps('ogg', 192, 44100, 2)).toBe(192);
+  });
+
+  it('writes a 96 kHz file at 48 kHz, where it has a bitrate mode', async () => {
+    // Past 50 kHz libvorbis refused every bitrate.
+    await exportAudio(createBuffer(2, 9600, 96000), 'ogg', { bitrate: 192 });
+    const [, , options] = encodeVia.mock.calls[0] as unknown as [
+      AudioBuffer,
+      string,
+      { args: string[] },
+    ];
+    expect(options.args).toEqual(['-c:a', 'libvorbis', '-ar', '48000', '-b:a', '192k']);
+    expect(outputSampleRate('ogg', 96000, 192, 2)).toBe(48000);
+    expect(vorbisRange(96000, 1)).toEqual([32, 240]);
+    expect(vorbisRange(6000, 1)).toEqual([8, 42]);
+    expect(outputSampleRate('ogg', 6000, 64, 1)).toBe(8000);
   });
 });
