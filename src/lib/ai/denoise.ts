@@ -20,7 +20,7 @@
  * Yielding every couple of seconds of audio costs nothing measurable and makes all
  * three work.
  */
-import { resampleBuffer } from '../audio/resample';
+import { resample } from '../audio/dsp';
 import {
   loadRnnoise,
   RNNOISE_DELAY,
@@ -144,7 +144,7 @@ export async function denoise(
   const working =
     sourceRate === RNNOISE_RATE
       ? buffer
-      : await resampleBuffer(
+      : resample(
           buffer,
           RNNOISE_RATE,
           Math.max(1, Math.round((buffer.length / sourceRate) * RNNOISE_RATE))
@@ -237,7 +237,7 @@ export async function denoise(
   }
 
   if (sourceRate === RNNOISE_RATE) return cleaned;
-  return resampleBuffer(cleaned, sourceRate, buffer.length);
+  return resample(cleaned, sourceRate, buffer.length);
 }
 
 /**

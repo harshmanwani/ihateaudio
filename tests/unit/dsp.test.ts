@@ -12,7 +12,7 @@ import {
   extractChannel,
   swapChannels,
   invertPhase,
-  resampleLinear,
+  resample,
   changeSpeed,
   padSilence,
   loop,
@@ -25,6 +25,7 @@ import {
   gainFactor,
   toDecibels,
 } from '../../src/lib/audio/dsp';
+import { toneBuffer } from '../../src/lib/audio/analysis';
 
 const RATE = 44100;
 
@@ -38,6 +39,21 @@ function constantBuffer(seconds: number, value = 0.5, channels = 2): AudioBuffer
 }
 
 /** Ramps 0..1 across the buffer, so position is recoverable from value. */
+/** Level of `freq` in channel 0, in dB relative to full scale, away from the edges. */
+function levelAt(buffer: AudioBuffer, freq: number): number {
+  const data = buffer.getChannelData(0);
+  const rate = buffer.sampleRate;
+  const from = Math.round(data.length * 0.25);
+  const to = Math.round(data.length * 0.75);
+  let re = 0;
+  let im = 0;
+  for (let i = from; i < to; i += 1) {
+    re += data[i]! * Math.cos((2 * Math.PI * freq * i) / rate);
+    im += data[i]! * Math.sin((2 * Math.PI * freq * i) / rate);
+  }
+  return 20 * Math.log10((2 * Math.hypot(re, im)) / (to - from));
+}
+
 function rampBuffer(seconds: number, channels = 1): AudioBuffer {
   const length = Math.round(seconds * RATE);
   const buffer = createBuffer(channels, length, RATE);
@@ -236,22 +252,28 @@ describe('channel operations', () => {
   });
 });
 
-describe('resampleLinear', () => {
+describe('resample', () => {
   it('changes rate and length together, holding duration', () => {
-    const out = resampleLinear(constantBuffer(2, 0.5, 1), 22050);
+    const out = resample(constantBuffer(2, 0.5, 1), 22050);
     expect(out.sampleRate).toBe(22050);
     expect(out.length).toBe(22050 * 2);
     expect(out.duration).toBeCloseTo(2, 3);
   });
 
   it('preserves signal level', () => {
-    const out = resampleLinear(constantBuffer(1, 0.5, 1), 48000);
+    const out = resample(constantBuffer(1, 0.5, 1), 48000);
     expect(out.getChannelData(0)[1000]).toBeCloseTo(0.5, 3);
   });
 
   it('is a no-op at the same rate', () => {
-    const out = resampleLinear(constantBuffer(1), RATE);
+    const out = resample(constantBuffer(1), RATE);
     expect(out.length).toBe(RATE);
+  });
+
+  it('filters before going down, so nothing folds back', () => {
+    // 10 kHz is above 16 kHz's Nyquist. Interpolation put it at 6 kHz.
+    const out = resample(toneBuffer(1, 10000, RATE, 1, -6), 16000);
+    expect(levelAt(out, 6000)).toBeLessThan(-60);
   });
 });
 
@@ -265,6 +287,13 @@ describe('changeSpeed', () => {
   it('doubles the duration at 0.5x', () => {
     const out = changeSpeed(constantBuffer(2, 0.5, 1), 0.5);
     expect(out.duration).toBeCloseTo(4, 1);
+  });
+
+  it('does not alias at 2x', () => {
+    // A 15 kHz cymbal at double speed belongs at 30 kHz, out of range. Without
+    // a filter it came back at 14.1 kHz at full level.
+    const out = changeSpeed(toneBuffer(1, 15000, RATE, 1, -6), 2);
+    expect(levelAt(out, RATE - 30000)).toBeLessThan(-60);
   });
 
   it('clamps absurd rates rather than allocating forever', () => {

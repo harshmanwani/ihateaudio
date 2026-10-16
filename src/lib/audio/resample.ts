@@ -13,7 +13,6 @@
  * in Chrome, which is a gentle low-pass in the audible band: 3.4 dB down at
  * 15 kHz for one pass from 44.1 to 48 kHz, and the AI tools make two passes.
  */
-import { createBuffer } from './dsp';
 
 /** Sinc zero crossings each side of the centre, at the lower of the two rates. */
 const ZERO_CROSSINGS = 16;
@@ -67,7 +66,7 @@ export function resampleChannel(
   from: number,
   to: number,
   length = Math.max(1, Math.round((input.length * to) / from))
-): Float32Array {
+): Float32Array<ArrayBuffer> {
   const out = new Float32Array(length);
   if (from === to) {
     out.set(input.subarray(0, Math.min(length, input.length)));
@@ -99,22 +98,3 @@ export function resampleChannel(
   return out;
 }
 
-/**
- * A whole buffer to `rate`, channel by channel.
- *
- * Yields between channels so a page can paint its progress: a five-minute
- * channel takes most of a second.
- */
-export async function resampleBuffer(
-  buffer: AudioBuffer,
-  rate: number,
-  length = Math.max(1, Math.round((buffer.length * rate) / buffer.sampleRate))
-): Promise<AudioBuffer> {
-  if (buffer.sampleRate === rate && buffer.length === length) return buffer;
-  const out = createBuffer(buffer.numberOfChannels, length, rate);
-  for (let c = 0; c < buffer.numberOfChannels; c += 1) {
-    if (c > 0) await new Promise((resolve) => setTimeout(resolve, 0));
-    out.copyToChannel(resampleChannel(buffer.getChannelData(c), buffer.sampleRate, rate, length), c);
-  }
-  return out;
-}

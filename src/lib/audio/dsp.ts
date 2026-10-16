@@ -5,6 +5,7 @@
  *
  * Everything here is Tier 0 — plain Web Audio and typed arrays, no downloads.
  */
+import { resampleChannel } from './resample';
 
 export type FadeCurve = 'linear' | 'exponential' | 'logarithmic' | 'scurve';
 
@@ -215,7 +216,7 @@ export function matchFormat(
   sampleRate: number
 ): AudioBuffer {
   let out = buffer;
-  if (out.sampleRate !== sampleRate) out = resampleLinear(out, sampleRate);
+  if (out.sampleRate !== sampleRate) out = resample(out, sampleRate);
   if (out.numberOfChannels !== channels) out = setChannels(out, channels);
   return out;
 }
@@ -298,28 +299,26 @@ export function invertPhase(buffer: AudioBuffer): AudioBuffer {
 }
 
 /**
- * Linear-interpolation resampler. Used for format matching and for
- * speed-with-pitch changes, where the artefacts are inaudible at the ratios
- * these tools use. Format conversion proper goes through the encoder.
+ * Sample-rate conversion with a band-limiting filter (resample.ts).
+ *
+ * This was linear interpolation, on the grounds that its artefacts are
+ * inaudible at the ratios these tools use. They are not: at 2x speed or +12
+ * semitones, a 15 kHz cymbal came back as a 14 kHz tone at full level, and the
+ * file-size tool's drop to 16 kHz put a 10 kHz tone at 6 kHz. Linear
+ * interpolation also dulls what it keeps, 3 dB down at 15 kHz from 44.1 to
+ * 48 kHz.
+ *
+ * `length` pins the frame count when a round trip must land exactly.
  */
-export function resampleLinear(buffer: AudioBuffer, rate: number): AudioBuffer {
-  if (rate === buffer.sampleRate) return cloneBuffer(buffer);
-  const ratio = rate / buffer.sampleRate;
-  const length = Math.max(1, Math.round(buffer.length * ratio));
+export function resample(
+  buffer: AudioBuffer,
+  rate: number,
+  length = Math.max(1, Math.round((buffer.length * rate) / buffer.sampleRate))
+): AudioBuffer {
+  if (rate === buffer.sampleRate && length === buffer.length) return cloneBuffer(buffer);
   const out = createBuffer(buffer.numberOfChannels, length, rate);
-
   for (let c = 0; c < buffer.numberOfChannels; c += 1) {
-    const src = buffer.getChannelData(c);
-    const dst = out.getChannelData(c);
-    const last = src.length - 1;
-    for (let i = 0; i < length; i += 1) {
-      const pos = i / ratio;
-      const idx = Math.floor(pos);
-      const frac = pos - idx;
-      const a = src[Math.min(idx, last)];
-      const b = src[Math.min(idx + 1, last)];
-      dst[i] = a + (b - a) * frac;
-    }
+    out.copyToChannel(resampleChannel(buffer.getChannelData(c), buffer.sampleRate, rate, length), c);
   }
   return out;
 }
@@ -331,7 +330,7 @@ export function resampleLinear(buffer: AudioBuffer, rate: number): AudioBuffer {
 export function changeSpeed(buffer: AudioBuffer, rate: number): AudioBuffer {
   const safe = Math.min(4, Math.max(0.25, rate));
   if (safe === 1) return cloneBuffer(buffer);
-  const resampled = resampleLinear(buffer, buffer.sampleRate / safe);
+  const resampled = resample(buffer, buffer.sampleRate / safe);
   // The data is now the right length; relabel it at the original rate so it
   // plays back faster rather than simply being a lower-rate file.
   const out = createBuffer(resampled.numberOfChannels, resampled.length, buffer.sampleRate);

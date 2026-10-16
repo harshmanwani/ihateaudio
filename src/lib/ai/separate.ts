@@ -7,8 +7,7 @@
  * shifts by 9%, which does not fail — it just separates noticeably worse, for a
  * reason nothing in the output points at.
  */
-import { createBuffer, setChannels } from '../audio/dsp';
-import { resampleBuffer } from '../audio/resample';
+import { createBuffer, resample, setChannels } from '../audio/dsp';
 import { MDX_RATE, type MdxModel, type Stem } from './models';
 import type { SeparateRequest, SeparateResponse } from './separate.worker';
 import { loadModel } from './store';
@@ -94,7 +93,7 @@ export async function separate(
 
   const originalRate = buffer.sampleRate;
   const mono = buffer.numberOfChannels === 1;
-  const at441 = await resampleBuffer(buffer, MDX_RATE);
+  const at441 = resample(buffer, MDX_RATE);
   // Surround is folded to stereo first, or toStereo keeps only front left and right.
   const channels = toStereo(at441.numberOfChannels > 2 ? setChannels(at441, 2) : at441);
 
@@ -225,7 +224,7 @@ async function restore(
   mono: boolean
 ): Promise<AudioBuffer> {
   const at441 = toBuffer(channels, MDX_RATE, mono);
-  return rate === MDX_RATE ? at441 : resampleBuffer(at441, rate);
+  return rate === MDX_RATE ? at441 : resample(at441, rate);
 }
 
 /** Label for a stem, used in filenames and in the results list. */

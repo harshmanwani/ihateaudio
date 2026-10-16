@@ -12,7 +12,7 @@ import { resampleChannel } from '../../src/lib/audio/resample';
 import { setChannels } from '../../src/lib/audio/dsp';
 import { toSrt, toVtt, toWhisperInput } from '../../src/lib/ai/transcribe';
 
-function tone(rate: number, freq: number, seconds = 1): Float32Array {
+function tone(rate: number, freq: number, seconds = 1): Float32Array<ArrayBuffer> {
   const out = new Float32Array(Math.round(rate * seconds));
   for (let i = 0; i < out.length; i += 1) out[i] = 0.5 * Math.sin((2 * Math.PI * freq * i) / rate);
   return out;

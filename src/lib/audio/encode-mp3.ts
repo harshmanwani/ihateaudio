@@ -6,7 +6,7 @@
  * trimmer feels instant while competitors spin.
  */
 import { audioError } from './errors';
-import { resampleLinear } from './dsp';
+import { resample, setChannels } from './dsp';
 
 /** Sample rates the MP3 format permits. Anything else must be resampled. */
 const MP3_RATES = [8000, 11025, 12000, 16000, 22050, 24000, 32000, 44100, 48000];
@@ -89,12 +89,13 @@ export async function encodeMp3(
 
   // MP3 only permits certain rates; resample rather than fail.
   const targetRate = nearestMp3Rate(buffer.sampleRate);
-  const source =
-    targetRate === buffer.sampleRate ? buffer : resampleLinear(buffer, targetRate);
+  const resampled = targetRate === buffer.sampleRate ? buffer : resample(buffer, targetRate);
 
-  // lamejs handles mono and stereo; anything wider is downmixed by taking the
-  // first two channels, which is what every consumer player would do anyway.
-  const channels = Math.min(2, source.numberOfChannels);
+  // lamejs handles mono and stereo. Wider is folded to stereo by the speaker
+  // downmix: taking the first two channels of a 5.1 film track left out the
+  // centre, which is where the dialogue is.
+  const source = resampled.numberOfChannels > 2 ? setChannels(resampled, 2) : resampled;
+  const channels = source.numberOfChannels;
   const encoder = new lame.Mp3Encoder(channels, targetRate, bitrate);
 
   const left = toInt16(source.getChannelData(0));

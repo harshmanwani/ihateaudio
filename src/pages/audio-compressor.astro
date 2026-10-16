@@ -232,7 +232,7 @@ const faq = [
 
 <script>
   import { createTool } from '../lib/tool';
-  import { setChannels, resampleLinear } from '../lib/audio/dsp';
+  import { setChannels, resample } from '../lib/audio/dsp';
   import { estimateSize } from '../lib/audio/export';
   import { filesize } from '../lib/format';
   import { panelColors, panelContext } from '../lib/canvas';
@@ -498,7 +498,7 @@ const faq = [
       if (mono && out.numberOfChannels > 1) out = setChannels(out, 1);
 
       const rate = targetRate();
-      if (rate > 0 && rate !== out.sampleRate) out = resampleLinear(out, rate);
+      if (rate > 0 && rate !== out.sampleRate) out = resample(out, rate);
 
       return out;
     },

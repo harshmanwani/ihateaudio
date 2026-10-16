@@ -27,7 +27,7 @@ const faq = [
   },
   {
     q: 'What is aliasing, and does this tool avoid it?',
-    a: 'When you lower the sample rate, frequencies above the new ceiling have nowhere to go and fold back down into the audible range as inharmonic whistles and grit. Proper converters run a steep low-pass filter first to remove them. This tool uses linear interpolation without that filter, which is fine for speech and most spoken-word material, but bright cymbal-heavy music taken down to 22.05 kHz or below can show artifacts. For mastering-grade work, use a DAW or SoX.',
+    a: 'When you lower the sample rate, frequencies above the new ceiling have nowhere to go and fold back down into the audible range as inharmonic whistles and grit. Proper converters run a steep low-pass filter first to remove them, and so does this one: a windowed-sinc filter that is flat to within 0.05 dB up to 18 kHz at CD rates. What sits above the new ceiling is removed, so a bright mix taken to 22.05 kHz loses its top octave, but it does not turn into noise.',
   },
   {
     q: 'Does changing the sample rate change the pitch or the length?',
@@ -57,12 +57,10 @@ const faq = [
 
         Nyquist is the one rule that decides everything on this page, and it is
         abstract until you can see what your particular file has sitting above the
-        line. Because this converter interpolates rather than filtering first, that
-        content does not disappear — it mirrors back down into the audible range,
-        so the ghost curve shows exactly where it will land. On a voice note there
+        line. The converter filters that band out before it drops samples, so the
+        shaded region is what the new file will not have. On a voice note there
         is nothing up there and the picture says so; on a bright mix going to
-        22 kHz it is unmistakable, which is the case the prose below is warning
-        about.
+        22 kHz it is plain how much of the top end goes.
       */}
       <div class="spectrum controls__full" data-spectrum-panel>
         <canvas class="spectrum__canvas" data-spectrum aria-hidden="true"></canvas>
@@ -148,7 +146,7 @@ const faq = [
       network, unchanged since digital trunking arrived in the 1960s.
     </p>
 
-    <h2>What downsampling costs, and what this tool does not do</h2>
+    <h2>What downsampling costs</h2>
     <p>
       Lowering the rate is not free. Any content above the new ceiling has to be
       removed first, and if it is not, it does not vanish, it folds back down
@@ -158,13 +156,13 @@ const faq = [
       this.
     </p>
     <p>
-      This tool resamples by linear interpolation and does not apply that filter.
-      For speech, voice notes, lectures, podcasts and anything destined for a
-      transcription model, the difference is inaudible and the convenience is
-      worth it. For bright, dense music going to 22.05 kHz or below, it is not:
-      use a DAW, SoX or a dedicated converter with a proper filter. Saying so is
-      more useful than pretending otherwise, and it is the one case on this page
-      where a desktop tool is genuinely the better answer.
+      This tool does. It resamples with a windowed-sinc filter, flat to within
+      0.05 dB up to 18 kHz at CD rates, that removes what the new rate cannot
+      hold before any samples are dropped. What it cannot do is keep that band:
+      bright music taken to 22.05 kHz or below loses everything above about
+      10 kHz. For speech,
+      voice notes and anything going to a transcription model, there is nothing
+      up there to lose.
     </p>
   </Fragment>
 </ToolPage>
@@ -201,7 +199,7 @@ const faq = [
 
 <script>
   import { createTool } from '../lib/tool';
-  import { resampleLinear } from '../lib/audio/dsp';
+  import { resample } from '../lib/audio/dsp';
   import { nearestMp3Rate } from '../lib/audio/encode-mp3';
   import { fft } from '../lib/audio/fft';
   import { hannPeriodic } from '../lib/audio/stft';
@@ -336,12 +334,6 @@ const faq = [
     const binHz = sourceRate / FFT_SIZE;
     let peak = 0;
     for (let bin = 1; bin < spec.length; bin += 1) peak = Math.max(peak, spec[bin]!);
-    const level = (hz: number): number => {
-      if (peak <= 0 || hz >= sourceNyquist) return FLOOR_DB;
-      const bin = Math.round(hz / binHz);
-      const value = spec[bin] ?? 0;
-      return value > 0 ? 20 * Math.log10(value / peak) : FLOOR_DB;
-    };
 
     /**
      * Column-wise maximum, so a narrow peak survives being squeezed onto a log
@@ -427,39 +419,6 @@ const faq = [
     context.lineJoin = 'round';
     context.stroke();
 
-    /*
-      Where the discarded band ends up.
-
-      This converter interpolates rather than filtering first, so content above
-      the new ceiling is not removed — it mirrors about the ceiling and lands back
-      inside the audible range as inharmonic tones. Drawing the reflection is the
-      honest version of the warning in the prose: on speech the ghost sits on the
-      floor and nothing happens, on a bright mix it rides up over the music.
-    */
-    if (losing) {
-      context.beginPath();
-      let started = false;
-      for (let px = padL; px <= x(nyquist); px += 1) {
-        const hz = fMin * (fMax / fMin) ** ((px - padL) / plotW);
-        const folded = 2 * nyquist - hz;
-        if (folded > sourceNyquist) continue;
-        const py = y(level(folded));
-        if (!started) {
-          context.moveTo(px, py);
-          started = true;
-        } else {
-          context.lineTo(px, py);
-        }
-      }
-      if (started) {
-        context.strokeStyle = alarm;
-        context.lineWidth = 1.5 * dpr;
-        context.setLineDash([4 * dpr, 3 * dpr]);
-        context.stroke();
-        context.setLineDash([]);
-      }
-    }
-
     // The ceiling.
     context.strokeStyle = losing ? alarm : `color-mix(in oklch, ${ink} 65%, transparent)`;
     context.lineWidth = 2 * dpr;
@@ -524,7 +483,7 @@ const faq = [
 
     process(ctx) {
       const rate = targetRate();
-      return rate === ctx.buffer.sampleRate ? ctx.buffer : resampleLinear(ctx.buffer, rate);
+      return rate === ctx.buffer.sampleRate ? ctx.buffer : resample(ctx.buffer, rate);
     },
   });
 
@@ -559,14 +518,12 @@ const faq = [
           const share = shareAbove(spectrum, ceiling);
           const percent = share < 0.005 ? '<0.5' : (share * 100).toFixed(share < 0.1 ? 1 : 0);
           specCaption.textContent =
-            `${percent}% of this file sits above ${khz(ceiling)}. This converter ` +
-            'interpolates rather than filtering first, so that content mirrors back down ' +
-            'into the audible range instead of disappearing: the dashed line is where it ' +
-            `lands. ${
+            `${percent}% of this file sits above ${khz(ceiling)}. The converter filters ` +
+            'it out before resampling, so it is removed rather than folded back into ' +
+            `the audible range. ${
               share < 0.01
-                ? 'At this level it is inaudible, which is why speech converts cleanly.'
-                : 'That is enough to hear, so use a converter with a proper low-pass filter ' +
-                  'if the result matters.'
+                ? 'At this level nothing audible goes, which is why speech converts cleanly.'
+                : 'That is enough to hear as a duller top end.'
             }`;
         }
       }

@@ -103,7 +103,7 @@ function resetWorker(): void {
  * The browser's resampler does not filter: an OfflineAudioContext at 16 kHz put
  * a 10 kHz tone at 6 kHz at full level.
  */
-export async function toWhisperInput(buffer: AudioBuffer): Promise<Float32Array> {
+export async function toWhisperInput(buffer: AudioBuffer): Promise<Float32Array<ArrayBuffer>> {
   const frames = Math.max(1, Math.round((buffer.length / buffer.sampleRate) * WHISPER.rate));
 
   // Downmix before resampling, so the filter runs over one channel.

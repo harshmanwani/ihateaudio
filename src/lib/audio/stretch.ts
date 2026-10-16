@@ -8,7 +8,7 @@
  * already written, then overlap-adds. The similarity search is what stops the
  * output developing the metallic warble a fixed-hop OLA produces.
  */
-import { createBuffer, cloneBuffer, resampleLinear } from './dsp';
+import { createBuffer, cloneBuffer, resample } from './dsp';
 
 /** Hann window, cached per size — the same few sizes recur constantly. */
 const windowCache = new Map<number, Float32Array>();
@@ -167,7 +167,7 @@ export function pitchShift(buffer: AudioBuffer, semitones: number): AudioBuffer 
 
   const ratio = semitoneRatio(clamped);
   const stretched = timeStretch(buffer, ratio);
-  const shifted = resampleLinear(stretched, buffer.sampleRate / ratio);
+  const shifted = resample(stretched, buffer.sampleRate / ratio);
 
   // Relabel at the original rate: the sample count now encodes the shift.
   const out = createBuffer(shifted.numberOfChannels, shifted.length, buffer.sampleRate);
