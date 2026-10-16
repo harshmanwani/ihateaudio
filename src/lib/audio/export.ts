@@ -173,7 +173,7 @@ export async function exportAudio(
     default: {
       const depth = losslessDepth(format.id, bitDepth);
       return encodeVia(buffer, format.extension, {
-        args: ffmpegArgsFor(format, bitrate, buffer.numberOfChannels, depth),
+        args: ffmpegArgsFor(format, bitrate, buffer.sampleRate, buffer.numberOfChannels, depth),
         bitDepth: depth ?? 24,
         onProgress,
         onLoadProgress: onEngineLoad,
@@ -199,6 +199,7 @@ function losslessDepth(formatId: string, bitDepth: WavBitDepth): 16 | 24 | null 
 function ffmpegArgsFor(
   format: FormatSpec,
   bitrate: number,
+  sampleRate: number,
   channels: number,
   depth: 16 | 24 | null
 ): string[] {
@@ -209,8 +210,18 @@ function ffmpegArgsFor(
       return ['-c:a', 'aac', '-b:a', `${bitrate}k`, '-f', 'mp4'];
     case 'aac':
       return ['-c:a', 'aac', '-b:a', `${bitrate}k`];
-    case 'ogg':
-      return ['-c:a', 'libvorbis', '-b:a', `${bitrate}k`];
+    case 'ogg': {
+      // libvorbis refuses a bitrate outside its range for the rate and width,
+      // and has no bitrate mode at all past 50 kHz; see vorbisRange.
+      const rate = vorbisRate(sampleRate);
+      return [
+        '-c:a',
+        'libvorbis',
+        ...(rate === sampleRate ? [] : ['-ar', String(rate)]),
+        '-b:a',
+        `${vorbisKbps(bitrate, sampleRate, channels)}k`,
+      ];
+    }
     case 'opus':
       /*
        * Constrained VBR, because libopus's default unconstrained VBR treats
@@ -326,6 +337,55 @@ const MP3_MPEG2 = [8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160];
 const MP3_MPEG25 = [8, 16, 24, 32, 40, 48, 56, 64];
 
 /**
+ * The rate a Vorbis file is written at. libvorbis's bitrate mode only has
+ * setups for 8 to 50 kHz; above that every bitrate is refused, so a 96 kHz
+ * file is resampled to 48 kHz, and the rare file below 8 kHz up to 8 kHz.
+ */
+export function vorbisRate(sampleRate: number): number {
+  if (sampleRate > 50000) return 48000;
+  if (sampleRate < 8000) return 8000;
+  return sampleRate;
+}
+
+/**
+ * [lowest rate, kbps per channel low and high, stereo kbps low and high],
+ * highest band first.
+ */
+const VORBIS_BANDS: [number, number, number, number, number][] = [
+  [40000, 32, 240, 45, 500],
+  [26000, 30, 190, 36, 380],
+  [19000, 16, 90, 30, 180],
+  [15000, 16, 100, 24, 200],
+  [9000, 12, 50, 16, 100],
+  [8000, 8, 42, 12, 84],
+];
+
+/**
+ * The bitrates, in kbps, libvorbis will open at for this rate and width.
+ *
+ * Outside them ffmpeg fails to open the encoder and writes nothing: 128 kbps
+ * mono at 16 kHz, where the most it takes is 100, was an export that simply
+ * failed. Each band is one of libvorbis's setup templates, whose limits are
+ * per channel; stereo also has a coupled template reaching lower, and 5.1 at
+ * 40 to 50 kHz its own. Measured edge by edge, to the kbps, on the
+ * @ffmpeg/core 0.12.10 build the site ships.
+ */
+export function vorbisRange(sampleRate: number, channels: number): [number, number] {
+  const rate = vorbisRate(sampleRate);
+  const band = VORBIS_BANDS.find(([from]) => rate >= from) ?? VORBIS_BANDS[VORBIS_BANDS.length - 1]!;
+  const [, low, high, stereoLow, stereoHigh] = band;
+  if (channels === 2) return [stereoLow, stereoHigh];
+  if (channels === 6 && rate >= 40000) return [14 * 6, high * 6];
+  return [low * channels, high * channels];
+}
+
+/** The bitrate libvorbis is asked for: the request, moved into its range. */
+export function vorbisKbps(bitrate: number, sampleRate: number, channels: number): number {
+  const [low, high] = vorbisRange(sampleRate, channels);
+  return Math.min(high, Math.max(low, bitrate));
+}
+
+/**
  * The most ffmpeg's AAC encoder will spend, in kbps, at this rate and width.
  *
  * It is not a setting but a measurement: past a point the encoder runs out of
@@ -347,7 +407,9 @@ function aacCeiling(sampleRate: number, channels: number): number {
  * The factors are the worst cases measured with the shipped core: constrained
  * Opus 1-3% over (the Ogg pages and 10 ms stereo frames are most of it), AAC
  * up to 8% over at 32 kHz and above and up to 15% below that, WMA 8% (ASF
- * framing). Vorbis's managed mode comes in at or under its target.
+ * framing). Vorbis is costed at the bitrate it is asked for once that is
+ * moved into its range, though on dense music it runs over that too: up to
+ * 15% at 64 kbps and above, more at the lowest rates.
  */
 export function effectiveKbps(
   formatId: string,
@@ -367,6 +429,8 @@ export function effectiveKbps(
       );
     case 'opus':
       return bitrate * 1.03;
+    case 'ogg':
+      return vorbisKbps(bitrate, sampleRate, channels);
     case 'wma':
       return bitrate * 1.08;
     default:
@@ -392,6 +456,8 @@ export function writtenKbps(
     case 'm4r':
     case 'aac':
       return Math.round(Math.min(bitrate, aacCeiling(sampleRate, channels)));
+    case 'ogg':
+      return vorbisKbps(bitrate, sampleRate, channels);
     default:
       return bitrate;
   }
@@ -399,7 +465,8 @@ export function writtenKbps(
 
 /**
  * The sample rate a format comes out at. MP3 can drop it on its own (see
- * `mp3Output`), and Opus always decodes at 48 kHz whatever went in.
+ * `mp3Output`), Opus always decodes at 48 kHz whatever went in, and Vorbis
+ * past 50 kHz is written at 48 (see `vorbisRate`).
  */
 export function outputSampleRate(
   formatId: string,
@@ -409,6 +476,7 @@ export function outputSampleRate(
 ): number {
   if (formatId === 'mp3') return mp3Output(sampleRate, bitrate, Math.min(2, channels)).sampleRate;
   if (formatId === 'opus') return 48000;
+  if (formatId === 'ogg') return vorbisRate(sampleRate);
   return sampleRate;
 }
 

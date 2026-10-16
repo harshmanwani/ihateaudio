@@ -17,6 +17,20 @@ const LOSSY_EXTENSIONS = new Set([
   'mp4', 'mov', 'mkv', 'avi', '3gp',
 ]);
 
+/**
+ * Sample-entry codes for audio an MP4-family file holds without loss, and
+ * what to call it. An .m4a holds Apple Lossless as readily as AAC, so the
+ * extension alone cannot say whether the audio has been through a lossy
+ * encoder; the track's sample description can.
+ */
+const LOSSLESS_MP4_CODECS = new Map([
+  ['alac', 'Apple Lossless'],
+  ['fLaC', 'FLAC'],
+  ...['lpcm', 'ipcm', 'fpcm', 'sowt', 'twos', 'in24', 'in32', 'fl32', 'fl64'].map(
+    (code) => [code, 'PCM'] as const
+  ),
+]);
+
 interface Verdict {
   kind: 'info' | 'warn';
   title: string;
@@ -47,19 +61,27 @@ function sourceBitrate(bytes: number, seconds: number): number | null {
   return kbps > MAX_AUDIO_KBPS ? null : kbps;
 }
 
+export interface Mp4Audio {
+  /** The sample entry's four-character code: 'mp4a' for AAC, 'alac' for Apple Lossless. */
+  codec: string | null;
+  /** The track's average bitrate, or null when the sample table cannot give it. */
+  kbps: number | null;
+}
+
 /**
- * The audio track's bitrate in an MP4-family file, read from the sample table
- * rather than guessed from the file size.
+ * The audio track of an MP4-family file: its codec, from the sample
+ * description, and its bitrate, read from the sample table rather than
+ * guessed from the file size.
  *
  * Size over time is fine for an audio file, but in a video it counts the
  * picture too: a 720p clip carrying 128 kbps AAC read as "about 3273 kbps",
  * which made the warning about re-encoding at a higher bitrate impossible to
  * trigger. The sample size table (stsz) lists every audio frame and the media
- * header (mdhd) the track's own length, so the division is exact. Null for
- * anything unreadable, including fragmented files, which keep their sizes in
- * per-fragment tables instead.
+ * header (mdhd) the track's own length, so the division is exact. The bitrate
+ * is null for fragmented files, which keep their sizes in per-fragment tables
+ * instead, and the whole answer null for anything unreadable.
  */
-export async function mp4AudioKbps(file: Blob): Promise<number | null> {
+export async function mp4Audio(file: Blob): Promise<Mp4Audio | null> {
   try {
     let offset = 0;
     for (let guard = 0; guard < 512 && offset + 8 <= file.size; guard += 1) {
@@ -78,7 +100,7 @@ export async function mp4AudioKbps(file: Blob): Promise<number | null> {
         // A moov this large is a damaged file, not a long one.
         if (size > 64 * 1024 * 1024) return null;
         const view = new DataView(await file.slice(offset + header, offset + size).arrayBuffer());
-        return soundTrackKbps(view);
+        return soundTrack(view);
       }
       offset += size;
     }
@@ -114,7 +136,7 @@ function boxes(view: DataView, start: number, end: number): { type: string; at: 
   return out;
 }
 
-function soundTrackKbps(moov: DataView): number | null {
+function soundTrack(moov: DataView): Mp4Audio | null {
   const child = (at: number, end: number, type: string) =>
     boxes(moov, at, end).find((box) => box.type === type);
 
@@ -131,7 +153,11 @@ function soundTrackKbps(moov: DataView): number | null {
       return minf ? child(minf.at, minf.end, 'stbl') : undefined;
     })();
     const stsz = stbl ? child(stbl.at, stbl.end, 'stsz') : undefined;
-    if (!mdhd || !stsz) return null;
+    // stsd: version and flags, an entry count, then the first entry's size
+    // and its type, which names the codec.
+    const stsd = stbl ? child(stbl.at, stbl.end, 'stsd') : undefined;
+    const codec = stsd && stsd.at + 16 <= stsd.end ? fourcc(moov, stsd.at + 12) : null;
+    if (!mdhd || !stsz) return { codec, kbps: null };
 
     const v1 = moov.getUint8(mdhd.at) === 1;
     const timescale = moov.getUint32(mdhd.at + (v1 ? 20 : 12));
@@ -144,18 +170,27 @@ function soundTrackKbps(moov: DataView): number | null {
     const count = moov.getUint32(stsz.at + 8);
     let bytes = fixed * count;
     if (fixed === 0) {
-      if (stsz.at + 12 + count * 4 > stsz.end) return null;
+      if (stsz.at + 12 + count * 4 > stsz.end) return { codec, kbps: null };
       for (let i = 0; i < count; i += 1) bytes += moov.getUint32(stsz.at + 12 + i * 4);
     }
 
-    if (count === 0 || seconds <= 0) return null;
-    return Math.round((bytes * 8) / seconds / 1000);
+    if (count === 0 || seconds <= 0) return { codec, kbps: null };
+    return { codec, kbps: Math.round((bytes * 8) / seconds / 1000) };
   }
   return null;
 }
 
+/**
+ * Whether a source has been through a lossy encoder: from its codec when the
+ * container names one, from its extension otherwise.
+ */
+export function isLossySource(extension: string, codec: string | null = null): boolean {
+  if (codec !== null && MP4_EXTENSIONS.has(extension)) return !LOSSLESS_MP4_CODECS.has(codec);
+  return LOSSY_EXTENSIONS.has(extension);
+}
+
 /** Measured once per file; the panel re-renders when the answer lands. */
-const measured = new WeakMap<File, number | null>();
+const measured = new WeakMap<File, Mp4Audio | null>();
 const measuring = new WeakSet<File>();
 
 /** Whether a buffer holds more than 16 bits, worked out once per buffer. */
@@ -177,7 +212,7 @@ function depthOf(runtime: ToolRuntime): WavBitDepth {
 }
 
 function verdictFor(
-  sourceExt: string,
+  sourceLossy: boolean,
   sourceKbps: number | null,
   targetId: string,
   targetKbps: number,
@@ -185,7 +220,6 @@ function verdictFor(
   narrowed = false
 ): Verdict | null {
   const target = formatById(targetId);
-  const sourceLossy = LOSSY_EXTENSIONS.has(sourceExt);
 
   if (!sourceLossy && !target.lossy && narrowed) {
     return {
@@ -262,12 +296,14 @@ export function wireConversionPanel(runtime: ToolRuntime): void {
     const rate = buffer.sampleRate;
     const channels = buffer.numberOfChannels;
     // What the encoder will really write, which below 32 kHz is often less
-    // than what was asked for: MP3 tops out at 160 kbps there, AAC sooner.
+    // than what was asked for: MP3 tops out at 160 kbps there, AAC sooner,
+    // Vorbis at 100 kbps for 16 kHz mono. Vorbis also has a floor, so 64 kbps
+    // of 5.1 at 48 kHz is written at 84.
     const targetKbps = target.lossy ? writtenKbps(targetId, asked, rate, channels) : asked;
 
     if (MP4_EXTENSIONS.has(sourceExt) && !measured.has(file) && !measuring.has(file)) {
       measuring.add(file);
-      void mp4AudioKbps(file).then((value) => {
+      void mp4Audio(file).then((value) => {
         measured.set(file, value);
         if (runtime.getFile() === file) render();
       });
@@ -277,16 +313,20 @@ export function wireConversionPanel(runtime: ToolRuntime): void {
     // bitrate is unknown rather than file size over time.
     const probe = measured.get(file);
     const kbps =
-      typeof probe === 'number'
-        ? probe
+      typeof probe?.kbps === 'number'
+        ? probe.kbps
         : VIDEO_EXTENSIONS.has(sourceExt)
           ? null
           : sourceBitrate(file.size, buffer.duration);
-    const sourceIsLossy = LOSSY_EXTENSIONS.has(sourceExt);
+    const codec = probe?.codec ?? null;
+    const sourceIsLossy = isLossySource(sourceExt, codec);
+    const lossless = codec === null ? undefined : LOSSLESS_MP4_CODECS.get(codec);
 
     set('[data-src-format]', sourceIsLossy && kbps
       ? `${sourceExt.toUpperCase()} · about ${kbps} kbps`
-      : sourceExt.toUpperCase());
+      : lossless
+        ? `${sourceExt.toUpperCase()} · ${lossless}`
+        : sourceExt.toUpperCase());
     set('[data-src-length]', duration(buffer.duration));
     set('[data-src-rate]', sampleRateLabel(buffer.sampleRate));
     set('[data-src-channels]', channelLabel(buffer.numberOfChannels));
@@ -298,10 +338,13 @@ export function wireConversionPanel(runtime: ToolRuntime): void {
     set('[data-out-format]', target.lossy
       ? targetKbps < asked
         ? `${target.label} · ${approx}${targetKbps} kbps, the most it writes at this rate`
-        : `${target.label} · ${targetKbps} kbps`
+        : targetKbps > asked
+          ? `${target.label} · ${approx}${targetKbps} kbps, the least it writes for this file`
+          : `${target.label} · ${targetKbps} kbps`
       : `${target.label} · lossless, ${bits === 32 ? '32-bit float' : `${bits}-bit`}`);
     // Conversion never changes duration or channel layout on these pages. The
-    // rate can change: MP3 drops it at low bitrates, and Opus is always 48 kHz.
+    // rate can change: MP3 drops it at low bitrates, Opus is always 48 kHz,
+    // and Vorbis past 50 kHz is 48 kHz too.
     set('[data-out-length]', duration(buffer.duration));
     set('[data-out-rate]', sampleRateLabel(outputSampleRate(targetId, rate, asked, channels)));
     set('[data-out-channels]', channelLabel(channels));
@@ -317,7 +360,7 @@ export function wireConversionPanel(runtime: ToolRuntime): void {
     set('[data-out-size]', `${filesize(outBytes)} · ${change}`);
 
     const narrowed = !target.lossy && bits === 16 && !sourceIsLossy && deeperThan16(buffer);
-    const verdict = verdictFor(sourceExt, kbps, targetId, targetKbps, narrowed);
+    const verdict = verdictFor(sourceIsLossy, kbps, targetId, targetKbps, narrowed);
     const slot = panel.querySelector<HTMLElement>('[data-convert-verdict]');
     if (!slot) return;
 

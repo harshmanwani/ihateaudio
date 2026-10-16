@@ -1,0 +1,99 @@
+import { describe, expect, it } from 'vitest';
+import { isLossySource, mp4Audio } from '../../src/lib/conversion';
+
+/*
+ * Real files, 50 ms of mono music at 8 kHz, made with ffmpeg 8:
+ *   ffmpeg -i song.wav -t 0.05 -ac 1 -ar 8000 -c:a alac -fflags +bitexact -map_metadata -1 alac.m4a
+ * and the same with -c:a aac -b:a 32k.
+ */
+const ALAC_M4A = [
+  'AAAAHGZ0eXBNNEEgAAACAE00QSBpc29taXNvMgAAAAhmcmVlAAACtG1kYXQAABAAAAMgAAAPCgG7/uAAn/8yAHf/',
+  'Dz3/hRbjb/nQ9/0Ou9tuXtRBy36UGBVWT1RkipOVLRsFu9fSBcc2taNOQMzbIGiFp7POR1z3dWxEnYA2kuYZycpN',
+  'D9M+llz4iCWVyXo38F1l+uMDGVOfRUkbNEvRLXRNseNhmAVhbMKVIPyjp49v+XhNePVNjIWuBtc9Tbb0bap+Jl4q',
+  'V4HMzqiIElgBWnGhyq6IEruJxB9E4sspNANxQ4IPmuRqrI8mrwF8KXS/xysrT0wQ/Y2e7Nl9WVu78sLMbb4ifXzB',
+  'txHBE1pmxUiTrwPrq5BZpQy30FdE3Com0bddzDGH9NDDx3I8ka7/1d0H3ZmnjhfykywfCIgVYUx0yVA4MwQFNoUw',
+  'KvaZeXeDs/TksRK6tWeryEkIfok97IMh62v70YY6HQyj+PRxY4LfHeBuofg26c0RM/8tolEirYWQXVPJlJ1jHzx8',
+  'zPNNyy+17cj94fNyGI8fjGS0+5mo7mlreqn5cYZPkMGP5UBMRjNP1q7nD+SRO00Lz/Tt3ABAe3BvHqB+oFBa4wHI',
+  'DdgjQmf6+a2qSgrDEBBceS5CMinnPpPfDLW1UTo69qGzZd8DNoO3f2a81/ChL08qj2we/FO1tGpMkIXjVi+FHLx1',
+  'B0nMo0BuRQL1SZWJp4Gcre13+hj4FOLuxnggXYYZ2GzZewSPGS+jla9SWbqamvD8ySAWQwMtpgbG73ViID3zJoGt',
+  'uxOcq8GuQ7uAdfLo4CaTSZ3uWjnV4ENSvEm+t1UOMNpl85Uzlh1BhxEh7CzlgLDdYznwD9C9W8Juys8XDzwuybwz',
+  'KgQ68Pc+DQXZRtBVZ8Fb8ulRvqwS/5jSyxViiqqpE7Xg0dISSZsY6eCqpN60oYEweHhbZDHc4qUIQYLTL2cWqnG2',
+  'UY4AAAKGbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAADIAAQAAAQAAAAAAAAAAAAAAAAEAAAAAAAAAAAAA',
+  'AAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAAdV0cmFrAAAAXHRr',
+  'aGQAAAADAAAAAAAAAAAAAAABAAAAAAAAADIAAAAAAAAAAAAAAAEBAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAA',
+  'AAAAAAAAAABAAAAAAAAAAAAAAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAAyAAAAAAABAAAAAAFNbWRpYQAA',
+  'ACBtZGhkAAAAAAAAAAAAAAAAAAAfQAAAAZBVxAAAAAAALWhkbHIAAAAAAAAAAHNvdW4AAAAAAAAAAAAAAABTb3Vu',
+  'ZEhhbmRsZXIAAAAA+G1pbmYAAAAQc21oZAAAAAAAAAAAAAAAJGRpbmYAAAAcZHJlZgAAAAAAAAABAAAADHVybCAA',
+  'AAABAAAAvHN0YmwAAABYc3RzZAAAAAAAAAABAAAASGFsYWMAAAAAAAAAAQAAAAAAAAAAAAEAEAAAAAAfQAAAAAAA',
+  'JGFsYWMAAAAAAAAQAAAQKAoOAQAAAAAgBAAB9AAAAB9AAAAAGHN0dHMAAAAAAAAAAQAAAAEAAAGQAAAAHHN0c2MA',
+  'AAAAAAAAAQAAAAEAAAABAAAAAQAAABRzdHN6AAAAAAAAAqwAAAABAAAAFHN0Y28AAAAAAAAAAQAAACwAAAA9dWR0',
+  'YQAAADVtZXRhAAAAAAAAACFoZGxyAAAAAAAAAABtZGlyYXBwbAAAAAAAAAAAAAAAAAhpbHN0',
+].join('');
+
+const AAC_M4A = [
+  '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',
+  'AAAIaWxzdA==',
+].join('');
+
+function file(base64: string): Blob {
+  return new Blob([Uint8Array.from(atob(base64), (c) => c.charCodeAt(0))]);
+}
+
+describe('mp4Audio', () => {
+  it('names Apple Lossless in an .m4a', async () => {
+    const audio = await mp4Audio(file(ALAC_M4A));
+    expect(audio?.codec).toBe('alac');
+    expect(audio?.kbps).toBeGreaterThan(80);
+  });
+
+  it('names AAC in an .m4a', async () => {
+    expect((await mp4Audio(file(AAC_M4A)))?.codec).toBe('mp4a');
+  });
+
+  it('answers null for something that is not an MP4', async () => {
+    expect(await mp4Audio(new Blob([new Uint8Array(64)]))).toBeNull();
+  });
+});
+
+describe('isLossySource', () => {
+  it('trusts the codec over the extension in an MP4-family file', () => {
+    // An Apple Lossless .m4a was told a higher bitrate could not recover its losses.
+    expect(isLossySource('m4a', 'alac')).toBe(false);
+    expect(isLossySource('m4a', 'mp4a')).toBe(true);
+    expect(isLossySource('mov', 'sowt')).toBe(false);
+    expect(isLossySource('mp4', 'fLaC')).toBe(false);
+  });
+
+  it('falls back to the extension when there is no codec to read', () => {
+    expect(isLossySource('m4a')).toBe(true);
+    expect(isLossySource('mp3')).toBe(true);
+    expect(isLossySource('wav')).toBe(false);
+    expect(isLossySource('flac')).toBe(false);
+  });
+});
