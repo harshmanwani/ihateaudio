@@ -77,6 +77,10 @@ const faq = [
             <dt>Out, after makeup</dt>
             <dd class="tnum" data-fact-out>—</dd>
           </div>
+          <div class="curve__fact">
+            <dt>Export peak</dt>
+            <dd class="tnum" data-fact-peak>—</dd>
+          </div>
           <p class="curve__note" data-fact-note></p>
         </dl>
       </div>
@@ -410,6 +414,7 @@ const faq = [
 <script>
   import { createTool } from '../lib/tool';
   import { applyCompressor, compressorCurve } from '../lib/audio/effects';
+  import { peakDb } from '../lib/audio/analysis';
   import { db } from '../lib/format';
   import { panelColors, panelContext } from '../lib/canvas';
 
@@ -424,6 +429,14 @@ const faq = [
 
   /** Axis range, in dB. Below -60 nothing useful is happening. */
   const FLOOR = -60;
+
+  /**
+   * Where the clip warning starts, in dBFS sample peak. A decibel under full
+   * scale is room for an MP3 or AAC encoder, which can put peaks back above
+   * where they sat in the render. It is also the cap the presets' makeup was
+   * tuned to, so none of them sets it off on a full-level song.
+   */
+  const CEILING = -1;
 
   /**
    * The compressor's transfer function, in dB, makeup included.
@@ -441,6 +454,17 @@ const faq = [
   function transfer(p: Params): (input: number) => number {
     const curve = compressorCurve(p.threshold, p.knee, p.ratio);
     return (input) => curve(input) + p.makeup;
+  }
+
+  /** Every setting but makeup, which is a plain gain after the compressor. */
+  function sameCompression(a: Params, b: Params): boolean {
+    return (
+      a.threshold === b.threshold &&
+      a.ratio === b.ratio &&
+      a.attack === b.attack &&
+      a.release === b.release &&
+      a.knee === b.knee
+    );
   }
 
   /**
@@ -605,6 +629,12 @@ const faq = [
     heavy: { threshold: -28, ratio: 10, attack: 2, release: 80, knee: 3, makeup: 14.5 },
   };
 
+  /**
+   * Told the sample peak, in dBFS, of every render (preview or export) with
+   * the file and settings it came from. onReady points it at the readout.
+   */
+  let onRendered: ((source: AudioBuffer, p: Params, peak: number) => void) | null = null;
+
   const tool = createTool({
     suffix: 'compressed',
     defaultFormat: 'mp3',
@@ -688,10 +718,14 @@ const faq = [
       const factLevel = root.querySelector<HTMLElement>('[data-fact-level]');
       const factGr = root.querySelector<HTMLElement>('[data-fact-gr]');
       const factOut = root.querySelector<HTMLElement>('[data-fact-out]');
+      const factPeak = root.querySelector<HTMLElement>('[data-fact-peak]');
       const factNote = root.querySelector<HTMLElement>('[data-fact-note]');
 
       // Measured once: the file does not change while the sliders move.
       const level = typicalLevel(ctx.buffer);
+
+      /** The last render of this file whose compression still matches the controls. */
+      let measured: { params: Params; peak: number } | null = null;
 
       const current = (): Params => ({
         threshold: runtime.value('threshold', -20),
@@ -705,6 +739,45 @@ const faq = [
       const dbText = (value: number): string =>
         `${value < 0 ? '−' : ''}${Math.abs(value).toFixed(1)} dB`;
 
+      const dbfsText = (value: number): string =>
+        `${value > 0 ? '+' : value < 0 ? '−' : ''}${Math.abs(value).toFixed(1)} dBFS`;
+
+      /**
+       * The loudest sample the export will have, or null when the controls
+       * have moved since the last render and no new one has landed yet.
+       *
+       * The clip warning used to read the curve at the material's typical
+       * level, and real exports peak well above that: the attack lets the
+       * start of each peak through before the gain comes down, so on songs and
+       * speech the export peaked a median 2–5 dB above the estimate by preset,
+       * and 8.5 dB above it for heavy on a punchy song. A file could clip with
+       * no warning. The preview renders the whole file through the same
+       * applyCompressor as the export, so its peak is the export's peak.
+       * Makeup is a plain gain after the compressor, so the peak follows it
+       * decibel for decibel and stays exact while that slider moves; any other
+       * control changes what gets through, so the figure waits for the render.
+       */
+      const exportPeak = (p: Params): number | null =>
+        measured && sameCompression(measured.params, p)
+          ? measured.peak + p.makeup - measured.params.makeup
+          : null;
+
+      /**
+       * Only makeup the user added is worth a warning. Without it the
+       * compressor can only turn the file down, so a peak above the ceiling
+       * at 0 dB makeup was already in the file (gentle leaves one song at
+       * -0.8 dBFS), and the slider cannot go lower anyway.
+       */
+      const clipNote = (peak: number, makeup: number): string | null => {
+        if (peak <= CEILING || makeup <= 0) return null;
+        // The highest half-decibel step that brings the peak under the ceiling.
+        const to = Math.max(0, Math.floor((makeup - (peak - CEILING)) * 2) / 2);
+        const fix = `Lower the makeup gain by ${(makeup - to).toFixed(1)} dB, to ${db(to)}.`;
+        return peak > 0
+          ? `The export peaks at ${dbfsText(peak)}, so it will clip. ${fix}`
+          : `The export peaks at ${dbfsText(peak)}, close enough to clip once it is encoded. ${fix}`;
+      };
+
       /** Redrawn on every move; it is 240 points of arithmetic, so it is free. */
       const repaint = (): void => {
         const p = current();
@@ -714,22 +787,35 @@ const faq = [
         // only definition that stays honest once makeup gain is in the picture.
         const out = transfer(p)(level);
         const reduction = level + p.makeup - out;
+        const peak = exportPeak(p);
+        const clipping = peak === null ? null : clipNote(peak, p.makeup);
 
         if (factLevel) factLevel.textContent = level <= FLOOR ? '—' : dbText(level);
         if (factGr) {
           factGr.textContent = level <= FLOOR ? '—' : `${reduction < 0.05 ? '0.0' : `−${reduction.toFixed(1)}`} dB`;
         }
         if (factOut) factOut.textContent = level <= FLOOR ? '—' : dbText(out);
+        if (factPeak) {
+          factPeak.textContent = peak === null || !Number.isFinite(peak) ? '—' : dbfsText(peak);
+        }
         if (factNote) {
           factNote.textContent =
-            reduction < 0.1
+            clipping ??
+            (reduction < 0.1
               ? 'The threshold is above where this recording sits, so nothing is being compressed. Lower it until the dot crosses the bend.'
-              : out > -0.5
-                ? 'The output is at the ceiling. Lower the makeup gain or it will clip.'
-                : reduction > 12
-                  ? 'More than 12 dB of reduction is a heavy effect rather than a correction. Expect to hear it working.'
-                  : 'The dot is where this recording sits on the curve, and the drop from the dashed line is what it loses.';
+              : reduction > 12
+                ? 'More than 12 dB of reduction is a heavy effect rather than a correction. Expect to hear it working.'
+                : 'The dot is where this recording sits on the curve, and the drop from the dashed line is what it loses.');
         }
+      };
+
+      // A render that lands after the controls have moved on describes
+      // settings nobody is looking at, and one from a file replaced since
+      // describes another file.
+      onRendered = (source, params, peak): void => {
+        if (source !== ctx.buffer || !sameCompression(params, current())) return;
+        measured = { params, peak };
+        repaint();
       };
 
       /** Slider and number input stay in step; the slider is authoritative. */
@@ -811,14 +897,21 @@ const faq = [
     },
   });
 
-  function render(buffer: AudioBuffer): Promise<AudioBuffer> {
-    return applyCompressor(buffer, {
+  async function render(buffer: AudioBuffer): Promise<AudioBuffer> {
+    const p: Params = {
       threshold: tool?.value('threshold', -20) ?? -20,
       ratio: tool?.value('ratio', 4) ?? 4,
-      attack: (tool?.value('attack', 5) ?? 5) / 1000,
-      release: (tool?.value('release', 120) ?? 120) / 1000,
+      attack: tool?.value('attack', 5) ?? 5,
+      release: tool?.value('release', 120) ?? 120,
       knee: tool?.value('knee', 6) ?? 6,
       makeup: tool?.value('makeup', 5.5) ?? 5.5,
+    };
+    const out = await applyCompressor(buffer, {
+      ...p,
+      attack: p.attack / 1000,
+      release: p.release / 1000,
     });
+    onRendered?.(buffer, p, peakDb(out));
+    return out;
   }
 </script>
