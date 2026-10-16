@@ -212,7 +212,7 @@ describe('Vorbis', () => {
     ];
     expect(options.args).toEqual(['-c:a', 'libvorbis', '-b:a', '100k']);
     expect(writtenKbps('ogg', 128, 16000, 1)).toBe(100);
-    expect(effectiveKbps('ogg', 128, 16000, 1)).toBe(100);
+    expect(effectiveKbps('ogg', 128, 16000, 1)).toBe(effectiveKbps('ogg', 100, 16000, 1));
     expect(estimateSize(proxy(20, 16000, 1), 'ogg', { bitrate: 128 })).toBe(
       estimateSize(proxy(20, 16000, 1), 'ogg', { bitrate: 100 })
     );
@@ -247,5 +247,51 @@ describe('Vorbis', () => {
     expect(vorbisRange(96000, 1)).toEqual([32, 240]);
     expect(vorbisRange(6000, 1)).toEqual([8, 42]);
     expect(outputSampleRate('ogg', 6000, 64, 1)).toBe(8000);
+  });
+});
+
+describe('Vorbis overshoot', () => {
+  /*
+   * Each row is the file furthest over its bitrate in one band, above and at
+   * or below 24 kbps a channel: 30 s of dense music from the middle of a song,
+   * encoded with the shipped core. Channels, rate, kbps asked, bytes written.
+   */
+  const worst: [number, number, number, number][] = [
+    [1, 44100, 32, 155558],
+    [2, 44100, 45, 206060],
+    [1, 32000, 30, 148661],
+    [2, 32000, 36, 199695],
+    [2, 24000, 160, 788297],
+    [1, 24000, 16, 100377],
+    [2, 16000, 96, 380460],
+    [1, 16000, 16, 78407],
+    [1, 11025, 32, 135363],
+    [1, 11025, 12, 67044],
+    [2, 8000, 64, 267087],
+    [1, 8000, 8, 44577],
+  ];
+
+  it.each(worst)('%i ch at %i Hz and %i kbps is costed at %i bytes or more', (ch, rate, kbps, bytes) => {
+    const estimate = estimateSize(proxy(30, rate, ch), 'ogg', { bitrate: kbps });
+    expect(estimate).toBeGreaterThanOrEqual(bytes);
+  });
+
+  it('costs the band factor at its two tiers', () => {
+    // 24 kHz mono at 16 kbps wrote 64% over; 24 kHz stereo at 160 wrote 31% over.
+    expect(effectiveKbps('ogg', 16, 24000, 1)).toBeCloseTo(16 * 1.64);
+    expect(effectiveKbps('ogg', 160, 24000, 2)).toBeCloseTo(160 * 1.32);
+    expect(effectiveKbps('ogg', 128, 44100, 2)).toBeCloseTo(128 * 1.28);
+    expect(effectiveKbps('ogg', 48, 44100, 2)).toBeCloseTo(48 * 1.28);
+  });
+
+  it('costs the bitrate written, after the range clamp', () => {
+    // 16 kHz mono stops at 100 kbps, so 128 is costed as 100 is.
+    expect(effectiveKbps('ogg', 128, 16000, 1)).toBeCloseTo(100 * 1.06);
+    // 5.1 at 48 kHz will not go under 84 kbps, 14 a channel.
+    expect(effectiveKbps('ogg', 64, 48000, 6)).toBeCloseTo(84 * 1.28);
+  });
+
+  it('leaves the overshoot off the label', () => {
+    expect(writtenKbps('ogg', 128, 44100, 2)).toBe(128);
   });
 });

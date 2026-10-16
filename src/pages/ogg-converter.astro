@@ -36,7 +36,7 @@ const faq = [
   },
   {
     q: 'Why is Vorbis normally variable bitrate?',
-    a: 'The encoder is designed around a quality scale from -1 to 10 rather than a fixed rate: it spends bits where the music is complex and saves them where it is not. Asking for a specific bitrate, as this page does, switches it into a managed mode that hits your number on average. That is what most tools and engines expect, and it makes file sizes predictable.',
+    a: 'The encoder is designed around a quality scale from -1 to 10 rather than a fixed rate: it spends bits where the music is complex and saves them where it is not. The bitrate you pick here sets the quality that averages that rate on typical audio, so dense music can come out up to 28% larger at 44.1 or 48 kHz, and speech usually comes out smaller. Vorbis can also hold a rate strictly, but that encoded three to eight times slower in our tests, so this page does not. The size shown before you download allows for the larger case.',
   },
 ];
 ---
@@ -112,10 +112,13 @@ const faq = [
     <p>
       It also means Vorbis is naturally variable bitrate. Its native control is a
       quality number from -1 to 10, where 3 lands near 112 kbps, 5 near 160 and 8
-      near 256, varying with the material. Requesting a fixed bitrate puts the
-      encoder into a managed mode that averages out to your target, which is what
-      this page does because predictable file sizes matter more than the last
-      percent of efficiency for most uses.
+      near 256, varying with the material. This page asks for a bitrate, and the
+      encoder turns it into the quality that averages that rate on typical audio,
+      so the file still follows the music. In our tests at 44.1 kHz, dense music
+      came out up to 28% over the number and most speech came in under it. Vorbis
+      also has a managed mode that holds the rate to within a few percent, but it
+      encoded three to eight times slower, so this page leaves it off. The size
+      shown before you download allows for the overshoot.
     </p>
 
     <h2>Where OGG belongs, and where it does not</h2>
