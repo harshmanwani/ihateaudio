@@ -133,13 +133,14 @@ const schema = [
       Page analytics, through Google Analytics and PostHog: which pages were
       viewed, roughly which country from, and which site sent you. On a tool
       page we also record what happened, and only this: that a file was
-      accepted, which output format you chose, and the error code if something
-      failed. A failure also records the facts that tell one cause from
-      another: the type of error, the browser's error message with anything
-      that could be a file name removed, the step that failed, how much of the
-      converter had downloaded, the kind of file (MP3 or OGG, for example), and
-      the class of browser and its memory. It exists so we know which tools are
-      worth more work and which ones are quietly broken.
+      accepted, which output format you chose, whether the export used the
+      smaller AAC encoder in place of the converter and why, and the error code
+      if something failed. A failure also records the facts that tell one cause
+      from another: the type of error, the browser's error message with
+      anything that could be a file name removed, the step that failed, how
+      much of the converter had downloaded, the kind of file (MP3 or OGG, for
+      example), and the class of browser and its memory. It exists so we know
+      which tools are worth more work and which ones are quietly broken.
     </p>
     <p>
       What is deliberately switched off is worth more than what is on. There is
@@ -164,7 +165,9 @@ const schema = [
     <p>
       Most tools need nothing beyond the page itself. A few output formats (M4A, OGG, FLAC, WMA, AIFF and iPhone ringtones) require a converter that
       is too large to include in every page, so it downloads on demand the first
-      time you use one, from this site's own servers.
+      time you use one, from this site's own servers. On a browser that cannot
+      run the converter, M4A, AAC and ringtones use a smaller encoder instead,
+      about 200 KB, from the same servers.
     </p>
     <p>
       That download goes one way: code comes to you, and your audio still does

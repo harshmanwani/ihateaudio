@@ -28,7 +28,7 @@ const faq = [
   },
   {
     q: 'Why does this tool take longer than the trimmer?',
-    a: 'Browsers ship an AAC decoder but not an AAC encoder, so writing a real M4R needs a proper encoder. The first export downloads a WebAssembly build of ffmpeg (roughly 31 MB) and the browser caches it afterwards, so a second ringtone exports immediately. The audio itself still never leaves your device; the code comes to the file.',
+    a: 'Browsers ship an AAC decoder but not an AAC encoder, so writing a real M4R needs a proper encoder. The first export downloads a WebAssembly build of ffmpeg (roughly 31 MB) and the browser caches it afterwards, so a second ringtone exports immediately. An iPhone older than iOS 16.4 cannot run that build, so there the page uses the AAC encoder from ffmpeg on its own, a download of about 200 KB that writes the same M4R. The audio itself still never leaves your device; the code comes to the file.',
   },
   {
     q: 'Where does the name in the ringtone list come from?',
@@ -138,8 +138,9 @@ const faq = [
       <div class="note note--info controls__full">
         <div class="note__body">
           M4R needs a real AAC encoder, which browsers do not include. The first
-          export downloads one (about 31 MB) and caches it, so the next ringtone
-          is immediate. Your audio is still never uploaded.
+          export downloads one (about 31 MB, or 200 KB on iPhones older than iOS
+          16.4) and caches it, so the next ringtone is immediate. Your audio is
+          still never uploaded.
         </div>
       </div>
     </div>

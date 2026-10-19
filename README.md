@@ -61,6 +61,16 @@ remembered for the page, so pressing again does not download 31 MB to fail the
 same way, and the bytes of a finished download are kept for a retry and for the
 replacement instance every eight runs.
 
+**AAC has a way round Tier 2.** For M4A, M4R and raw AAC, `encode-aac.ts` runs
+the same FFmpeg 5.1.4 AAC encoder compiled on its own without SIMD, about 170 KB
+gzipped, or the same code as plain JavaScript where the CSP refuses
+WebAssembly. `mp4-write.ts` writes the container the way ffmpeg's muxer does.
+The router uses it when the core cannot run here or has already failed to load
+in the page, and reports each use as `engine_fallback`; other Tier 2 formats
+are marked "not in this browser" in the format list instead. The builds in
+`src/lib/audio/aac/` are committed. Rebuild them with
+`scripts/aac-encoder/build.sh` only to change the FFmpeg release.
+
 The AI studio is a fourth cost bracket, and the table above deliberately leaves
 it unnumbered: `ExportTier` is still `0 | 1 | 2`, because weights are an
 input-side cost no output format can trigger. This one is chosen per *tool*, and
@@ -98,6 +108,8 @@ src/
       analysis.ts      ITU-R BS.1770-4 loudness, true peak, tempo
       export.ts        The tier router
       ffmpeg.ts        Tier 2: the core, its support check and load failures
+      encode-aac.ts    AAC without the core, in a worker (builds in aac/)
+      mp4-write.ts     The MP4 and ADTS containers for that AAC
       diagnose.ts      What an error report may say beyond its code
     ai/
       models.ts        Catalogue: sizes, checksums, measured STFT parameters

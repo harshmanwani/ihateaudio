@@ -11,6 +11,7 @@
 import { decodeFile } from './audio/decode';
 import { AudioError, toAudioError } from './audio/errors';
 import { describeError } from './audio/diagnose';
+import { ffmpegBlocker, unsupportedError } from './audio/ffmpeg';
 import { Player } from './audio/player';
 import { Waveform } from './audio/waveform';
 import type { SliceOptions } from './audio/slices';
@@ -19,6 +20,7 @@ import {
   estimateSize,
   bitratesFor,
   formatById,
+  needsMissingEngine,
   FORMATS,
   type FormatSpec,
 } from './audio/export';
@@ -354,7 +356,11 @@ export class ToolRuntime {
     for (const format of allowed) {
       const option = document.createElement('option');
       option.value = format.id;
-      option.textContent = format.label;
+      // Said in the list, before anyone picks it, rather than after a press
+      // that could only fail.
+      option.textContent = needsMissingEngine(format.id)
+        ? `${format.label} (not in this browser)`
+        : format.label;
       select.append(option);
     }
 
@@ -394,11 +400,30 @@ export class ToolRuntime {
     }
 
     this.updateSize();
+    this.noteMissingEngine();
     // Converter pages render a live source-vs-output comparison, which has to
     // re-render whenever the target format or quality moves.
     this.root.dispatchEvent(
       new CustomEvent('formatchange', { detail: { format: spec.id } })
     );
+  }
+
+  /**
+   * Says, under the drop zone, that the chosen format cannot be written in this
+   * browser and what can, before anything is downloaded or pressed. Clears its
+   * own note when the format changes to one that works.
+   */
+  private noteMissingEngine(): void {
+    const status = this.el.status;
+    if (!status) return;
+    const blocker = needsMissingEngine(this.getFormat()) ? ffmpegBlocker() : null;
+    if (blocker) {
+      const error = unsupportedError(blocker);
+      this.showNote(`${error.message} ${error.fix}`, 'warn');
+      status.firstElementChild?.setAttribute('data-engine-note', '');
+    } else if (status.querySelector('[data-engine-note]')) {
+      status.innerHTML = '';
+    }
   }
 
   /** The currently selected output format id. */
@@ -496,6 +521,8 @@ export class ToolRuntime {
       this.config.onReady?.(this.context(), this);
       await yieldToMain();
       this.refreshPreview();
+      // Reading the file cleared the status, and with it any such note.
+      this.noteMissingEngine();
 
       track('file_loaded', {
         files: files.length,

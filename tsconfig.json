@@ -7,6 +7,10 @@
     // Vendored build artefacts, including a 31 MB minified core that would
     // otherwise be typechecked on every run.
     "public/ffmpeg",
+    // The light AAC encoder's Emscripten output (scripts/aac-encoder/build.sh).
+    // allowJs pulls it in otherwise, and the 750 KB wasm2js build ran
+    // `astro check` out of memory.
+    "src/lib/audio/aac",
     // Has its own tsconfig: the Workers runtime types conflict with the DOM
     // types every other file here needs.
     "worker"
