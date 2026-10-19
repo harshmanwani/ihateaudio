@@ -1,15 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createBuffer } from '../../src/lib/audio/dsp';
+import { audioError } from '../../src/lib/audio/errors';
 
 // ffmpeg.wasm cannot run under Node, and what matters here is what gets asked
 // of it: the arguments and the depth of the WAV it is handed.
-const encodeVia = vi.fn(async () => new Blob([new Uint8Array(4)]));
-vi.mock('../../src/lib/audio/ffmpeg', () => ({ encodeVia }));
+const encodeVia = vi.fn(async (..._args: unknown[]): Promise<Blob> => new Blob([new Uint8Array(4)]));
+const core = vi.hoisted(() => ({
+  blocker: null as string | null,
+  failed: false,
+  ready: false,
+}));
+vi.mock('../../src/lib/audio/ffmpeg', () => ({
+  encodeVia,
+  ffmpegBlocker: () => core.blocker,
+  ffmpegFailed: () => core.failed,
+  isFFmpegReady: () => core.ready,
+}));
+
+// The light AAC encoder runs in a worker; here only the routing to it matters.
+const encodeAac = vi.fn(async (..._args: unknown[]): Promise<Blob> => new Blob([new Uint8Array(8)], { type: 'audio/mp4' }));
+vi.mock('../../src/lib/audio/encode-aac', () => ({ encodeAac, aacEngine: () => 'wasm' }));
+
+const track = vi.fn();
+vi.mock('../../src/lib/track', () => ({ track }));
 
 const {
   effectiveKbps,
   estimateSize,
   exportAudio,
+  needsMissingEngine,
   mp3Output,
   outputSampleRate,
   vorbisRange,
@@ -293,5 +312,85 @@ describe('Vorbis overshoot', () => {
 
   it('leaves the overshoot off the label', () => {
     expect(writtenKbps('ogg', 128, 44100, 2)).toBe(128);
+  });
+});
+
+describe('the AAC formats without the ffmpeg core', () => {
+  beforeEach(() => {
+    encodeVia.mockClear();
+    encodeAac.mockClear();
+    track.mockClear();
+    core.blocker = null;
+    core.failed = false;
+    core.ready = false;
+  });
+
+  it('go through the core when it can run, as before', async () => {
+    await exportAudio(createBuffer(2, 4410, 44100), 'm4r', { bitrate: 192 });
+    expect(encodeVia).toHaveBeenCalledTimes(1);
+    expect(encodeAac).not.toHaveBeenCalled();
+  });
+
+  /*
+   * iOS 15: the core needs WebAssembly SIMD, and every press downloaded 31 MB
+   * to fail the same way. The light encoder is the same libavcodec AAC.
+   */
+  it('never download the core where it cannot run', async () => {
+    core.blocker = 'no-simd';
+    for (const [format, container] of [['m4r', 'mp4'], ['m4a', 'mp4'], ['aac', 'adts']] as const) {
+      encodeAac.mockClear();
+      await exportAudio(createBuffer(2, 4410, 44100), format, { bitrate: 128 });
+      expect(encodeAac.mock.calls[0]?.[1], format).toMatchObject({ bitrate: 128, container });
+    }
+    expect(encodeVia).not.toHaveBeenCalled();
+    expect(track).toHaveBeenCalledWith('engine_fallback', expect.objectContaining({ reason: 'no-simd' }));
+  });
+
+  it('fall back at once when the core fails to load, and say why', async () => {
+    encodeVia.mockRejectedValueOnce(
+      audioError('ffmpeg-load-failed', undefined, { stage: 'load', error_name: 'RuntimeError' })
+    );
+    const blob = await exportAudio(createBuffer(2, 4410, 44100), 'm4r');
+    expect(blob.type).toBe('audio/mp4');
+    expect(encodeAac).toHaveBeenCalledTimes(1);
+    expect(track).toHaveBeenCalledWith(
+      'engine_fallback',
+      expect.objectContaining({ format: 'm4r', reason: 'load-failed', stage: 'load', error_name: 'RuntimeError' })
+    );
+  });
+
+  it('skip the core for the rest of the page once it has failed', async () => {
+    core.failed = true;
+    await exportAudio(createBuffer(2, 4410, 44100), 'm4a');
+    expect(encodeVia).not.toHaveBeenCalled();
+    expect(encodeAac).toHaveBeenCalledTimes(1);
+  });
+
+  it('use a core that is already loaded, which costs nothing more', async () => {
+    core.failed = true;
+    core.ready = true;
+    await exportAudio(createBuffer(2, 4410, 44100), 'm4a');
+    expect(encodeVia).toHaveBeenCalledTimes(1);
+  });
+
+  it('leave a failed encode or a cancel alone', async () => {
+    encodeVia.mockRejectedValueOnce(audioError('encode-failed'));
+    await expect(exportAudio(createBuffer(2, 4410, 44100), 'm4r')).rejects.toMatchObject({ code: 'encode-failed' });
+    encodeVia.mockRejectedValueOnce(audioError('cancelled'));
+    await expect(exportAudio(createBuffer(2, 4410, 44100), 'm4r')).rejects.toMatchObject({ code: 'cancelled' });
+    expect(encodeAac).not.toHaveBeenCalled();
+  });
+
+  it('do not stand in for formats they cannot write', async () => {
+    encodeVia.mockRejectedValueOnce(audioError('ffmpeg-load-failed'));
+    await expect(exportAudio(createBuffer(2, 4410, 44100), 'ogg')).rejects.toMatchObject({ code: 'ffmpeg-load-failed' });
+    expect(encodeAac).not.toHaveBeenCalled();
+  });
+
+  it('mark only the formats with no engine in this browser', () => {
+    expect(needsMissingEngine('ogg')).toBe(false);
+    core.blocker = 'wasm-blocked';
+    expect(['ogg', 'opus', 'flac', 'aiff', 'wma'].map(needsMissingEngine)).toEqual([true, true, true, true, true]);
+    expect(['mp3', 'wav', 'm4a', 'm4r', 'aac'].map(needsMissingEngine)).toEqual([false, false, false, false, false]);
   });
 });

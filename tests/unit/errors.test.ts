@@ -28,6 +28,7 @@ describe('audioError', () => {
       'no-audio-track',
       'encode-failed',
       'ffmpeg-load-failed',
+      'ffmpeg-unsupported',
       'model-load-failed',
       'cancelled',
       'unknown-error',
@@ -65,6 +66,32 @@ describe('toAudioError', () => {
     ]) {
       expect(toAudioError(new Error(text)).code, text).toBe('decode-failed');
     }
+  });
+
+  /*
+   * Safari's own wording. Two iPhones (iOS 15.8.7 and 17.6.1) sent
+   * 'unknown-error' eight times between them from the ringtone maker, every
+   * time before the file had loaded: Safari rejects a decode it cannot do with
+   * an EncodingError whose message is only "Decoding failed", and that matched
+   * none of the wordings above.
+   */
+  it("recognises Safari's decode failure by its name", () => {
+    expect(toAudioError(new DOMException('Decoding failed', 'EncodingError')).code).toBe('decode-failed');
+    expect(toAudioError(new Error('Decoding failed')).code).toBe('decode-failed');
+  });
+
+  it('keeps what the report may say about an unrecognised error', () => {
+    const err = toAudioError(new TypeError("undefined is not an object (evaluating 'r.length')"));
+    expect(err.detail).toMatchObject({
+      error_name: 'TypeError',
+      error_message: "undefined is not an object (evaluating 'r.length')",
+    });
+  });
+
+  it('drops a message that may hold a file name, whole', () => {
+    const err = toAudioError(new Error('Could not read Voice Memo 3.m4a from disk'));
+    expect(err.detail?.error_message).toBe('<redacted: possible filename>');
+    expect(JSON.stringify(err.detail)).not.toMatch(/Voice Memo/);
   });
 
   /**

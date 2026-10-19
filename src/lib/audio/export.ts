@@ -8,8 +8,10 @@
  */
 import { encodeWav, wavSize, type WavBitDepth } from './encode-wav';
 import { encodeMp3, mp3Size, nearestMp3Rate, type Mp3Bitrate } from './encode-mp3';
-import { encodeVia } from './ffmpeg';
-import { audioError } from './errors';
+import { encodeVia, ffmpegBlocker, ffmpegFailed, isFFmpegReady } from './ffmpeg';
+import { encodeAac, aacEngine, type AacContainer } from './encode-aac';
+import { audioError, toAudioError } from './errors';
+import { track } from '../track';
 
 export type ExportTier = 0 | 1 | 2;
 
@@ -171,16 +173,80 @@ export async function exportAudio(
       });
 
     default: {
+      const container = AAC_CONTAINERS[format.id];
+
+      // AAC has a light encoder of its own, so a browser that cannot run the
+      // core, or a page where it already failed, never downloads 31 MB for it.
+      if (container && !isFFmpegReady()) {
+        const blocker = ffmpegBlocker();
+        if (blocker || ffmpegFailed()) {
+          return encodeLight(buffer, format, container, { bitrate, onProgress, signal }, {
+            reason: blocker ?? 'failed-before',
+          });
+        }
+      }
+
       const depth = losslessDepth(format.id, bitDepth);
-      return encodeVia(buffer, format.extension, {
-        args: ffmpegArgsFor(format, bitrate, buffer.sampleRate, buffer.numberOfChannels, depth),
-        bitDepth: depth ?? 24,
-        onProgress,
-        onLoadProgress: onEngineLoad,
-        signal,
-      });
+      try {
+        return await encodeVia(buffer, format.extension, {
+          args: ffmpegArgsFor(format, bitrate, buffer.sampleRate, buffer.numberOfChannels, depth),
+          bitDepth: depth ?? 24,
+          onProgress,
+          onLoadProgress: onEngineLoad,
+          signal,
+        });
+      } catch (err) {
+        // The core would not load: the same encoder, without it, still makes
+        // the file. Anything else (a cancel, a failed encode) stays what it is.
+        const failure = toAudioError(err);
+        if (!container || failure.code !== 'ffmpeg-load-failed' || signal?.aborted) throw failure;
+        return encodeLight(buffer, format, container, { bitrate, onProgress, signal }, {
+          reason: 'load-failed',
+          ...failure.detail,
+        });
+      }
     }
   }
+}
+
+/**
+ * The light AAC encode, reported as `engine_fallback` with why the core was
+ * passed over, so the reports show how often it carries an export and why.
+ */
+async function encodeLight(
+  buffer: AudioBuffer,
+  format: FormatSpec,
+  container: AacContainer,
+  options: { bitrate: number; onProgress?: (ratio: number) => void; signal?: AbortSignal },
+  why: Record<string, string | number | boolean>
+): Promise<Blob> {
+  try {
+    const blob = await encodeAac(buffer, { ...options, container });
+    track('engine_fallback', { format: format.id, aac_engine: aacEngine() ?? 'unknown', ...why });
+    return blob;
+  } catch (err) {
+    const failure = toAudioError(err);
+    if (failure.code !== 'cancelled') failure.detail = { ...why, ...failure.detail };
+    throw failure;
+  }
+}
+
+/** The formats the light AAC encoder can write, and the container each one is. */
+const AAC_CONTAINERS: Record<string, AacContainer | undefined> = {
+  m4a: 'mp4',
+  m4r: 'mp4',
+  aac: 'adts',
+};
+
+/**
+ * True when this format cannot be written in this browser: it needs the
+ * ffmpeg core, the core cannot run here, and there is no light encoder for
+ * it. Known before anything is downloaded.
+ */
+export function needsMissingEngine(formatId: string): boolean {
+  const format = FORMATS_BY_ID.get(formatId);
+  if (!format || format.tier < 2 || AAC_CONTAINERS[format.id]) return false;
+  return ffmpegBlocker() !== null;
 }
 
 /**

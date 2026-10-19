@@ -1,7 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { encodeWav } from '../../src/lib/audio/encode-wav';
 import { createBuffer } from '../../src/lib/audio/dsp';
-import { readFileFormat, readFormat } from '../../src/lib/audio/decode';
+import { decodeOn, readFileFormat, readFormat } from '../../src/lib/audio/decode';
+import { toAudioError } from '../../src/lib/audio/errors';
 
 const RATE = 44100;
 
@@ -99,5 +100,35 @@ describe('readFileFormat', () => {
 
   it('returns null for a file it cannot place rather than guessing', async () => {
     expect(await readFileFormat(new Blob([new Uint8Array(4096).fill(7)]))).toBeNull();
+  });
+});
+
+describe('decodeOn', () => {
+  /*
+   * WebKit 26.5, measured: the error callback gets null, and it fires before
+   * the promise rejects with the EncodingError, so a failed decode reached
+   * toAudioError as null and was reported as 'unknown-error'.
+   */
+  it("reports Safari's null decode failure as a decode failure", async () => {
+    const safari = {
+      decodeAudioData(_bytes: ArrayBuffer, _ok: unknown, fail: (err: null) => void) {
+        fail(null);
+        return Promise.reject(new DOMException('Decoding failed', 'EncodingError'));
+      },
+    } as unknown as BaseAudioContext;
+    const err = await decodeOn(safari, new ArrayBuffer(8)).catch((e: unknown) => e);
+    expect(toAudioError(err).code).toBe('decode-failed');
+  });
+
+  it('keeps the error a browser passes', async () => {
+    const chromium = {
+      decodeAudioData(_bytes: ArrayBuffer, _ok: unknown, fail: (err: unknown) => void) {
+        const err = new DOMException('Unable to decode audio data', 'EncodingError');
+        fail(err);
+        return Promise.reject(err);
+      },
+    } as unknown as BaseAudioContext;
+    const err = await decodeOn(chromium, new ArrayBuffer(8)).catch((e: unknown) => e);
+    expect((err as DOMException).message).toBe('Unable to decode audio data');
   });
 });
