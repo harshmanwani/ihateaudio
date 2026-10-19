@@ -6,6 +6,8 @@
  * exotic configurations. A tool that says exactly what went wrong beats a tool
  * that spins forever, so every throw site uses one of these.
  */
+import { describeError, type DiagnosticProps } from './diagnose';
+
 export type AudioErrorCode =
   | 'unsupported-format'
   | 'decode-failed'
@@ -25,6 +27,11 @@ export class AudioError extends Error {
   readonly code: AudioErrorCode;
   /** What the user should actually do next. Rendered under the message. */
   readonly fix: string;
+  /**
+   * Facts about the failure for the error report, from diagnose.ts: never
+   * the file's name, size or content. Shown to nobody.
+   */
+  detail?: DiagnosticProps;
 
   constructor(code: AudioErrorCode, message: string, fix: string) {
     super(message);
@@ -90,9 +97,11 @@ const COPY: Record<AudioErrorCode, { message: string; fix: string }> = {
 };
 
 /** Builds a known error with its standard copy, optionally overriding the fix. */
-export function audioError(code: AudioErrorCode, fix?: string): AudioError {
+export function audioError(code: AudioErrorCode, fix?: string, detail?: DiagnosticProps): AudioError {
   const copy = COPY[code];
-  return new AudioError(code, copy.message, fix ?? copy.fix);
+  const error = new AudioError(code, copy.message, fix ?? copy.fix);
+  if (detail) error.detail = detail;
+  return error;
 }
 
 /** Normalises anything thrown into an AudioError so the UI can always render it. */
@@ -109,13 +118,22 @@ export function toAudioError(err: unknown): AudioError {
   }
 
   const text = err instanceof Error ? err.message : String(err);
+  // What the error report may say about it; see diagnose.ts.
+  const detail = describeError(err);
 
   // Browsers report OOM inconsistently; these are the observed shapes.
   if (/allocation|out of memory|Array buffer allocation/i.test(text)) {
-    return audioError('out-of-memory');
+    return audioError('out-of-memory', undefined, detail);
   }
-  if (/EncodingError|Unable to decode|decodeAudioData/i.test(text)) {
-    return audioError('decode-failed');
+  // Matched by name as well as wording. Safari rejects decodeAudioData with an
+  // EncodingError whose whole message is "Decoding failed", which the Chromium
+  // and Firefox wordings missed, so a file Safari could not decode was reported
+  // as one of our own crashes (see decodeOn in decode.ts for the other half).
+  if (
+    (err as { name?: unknown } | null)?.name === 'EncodingError' ||
+    /EncodingError|Unable to decode|decodeAudioData|Decoding failed/i.test(text)
+  ) {
+    return audioError('decode-failed', undefined, detail);
   }
 
   // The AI tools fetch their runtime the first time they are used, and a failure
@@ -129,12 +147,13 @@ export function toAudioError(err: unknown): AudioError {
       text
     )
   ) {
-    return audioError('model-load-failed');
+    return audioError('model-load-failed', undefined, detail);
   }
 
   // Anything that reaches here is unrecognised, which in practice means one of
   // our own bugs. It must not borrow 'decode-failed': that code is the signal
   // for "the file is broken", and folding crashes into it made the two
-  // indistinguishable in analytics, where the code is all we send.
-  return audioError('unknown-error');
+  // indistinguishable in analytics. The error's type and its scrubbed message
+  // go with it, because the code alone cannot say which bug it was.
+  return audioError('unknown-error', undefined, detail);
 }

@@ -8,6 +8,7 @@
  * than crashing the tab.
  */
 import { audioError, toAudioError } from './errors';
+import { describeError } from './diagnose';
 import { decodeVia, isFFmpegReady } from './ffmpeg';
 import { audioTrack, fourcc, isMp4, mp4AudioTrack, type Mp4AudioTrack } from './mp4';
 
@@ -508,11 +509,19 @@ async function decodeAt(bytes: ArrayBuffer, rate: number | null): Promise<AudioB
  * promise. Both context types need that treatment: an OfflineAudioContext is
  * not exempt, and the rate-guess path used to assume the promise form purely
  * because it was written second.
+ *
+ * Safari also calls the error callback with null, before its promise rejects
+ * with the real EncodingError, so a failed decode arrived here as null. That
+ * matched nothing in toAudioError and became 'unknown-error': every file an
+ * iPhone could not decode was reported as one of our own crashes, before the
+ * file had even loaded. Measured in WebKit 26.5; Chromium passes the error.
  */
-function decodeOn(ctx: BaseAudioContext, bytes: ArrayBuffer): Promise<AudioBuffer> {
+export function decodeOn(ctx: BaseAudioContext, bytes: ArrayBuffer): Promise<AudioBuffer> {
   return new Promise<AudioBuffer>((resolve, reject) => {
-    const maybe = ctx.decodeAudioData(bytes, resolve, reject);
-    if (maybe && typeof maybe.then === 'function') maybe.then(resolve, reject);
+    const fail = (err: unknown): void =>
+      reject(err ?? new DOMException('Decoding failed', 'EncodingError'));
+    const maybe = ctx.decodeAudioData(bytes, resolve, fail);
+    if (maybe && typeof maybe.then === 'function') maybe.then(resolve, fail);
   });
 }
 
@@ -528,8 +537,33 @@ function classifyDecodeFailure(err: unknown, file: File | Blob): Error {
   if (['wma', 'aiff', 'aif', 'amr', 'ape', 'ac3', 'dts'].includes(ext)) {
     return audioError(
       'unsupported-format',
-      `Browsers can't decode .${ext} directly. Use the audio converter, which loads a fuller decoder on demand.`
+      `Browsers can't decode .${ext} directly. Use the audio converter, which loads a fuller decoder on demand.`,
+      { input_format: ext, ...describeError(err) }
     );
   }
-  return toAudioError(err);
+  const failure = toAudioError(err);
+  if (failure.code !== 'decode-failed') return failure;
+  // Formats one browser decodes and another does not. Safari has been the
+  // gap for Ogg, Opus and WebM audio, which is where WhatsApp voice notes and
+  // many downloads come from, and "it may be corrupted" was the wrong advice.
+  if (PATCHY.has(ext)) {
+    return audioError(
+      'unsupported-format',
+      `This browser could not decode this .${ext} file. Open it in Chrome or Firefox on a computer, or convert it to MP3 first.`,
+      { input_format: ext, ...failure.detail }
+    );
+  }
+  // The type, from a fixed list and never the name, so the reports show which
+  // kinds of file fail to decode where.
+  failure.detail = { input_format: INPUT_FORMATS.has(ext) ? ext : 'other', ...failure.detail };
+  return failure;
 }
+
+/** File types whose decoding differs between browsers. */
+const PATCHY = new Set(['ogg', 'oga', 'opus', 'webm', 'weba', 'caf', '3gp']);
+
+/** File types the error report may name. Anything else is 'other'. */
+const INPUT_FORMATS = new Set([
+  'mp3', 'wav', 'm4a', 'aac', 'mp4', 'mov', 'flac', 'ogg', 'oga', 'opus', 'webm', 'weba', 'caf',
+  '3gp', 'm4r', 'aif', 'aiff', 'wma', 'amr', 'mkv',
+]);
