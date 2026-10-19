@@ -7,7 +7,8 @@
  * core is served from our own origin, so using it still involves no third-party
  * request and no upload.
  */
-import { audioError, type AudioErrorCode } from './errors';
+import { audioError, type AudioError, type AudioErrorCode } from './errors';
+import { describeError, environment } from './diagnose';
 import { encodeWav, type WavBitDepth } from './encode-wav';
 import { FFMPEG_CORE_VERSION } from './ffmpeg-version';
 
@@ -49,8 +50,8 @@ let loading: Promise<FFmpegInstance> | null = null;
  *   - AAC, FLAC, WMA and AIFF: 32 KB.
  *
  * Eight runs spend 1.8 KB, half of the tightest margin. A replacement loads
- * from the HTTP cache in about 50 ms, and its first encode is about 30 ms
- * slower while the wasm warms up.
+ * from the bytes already in memory (see `core`), and its first encode is about
+ * 30 ms slower while the wasm warms up.
  */
 const RUNS_PER_INSTANCE = 8;
 
@@ -66,6 +67,159 @@ export function isFFmpegReady(): boolean {
 }
 
 /**
+ * Why the core cannot run in this browser, or null when it can.
+ *
+ *   - no-wasm: no WebAssembly at all.
+ *   - wasm-blocked: WebAssembly exists but may not compile. The CSP allows it
+ *     through 'wasm-unsafe-eval', a keyword Safari only learned in 16.0; Safari
+ *     15 wants 'unsafe-eval', which this site will not grant, so on iOS 15 no
+ *     WebAssembly runs at all.
+ *   - no-simd: the core is built with -msimd128, and Safari only compiles SIMD
+ *     from 16.4. Before that the 31 MB download ends in a CompileError, every
+ *     time: on iOS 15 that was eight downloads in five minutes from one person.
+ *   - no-module-worker: @ffmpeg/ffmpeg starts its worker as a module, which
+ *     Firefox only allows from 114.
+ *   - low-memory: Chromium says the device has under 1 GB. Compiling 31 MB of
+ *     wasm takes a few times that in memory, and the tab dies rather than fails.
+ */
+export type FFmpegBlocker = 'no-wasm' | 'wasm-blocked' | 'no-simd' | 'no-module-worker' | 'low-memory';
+
+let blocker: FFmpegBlocker | null | undefined;
+
+/** Checked once, without downloading anything. */
+export function ffmpegBlocker(): FFmpegBlocker | null {
+  if (blocker === undefined) blocker = detectBlocker();
+  return blocker;
+}
+
+/** The smallest valid module: compiling it is what a CSP refuses. */
+const EMPTY_MODULE = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]);
+
+/** One function using i8x16.splat and i8x16.popcnt, as wasm-feature-detect tests SIMD. */
+const SIMD_MODULE = new Uint8Array([
+  0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15,
+  253, 98, 11,
+]);
+
+function detectBlocker(): FFmpegBlocker | null {
+  if (typeof WebAssembly !== 'object') return 'no-wasm';
+  try {
+    new WebAssembly.Module(EMPTY_MODULE);
+  } catch {
+    return 'wasm-blocked';
+  }
+  try {
+    if (!WebAssembly.validate(SIMD_MODULE)) return 'no-simd';
+  } catch {
+    return 'no-simd';
+  }
+  if (!moduleWorkers()) return 'no-module-worker';
+  const memory =
+    typeof navigator === 'undefined'
+      ? undefined
+      : (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+  if (typeof memory === 'number' && memory < 1) return 'low-memory';
+  return null;
+}
+
+/**
+ * Whether `new Worker(url, { type: 'module' })` is understood. A browser that
+ * reads the option reads `type`; the URL is invalid on purpose, so nothing
+ * starts and no CSP report is filed.
+ */
+function moduleWorkers(): boolean {
+  if (typeof Worker === 'undefined') return false;
+  let supported = false;
+  const options = {
+    get type(): 'module' {
+      supported = true;
+      return 'module';
+    },
+  };
+  try {
+    new Worker('blob://', options).terminate();
+  } catch {
+    /* Expected: only whether `type` was read matters. */
+  }
+  return supported;
+}
+
+/** For tests: forget what the last check found. */
+export function resetFFmpegSupport(): void {
+  blocker = undefined;
+}
+
+/** Where a load got to when it failed, for the error report. */
+export type LoadStage = 'import' | 'download' | 'load';
+
+/**
+ * The core's wasm, kept once it has been downloaded in full.
+ *
+ * A retry after a failed start, and the replacement instance every eight runs,
+ * load from this instead of the network. Leaving it to the HTTP cache was not
+ * enough: iOS Safari does not reliably keep a 31 MB response there, so a press
+ * after a failure could download all of it again, and ffmpeg's own fetch after
+ * the progress download could too. It lives for the page, not in Cache
+ * Storage: public/sw.js keeps the core out of storage on purpose, to protect
+ * the quota.
+ */
+let core: Blob | null = null;
+
+/** Lets the kept bytes go, so the next load downloads them again. */
+export function dropFFmpegCore(): void {
+  core = null;
+}
+
+/**
+ * A failed start that is not worth repeating in this page. A CompileError is
+ * the browser saying it cannot run this wasm, and it will say so again; any
+ * other start failure gets one more try from the kept bytes. A failed download
+ * is never remembered: the visitor can press again once the connection is back.
+ */
+let failure: AudioError | null = null;
+let startFailures = 0;
+/** Any failed load in this page, remembered or not. */
+let failedOnce = false;
+
+/** For tests and for a deliberate retry: forget a remembered failure. */
+export function forgetFFmpegFailure(): void {
+  failure = null;
+  startFailures = 0;
+  failedOnce = false;
+}
+
+/**
+ * True once the core has failed to load in this page, for any reason. The
+ * formats with a light encoder stop asking for the core from then on, so a
+ * second ringtone does not wait out a second 31 MB download that went wrong
+ * the first time.
+ */
+export function ffmpegFailed(): boolean {
+  return failedOnce;
+}
+
+/** How long the core may take to start from bytes already in memory. */
+const START_TIMEOUT_MS = 90_000;
+
+/** How long a download may go without a byte before it is called stalled. */
+const STALL_TIMEOUT_MS = 30_000;
+
+/**
+ * The error for a browser that cannot run the core, with the alternative that
+ * works here. Thrown before anything is downloaded.
+ */
+export function unsupportedError(reason: FFmpegBlocker): AudioError {
+  const ios = /^ios-/.test(String(environment().ua_class));
+  const fix =
+    reason === 'low-memory'
+      ? 'This device has too little memory for the converter. MP3 and WAV work here without it.'
+      : ios
+        ? 'The converter needs iOS 16.4 or later. MP3 and WAV work on this iPhone without it.'
+        : undefined;
+  return audioError('ffmpeg-unsupported', fix, { stage: 'support', blocker: reason, ...environment() });
+}
+
+/**
  * Loads the core. Callers should surface `onStatus` because this is the one
  * place on the site where a real wait can happen, and saying why is the
  * difference between patience and a bounce.
@@ -76,23 +230,35 @@ export async function loadFFmpeg(
   if (instance?.loaded) return instance;
   if (loading) return loading;
 
+  const reason = ffmpegBlocker();
+  if (reason) throw unsupportedError(reason);
+  if (failure) {
+    // The same answer without another download, marked so the report shows the
+    // loop has stopped.
+    throw audioError(failure.code, failure.fix, { ...failure.detail, remembered: true });
+  }
+
   loading = (async () => {
+    let stage: LoadStage = 'import';
+    let received = 0;
+    let url: string | null = null;
+    let ff: FFmpegInstance | null = null;
     try {
       const { FFmpeg } = await import('@ffmpeg/ffmpeg');
-      const ff = new FFmpeg() as unknown as FFmpegInstance;
+      ff = new FFmpeg() as unknown as FFmpegInstance;
 
       // classWorkerURL is deliberately not passed — the library's own worker
       // resolution is what Vite can statically rewrite to an emitted chunk.
 
-      // Fully absolute URLs, and deliberately not blob URLs.
+      // An absolute URL for the core, and deliberately not a blob URL.
       //
       // The worker import()s coreURL, resolved against the *worker's* base
       // URL rather than the page's. A root-relative "/ffmpeg/..." breaks
       // whenever that base is not the site root; an absolute URL resolves
-      // identically from any base.
-      //
-      // A blob URL would not work either: the core derives sibling filenames
-      // by string-replacing the ".js" extension, which a blob URL lacks.
+      // identically from any base. A blob URL would not work for the core:
+      // it derives sibling filenames by string-replacing the ".js"
+      // extension, which a blob URL lacks. The wasm is named separately, so
+      // it can be the bytes already downloaded.
       //
       // The version is in the path so the response can be cached immutably for
       // a year. Without it the filename never changes when the package does, so
@@ -102,58 +268,148 @@ export async function loadFFmpeg(
       const coreURL = new URL('ffmpeg-core.js', base).href;
       const wasmURL = new URL('ffmpeg-core.wasm', base).href;
 
+      stage = 'download';
       onStatus?.(0.02);
-      await prewarm(wasmURL, onStatus);
+      const wasm =
+        core ??
+        (await download(wasmURL, (bytes, total) => {
+          received = bytes;
+          // Capped below 1: the core still has to compile after the download.
+          onStatus?.(Math.min(0.95, bytes / total));
+        }));
+      core = wasm;
+      received = wasm.size;
 
-      // wasmURL is served from the HTTP cache thanks to the prewarm above.
-      await ff.load({ coreURL, wasmURL });
+      stage = 'load';
+      url = URL.createObjectURL(wasm);
+      const started = ff;
+      await withTimeout(started.load({ coreURL, wasmURL: url }), START_TIMEOUT_MS, () => started.terminate());
       onStatus?.(1);
 
-      instance = ff;
+      instance = started;
       runs = 0;
-      return ff;
-    } catch {
+      startFailures = 0;
+      return started;
+    } catch (err) {
       loading = null;
-      throw audioError('ffmpeg-load-failed');
+      // A worker whose core would not start holds memory and does nothing.
+      try {
+        ff?.terminate();
+      } catch {
+        /* Already gone. */
+      }
+      throw loadFailure(err, stage, received);
+    } finally {
+      if (url) URL.revokeObjectURL(url);
     }
   })();
 
   return loading;
 }
 
+/** The report for a failed load, remembering it when a retry would only repeat it. */
+function loadFailure(err: unknown, stage: LoadStage, received: number): AudioError {
+  failedOnce = true;
+  const described = describeError(err);
+  const detail = { stage, ...described, loaded_mb: Math.round(received / 100_000) / 10 };
+  if (stage !== 'load') {
+    return audioError(
+      'ffmpeg-load-failed',
+      'The converter download stopped. Check your connection and press the button again. Nothing is uploaded — only the converter code is downloaded.',
+      detail
+    );
+  }
+
+  startFailures += 1;
+  // The browser's own verdict on the wasm does not change between presses.
+  const deterministic = /CompileError|LinkError/.test(`${described.error_name} ${described.error_message}`);
+  if (deterministic || startFailures >= 2) {
+    failure = audioError(
+      'ffmpeg-load-failed',
+      'The converter downloaded but will not start on this device. MP3 and WAV work without it.',
+      detail
+    );
+    // Nothing will load from it again in this page.
+    core = null;
+    return failure;
+  }
+  return audioError(
+    'ffmpeg-load-failed',
+    'The converter downloaded but did not start. Press the button again to retry: it will not download again. MP3 and WAV work without it.',
+    detail
+  );
+}
+
 /**
- * Streams the wasm into the HTTP cache so the 31 MB wait can show a real
- * percentage instead of a spinner. ffmpeg's own load then reads from cache.
- *
- * Failures here are deliberately swallowed — this is a progress affordance, and
- * ffmpeg fetching the file itself remains the source of truth.
+ * Downloads the wasm with progress, into a Blob ready to hand to the worker.
+ * Throws when the response is not the file, or when the bytes stop coming.
  */
-async function prewarm(
+async function download(
   url: string,
-  onStatus?: (ratio: number) => void
-): Promise<void> {
-  if (!onStatus) return;
+  onBytes: (bytes: number, total: number) => void
+): Promise<Blob> {
+  const controller = new AbortController();
+  let stalled = false;
+  let timer = setTimeout(() => {
+    stalled = true;
+    controller.abort();
+  }, STALL_TIMEOUT_MS);
+  const touch = (): void => {
+    clearTimeout(timer);
+    timer = setTimeout(() => {
+      stalled = true;
+      controller.abort();
+    }, STALL_TIMEOUT_MS);
+  };
+
   try {
-    const response = await fetch(url);
-    if (!response.ok || !response.body) return;
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
 
     const declared = Number(response.headers.get('content-length')) || 0;
     // Compressed transfer means content-length understates the real size, so
     // fall back to the known uncompressed figure.
     const total = declared > 1_000_000 ? declared : 31.5 * 1024 * 1024;
 
+    if (!response.body) {
+      const blob = await response.blob();
+      onBytes(blob.size, total);
+      return new Blob([blob], { type: 'application/wasm' });
+    }
+
     const reader = response.body.getReader();
+    const parts: Uint8Array[] = [];
     let received = 0;
     for (;;) {
       const { done, value } = await reader.read();
       if (done) break;
-      received += value?.length ?? 0;
-      // Cap below 1: instantiation still has to happen after the download.
-      onStatus(Math.min(0.95, received / total));
+      touch();
+      if (value) {
+        parts.push(value);
+        received += value.length;
+        onBytes(received, total);
+      }
     }
-  } catch {
-    /* Progress is a nicety; the load itself will surface any real failure. */
+    // application/wasm lets the worker compile it while it streams in.
+    return new Blob(parts as BlobPart[], { type: 'application/wasm' });
+  } catch (err) {
+    if (stalled) throw new DOMException(`No data for ${STALL_TIMEOUT_MS / 1000} s`, 'TimeoutError');
+    throw err;
+  } finally {
+    clearTimeout(timer);
   }
+}
+
+/** Rejects with a TimeoutError if `promise` takes longer than `ms`, after calling `onTimeout`. */
+function withTimeout<T>(promise: Promise<T>, ms: number, onTimeout: () => void): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => {
+      onTimeout();
+      reject(new DOMException(`No answer in ${ms / 1000} s`, 'TimeoutError'));
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 /** Frees the core. Worth doing on mobile, where 31 MB of heap is significant. */

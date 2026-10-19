@@ -28,6 +28,7 @@ describe('audioError', () => {
       'no-audio-track',
       'encode-failed',
       'ffmpeg-load-failed',
+      'ffmpeg-unsupported',
       'model-load-failed',
       'cancelled',
       'unknown-error',

@@ -19,6 +19,7 @@ export type AudioErrorCode =
   | 'no-audio-track'
   | 'encode-failed'
   | 'ffmpeg-load-failed'
+  | 'ffmpeg-unsupported'
   | 'model-load-failed'
   | 'cancelled'
   | 'unknown-error';
@@ -81,6 +82,10 @@ const COPY: Record<AudioErrorCode, { message: string; fix: string }> = {
   'ffmpeg-load-failed': {
     message: "The converter couldn't load.",
     fix: 'Check your connection and reload the page. Nothing is uploaded — only the converter code is downloaded.',
+  },
+  'ffmpeg-unsupported': {
+    message: "This browser can't run the converter this format needs.",
+    fix: 'MP3 and WAV work here without it. For other formats, use a current Chrome, Firefox, Edge or Safari.',
   },
   'model-load-failed': {
     message: "The AI model couldn't load.",

@@ -132,10 +132,14 @@ const schema = [
     <p>
       Page analytics, through Google Analytics and PostHog: which pages were
       viewed, roughly which country from, and which site sent you. On a tool
-      page we also record three things about what happened, and only these
-      three: that a file was accepted, which output format you chose, and the
-      error code if something failed. It exists so we know which tools are worth
-      more work and which ones are quietly broken.
+      page we also record what happened, and only this: that a file was
+      accepted, which output format you chose, and the error code if something
+      failed. A failure also records the facts that tell one cause from
+      another: the type of error, the browser's error message with anything
+      that could be a file name removed, the step that failed, how much of the
+      converter had downloaded, the kind of file (MP3 or OGG, for example), and
+      the class of browser and its memory. It exists so we know which tools are
+      worth more work and which ones are quietly broken.
     </p>
     <p>
       What is deliberately switched off is worth more than what is on. There is

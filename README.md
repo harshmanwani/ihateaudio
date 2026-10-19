@@ -51,6 +51,16 @@ Trimming an MP3 and saving it back never touches ffmpeg. A tool page is **55 KB
 gzipped** on first visit and **19 KB** after, including the waveform renderer,
 transport and encoder plumbing.
 
+The core is built with WebAssembly SIMD, which Safari only compiles from 16.4,
+and the CSP allows WebAssembly through `'wasm-unsafe-eval'`, which Safari only
+knows from 16.0. `ffmpegBlocker()` finds a browser like that before anything
+downloads, and the export says what works there instead. A core that fails to
+load is reported with the stage it failed at, the error's type and scrubbed
+message, and how much had downloaded (`diagnose.ts`). A CompileError is
+remembered for the page, so pressing again does not download 31 MB to fail the
+same way, and the bytes of a finished download are kept for a retry and for the
+replacement instance every eight runs.
+
 The AI studio is a fourth cost bracket, and the table above deliberately leaves
 it unnumbered: `ExportTier` is still `0 | 1 | 2`, because weights are an
 input-side cost no output format can trigger. This one is chosen per *tool*, and
@@ -87,6 +97,8 @@ src/
       effects.ts       OfflineAudioContext graph effects
       analysis.ts      ITU-R BS.1770-4 loudness, true peak, tempo
       export.ts        The tier router
+      ffmpeg.ts        Tier 2: the core, its support check and load failures
+      diagnose.ts      What an error report may say beyond its code
     ai/
       models.ts        Catalogue: sizes, checksums, measured STFT parameters
       store.ts         Fetch once, cache, verify the SHA-256

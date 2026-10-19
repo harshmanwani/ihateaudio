@@ -10,6 +10,7 @@
  */
 import { decodeFile } from './audio/decode';
 import { AudioError, toAudioError } from './audio/errors';
+import { describeError } from './audio/diagnose';
 import { Player } from './audio/player';
 import { Waveform } from './audio/waveform';
 import type { SliceOptions } from './audio/slices';
@@ -2234,9 +2235,12 @@ export class ToolRuntime {
     }
 
     const fix = error instanceof AudioError ? error.fix : 'Try reloading the page.';
-    // The error code, never the message: messages can contain a filename.
+    // The code, plus what diagnose.ts allows: the error's type, its message with
+    // anything file-like dropped, the stage it failed at, and the device class.
+    // Never the message as shown, which can name the file.
     track('tool_error', {
       code: error instanceof AudioError ? error.code : 'unknown',
+      ...(error instanceof AudioError ? error.detail : describeError(error)),
     });
 
     // textContent, never innerHTML — error text can contain a filename.
