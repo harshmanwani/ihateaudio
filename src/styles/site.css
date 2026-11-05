@@ -478,6 +478,19 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* The studio credit: the line's own muted colour, told apart by a faint underline. */
+.ftr__studio {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+}
+
+.ftr__studio:hover {
+  color: var(--ink);
+  text-decoration-color: var(--ink);
+}
+
 /* ---------- Privacy line ---------- */
 
 .privacy {
